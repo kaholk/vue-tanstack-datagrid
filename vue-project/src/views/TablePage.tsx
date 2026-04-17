@@ -21,16 +21,55 @@ type CustomerRow = {
   score: number
   balance: number
   createdAt: string
-}
+} & Record<`extraCol${string}`, string>
 
 const backendBaseUrl = import.meta.env.VITE_GRID_API_URL ?? 'http://127.0.0.1:8000'
 
+const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (_, index) => {
+  const columnId = `extraCol${String(index + 1).padStart(2, '0')}` as const
+
+  return {
+    id: columnId,
+    accessorKey: columnId,
+    header: `Extra ${String(index + 1).padStart(2, '0')}`,
+    size: 140,
+    serverField: columnId,
+  }
+})
+
 const columns: DataGridColumn<CustomerRow>[] = [
+  {
+    id: 'select',
+    header: ({ table }) => (
+      <input
+        type="checkbox"
+        checked={table.getIsAllPageRowsSelected()}
+        indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+        onChange={table.getToggleAllPageRowsSelectedHandler()}
+      />
+    ),
+    cell: ({ row }) => (
+      <input
+        type="checkbox"
+        checked={row.getIsSelected()}
+        disabled={!row.getCanSelect()}
+        onChange={row.getToggleSelectedHandler()}
+      />
+    ),
+    size: 56,
+    align: 'center',
+    headerMode: 'custom',
+    showFilter: false,
+    pickerLabel: 'Select',
+    enableHiding: false,
+    enablePinning: true,
+  },
   {
     id: 'id',
     accessorKey: 'id',
     header: 'ID',
-    size: 84,
+    size: 120,
+    align: 'end',
     enableHiding: false,
     enablePinning: true,
     serverField: 'id',
@@ -105,6 +144,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     accessorKey: 'status',
     header: 'Status',
     size: 120,
+    align: 'center',
     serverField: 'status',
     cell: ({ getValue }) => <span class="data-grid__badge">{String(getValue())}</span>,
   },
@@ -113,6 +153,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     accessorKey: 'visits',
     header: 'Visits',
     size: 110,
+    align: 'end',
     serverField: 'visits',
   },
   {
@@ -120,6 +161,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     accessorKey: 'progress',
     header: 'Progress',
     size: 120,
+    align: 'end',
     serverField: 'progress',
     cell: ({ getValue }) => `${getValue<number>()}%`,
   },
@@ -128,6 +170,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     accessorKey: 'score',
     header: 'Score',
     size: 110,
+    align: 'end',
     serverField: 'score',
   },
   {
@@ -135,6 +178,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     accessorKey: 'balance',
     header: 'Balance',
     size: 130,
+    align: 'end',
     serverField: 'balance',
     cell: ({ getValue }) => `${Number(getValue<number>()).toFixed(2)} PLN`,
   },
@@ -145,6 +189,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 140,
     serverField: 'createdAt',
   },
+  ...extraColumns,
   {
     id: 'scoreBand',
     header: 'Score Band',
@@ -155,17 +200,20 @@ const columns: DataGridColumn<CustomerRow>[] = [
       return 'D'
     },
     size: 110,
+    align: 'center',
     localKind: 'computed',
     enablePinning: true,
+    requiredServerFields: ['score'],
     cell: ({ getValue }) => <strong>{String(getValue())}</strong>,
   },
   {
     id: 'actions',
     header: 'Actions',
-    size: 160,
+    size: 220,
     localKind: 'action',
     enableHiding: false,
     enablePinning: true,
+    requiredServerFields: ['customerCode', 'email'],
     cell: ({ row }) => (
       <div class="data-grid__actions">
         <button type="button" onClick={() => window.alert(`Preview ${row.original.customerCode}`)}>
@@ -235,7 +283,7 @@ export default defineComponent({
                 },
               ],
               columnPinning: {
-                left: ['id', 'customerCode'],
+                left: ['select', 'id', 'customerCode'],
                 right: ['actions'],
               },
             }}

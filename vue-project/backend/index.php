@@ -26,6 +26,10 @@ $pageSize = max(1, min(500, (int) ($payload['pageSize'] ?? 100)));
 $sorting = is_array($payload['sorting'] ?? null) ? $payload['sorting'] : [];
 $filters = is_array($payload['filters'] ?? null) ? $payload['filters'] : [];
 $search = trim((string) ($payload['search'] ?? ''));
+$includeColumns = array_values(array_filter(
+    is_array($payload['include_columns'] ?? null) ? $payload['include_columns'] : [],
+    static fn (mixed $value): bool => is_string($value) && $value !== ''
+));
 
 $statuses = ['active', 'pending', 'blocked', 'lead'];
 $plans = ['free', 'starter', 'growth', 'enterprise'];
@@ -38,6 +42,11 @@ $companies = ['Northwind', 'Acme', 'Orbit', 'PixelForge', 'BluePeak', 'Solaris',
 
 $dataset = [];
 $datasetSize = 20000;
+$extraColumnNames = [];
+
+for ($columnIndex = 1; $columnIndex <= 30; $columnIndex++) {
+    $extraColumnNames[] = sprintf('extraCol%02d', $columnIndex);
+}
 
 for ($index = 1; $index <= $datasetSize; $index++) {
     $firstName = $firstNames[$index % count($firstNames)];
@@ -54,7 +63,7 @@ for ($index = 1; $index <= $datasetSize; $index++) {
     $balance = round((($index * 37) % 50000) / 10, 2);
     $createdAt = date('Y-m-d', strtotime(sprintf('-%d days', $index % 720)));
 
-    $dataset[] = [
+    $row = [
         'id' => $index,
         'customerCode' => sprintf('CUS-%05d', $index),
         'firstName' => $firstName,
@@ -72,9 +81,16 @@ for ($index = 1; $index <= $datasetSize; $index++) {
         'balance' => $balance,
         'createdAt' => $createdAt,
     ];
+
+    foreach ($extraColumnNames as $extraIndex => $columnName) {
+        $row[$columnName] = sprintf('V%02d-%04d', $extraIndex + 1, (($index * ($extraIndex + 3)) % 10000));
+    }
+
+    $dataset[] = $row;
 }
 
 $searchableFields = [
+    'id',
     'customerCode',
     'firstName',
     'lastName',
@@ -85,6 +101,7 @@ $searchableFields = [
     'department',
     'plan',
     'status',
+    ...$extraColumnNames,
 ];
 
 if ($search !== '') {
@@ -161,6 +178,34 @@ $totalRows = count($dataset);
 $pageCount = (int) ceil($totalRows / $pageSize);
 $offset = $pageIndex * $pageSize;
 $rows = array_slice($dataset, $offset, $pageSize);
+
+if ($includeColumns !== []) {
+    $allowedColumns = array_flip(array_keys($dataset[0] ?? []));
+    $requestedColumns = ['id'];
+
+    foreach ($includeColumns as $columnName) {
+        if (isset($allowedColumns[$columnName])) {
+            $requestedColumns[] = $columnName;
+        }
+    }
+
+    $requestedColumns = array_values(array_unique($requestedColumns));
+
+    $rows = array_map(
+        static function (array $row) use ($requestedColumns): array {
+            $projected = [];
+
+            foreach ($requestedColumns as $columnName) {
+                if (array_key_exists($columnName, $row)) {
+                    $projected[$columnName] = $row[$columnName];
+                }
+            }
+
+            return $projected;
+        },
+        $rows
+    );
+}
 
 echo json_encode(
     [
