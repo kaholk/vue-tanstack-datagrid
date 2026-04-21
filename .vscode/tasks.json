@@ -13,7 +13,11 @@
         "owner": "custom",
         "pattern": [
           {
-            "regexp": "."
+            "regexp": "^(.+):(\\d+):(\\d+):\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "message": 4
           }
         ],
         "background": {
@@ -40,7 +44,11 @@
         "owner": "custom",
         "pattern": [
           {
-            "regexp": "."
+            "regexp": "^(.+):(\\d+):(\\d+):\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "message": 4
           }
         ],
         "background": {
@@ -57,6 +65,10 @@
     },
     {
       "label": "dev: frontend + backend",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "dependsOn": [
         "frontend: dev",
         "backend: dev"
