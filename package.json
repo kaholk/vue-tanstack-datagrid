@@ -6,8 +6,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:frontend": "bun --cwd frontend run dev",
-    "build:frontend": "bun --cwd frontend run build",
-    "type-check:frontend": "bun --cwd frontend run type-check"
+    "dev:frontend": "bun run --cwd frontend dev",
+    "build:frontend": "bun run --cwd frontend build",
+    "type-check:frontend": "bun run --cwd frontend type-check",
+    "build:datagrid": "bun run --cwd packages/datagrid build",
+    "type-check:datagrid": "bun run --cwd packages/datagrid type-check"
   }
 }

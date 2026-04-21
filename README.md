@@ -32,7 +32,11 @@ Backend:
 php -S 127.0.0.1:8000 -t backend
 ```
 
-## Nastepny krok
+## Build paczki
 
-Kolejny sensowny etap to dodanie builda paczki `packages/datagrid`,
-zeby publikacja na npm nie opierala sie na surowych plikach `src`.
+Paczka `packages/datagrid` ma teraz osobny build do `dist/`, wiec eksporty npm
+nie wskazuja juz na surowe pliki `src`.
+
+```sh
+npm run build:datagrid
+```

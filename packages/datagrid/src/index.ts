@@ -1,4 +1,7 @@
 export { default as DataGrid } from './DataGrid'
 export { default as DataGridDialog } from './components/DataGridDialog'
 export { default as DataGridDropdownMenu } from './components/DataGridDropdownMenu'
+export { default as DataGridFooter } from './components/DataGridFooter'
+export { default as DataGridHeaderCell } from './components/DataGridHeaderCell'
+export { default as DataGridToolbar } from './components/DataGridToolbar'
 export * from './types'

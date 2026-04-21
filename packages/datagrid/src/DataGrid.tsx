@@ -30,6 +30,9 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 
 import DataGridDialog from './components/DataGridDialog'
 import DataGridDropdownMenu from './components/DataGridDropdownMenu'
+import DataGridFooter from './components/DataGridFooter'
+import DataGridHeaderCell from './components/DataGridHeaderCell'
+import DataGridToolbar from './components/DataGridToolbar'
 import type {
   DataGridColumnAlign,
   DataGridColumn,
@@ -1930,110 +1933,21 @@ export default defineComponent({
       return (
         <section class="data-grid">
           <div class="data-grid__table-shell">
-            <div class="data-grid__toolbar">
-              {props.viewStorageKey ? (
-                <div class="data-grid__views" data-grid-view-root="true">
-                  <button
-                    type="button"
-                    class="data-grid__toolbar-button"
-                    onClick={toggleViewsMenu}
-                    data-grid-view-root="true"
-                  >
-                    Widoki
-                  </button>
-                  {isViewsMenuOpen.value ? (
-                    <DataGridDropdownMenu
-                      menuClass="data-grid__views-menu"
-                      scopeAttr="data-grid-view-root"
-                    >
-                      <label class="data-grid__views-picker">
-                        <span>Widok</span>
-                        <select
-                          value={activeViewId.value}
-                          onChange={(event) =>
-                            selectSavedView((event.target as HTMLSelectElement).value)
-                          }
-                        >
-                          <option value="">Domyslny</option>
-                          {savedViews.value.map((view) => (
-                            <option key={view.id} value={view.id}>
-                              {view.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div class="data-grid__views-actions">
-                        <button
-                          type="button"
-                          class="data-grid__toolbar-button"
-                          onClick={openSaveViewDialog}
-                          data-grid-view-root="true"
-                        >
-                          Zapisz
-                        </button>
-                        <button
-                          type="button"
-                          class="data-grid__toolbar-button"
-                          onClick={overwriteActiveView}
-                          disabled={!savedViews.value.length}
-                          data-grid-view-root="true"
-                        >
-                          Nadpisz
-                        </button>
-                        <button
-                          type="button"
-                          class="data-grid__toolbar-button"
-                          onClick={deleteActiveView}
-                          disabled={!activeViewId.value}
-                          data-grid-view-root="true"
-                        >
-                          Usun
-                        </button>
-                      </div>
-                    </DataGridDropdownMenu>
-                  ) : null}
-                </div>
-              ) : null}
-              <div class="data-grid__quick-search">
-                {quickFilterConfigs.value.map((quickFilter) => (
-                  <div
-                    key={quickFilter.id}
-                    class="data-grid__quick-search-filter"
-                    style={
-                      quickFilter.width
-                        ? {
-                            '--data-grid-quick-filter-width':
-                              typeof quickFilter.width === 'number'
-                                ? `${quickFilter.width}px`
-                                : quickFilter.width,
-                          }
-                        : undefined
-                    }
-                  >
-                    <span class="data-grid__quick-search-label">{quickFilter.config.label}</span>
-                    {renderFilterControl(quickFilter.config, { toolbar: true })}
-                  </div>
-                ))}
-              </div>
-              <div class="data-grid__toolbar-actions" data-grid-dialog-root="true">
-                <button
-                  type="button"
-                  class="data-grid__toolbar-button"
-                  onClick={toggleFilterDialog}
-                  data-grid-dialog-root="true"
-                >
-                  Filtry
-                </button>
-                <button
-                  type="button"
-                  class="data-grid__toolbar-button"
-                  onClick={toggleColumnPicker}
-                  data-grid-dialog-root="true"
-                >
-                  Columns
-                </button>
-              </div>
-            </div>
+            <DataGridToolbar
+              viewStorageKey={props.viewStorageKey}
+              isViewsMenuOpen={isViewsMenuOpen.value}
+              activeViewId={activeViewId.value}
+              savedViews={savedViews.value}
+              quickFilters={quickFilterConfigs.value}
+              renderFilterControl={renderFilterControl}
+              onToggleViewsMenu={toggleViewsMenu}
+              onSelectSavedView={selectSavedView}
+              onOpenSaveViewDialog={openSaveViewDialog}
+              onOverwriteActiveView={overwriteActiveView}
+              onDeleteActiveView={deleteActiveView}
+              onToggleFilterDialog={toggleFilterDialog}
+              onToggleColumnPicker={toggleColumnPicker}
+            />
 
             <div
               ref={scrollElementRef}
@@ -2083,7 +1997,27 @@ export default defineComponent({
                             ),
                           }}
                         >
-                          {renderHeaderCell(entry.item.getContext(), entry.column)}
+                          <DataGridHeaderCell
+                            header={entry.item.getContext()}
+                            column={entry.column}
+                            pickerLabel={renderColumnPickerLabel(entry.column)}
+                            justifyContent={toJustifyContent(
+                              (entry.column.columnDef as DataGridColumn<AnyRow>).align,
+                            )}
+                            menuStyle={getColumnMenuStyle(entry.column)}
+                            isMenuOpen={openMenuColumnId.value === entry.column.id}
+                            pinnedSide={pinnedSide}
+                            renderFilterControl={(config) => renderFilterControl(config)}
+                            getColumnFilterConfig={getColumnFilterConfig}
+                            onToggleMenu={toggleColumnMenu}
+                            onToggleSorting={toggleSorting}
+                            onSetSortDesc={setSortDesc}
+                            onClearSorting={clearSorting}
+                            onSetPin={setPin}
+                            onCloseMenu={() => {
+                              openMenuColumnId.value = null
+                            }}
+                          />
                         </div>
                       )
                     })}
@@ -2108,7 +2042,11 @@ export default defineComponent({
                     return (
                       <div
                         key={row.id}
-                        class="data-grid__row"
+                        class={[
+                          'data-grid__row',
+                          row.getIsSelected() ? 'data-grid__row--selected' : '',
+                        ]}
+                        aria-selected={row.getIsSelected() ? 'true' : 'false'}
                         style={{
                           height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
@@ -2158,78 +2096,31 @@ export default defineComponent({
               </div>
             </div>
 
-            <div class="data-grid__footer">
-              <div class="data-grid__meta">
-                <span>{isLoading.value ? 'Loading...' : `Rows: ${requestState.value.totalRows}`}</span>
-                <span>{`Fetched: ${requestState.value.rows.length}`}</span>
-                {requestState.value.meta?.datasetSize ? (
-                  <span>{`Dataset: ${requestState.value.meta.datasetSize}`}</span>
-                ) : null}
-              </div>
-
-              <div class="data-grid__pagination">
-                <button
-                  type="button"
-                  class="data-grid__pagination-nav"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                  aria-label="Previous page"
-                >
-                  {'<'}
-                </button>
-                <div class="data-grid__pagination-pages" aria-label="Pagination">
-                  {paginationItems.map((item) =>
-                    item.type === 'ellipsis' ? (
-                      <span key={item.key} class="data-grid__pagination-ellipsis" aria-hidden="true">
-                        ...
-                      </span>
-                    ) : (
-                      <button
-                        key={item.value}
-                        type="button"
-                        class={[
-                          'data-grid__pagination-page',
-                          item.value === pageIndex ? 'data-grid__pagination-page--active' : '',
-                        ]}
-                        onClick={() => table.setPageIndex(item.value)}
-                        aria-current={item.value === pageIndex ? 'page' : undefined}
-                        aria-label={`Page ${item.value + 1}`}
-                      >
-                        {item.value + 1}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <button
-                  type="button"
-                  class="data-grid__pagination-nav"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                  aria-label="Next page"
-                >
-                  {'>'}
-                </button>
-              </div>
-
-              <label class="data-grid__page-size">
-                <span>Rows</span>
-                <select
-                  value={String(pagination.value.pageSize)}
-                  onChange={(event) => {
-                    pagination.value = {
-                      pageIndex: 0,
-                      pageSize: toNumber((event.target as HTMLSelectElement).value, 100),
-                    }
-                  }}
-                >
-                  {[50, 100, 250, 500].map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <DataGridFooter
+              isLoading={isLoading.value}
+              totalRows={requestState.value.totalRows}
+              fetchedRows={requestState.value.rows.length}
+              datasetSize={
+                typeof requestState.value.meta?.datasetSize === 'string' ||
+                typeof requestState.value.meta?.datasetSize === 'number'
+                  ? requestState.value.meta.datasetSize
+                  : undefined
+              }
+              pageIndex={pageIndex}
+              pageSize={pagination.value.pageSize}
+              paginationItems={paginationItems}
+              canPreviousPage={table.getCanPreviousPage()}
+              canNextPage={table.getCanNextPage()}
+              onPreviousPage={() => table.previousPage()}
+              onNextPage={() => table.nextPage()}
+              onSetPageIndex={(nextPageIndex) => table.setPageIndex(nextPageIndex)}
+              onPageSizeChange={(pageSize) => {
+                pagination.value = {
+                  pageIndex: 0,
+                  pageSize,
+                }
+              }}
+            />
           </div>
 
           {serverFilterColumns.value.length === 0 ? (

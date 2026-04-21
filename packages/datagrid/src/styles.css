@@ -27,7 +27,7 @@
     align-items: flex-end;
     justify-content: space-between;
     padding: 0.9rem 1rem;
-    background: linear-gradient(180deg, var(--app-header-start) 0%, var(--app-header-end) 100%);
+    background: var(--app-surface-muted);
     border-bottom: 1px solid var(--app-border);
   }
 
@@ -232,6 +232,14 @@
 
   .data-grid__row:not(.data-grid__row--header):hover .data-grid__cell {
     background: var(--app-row-hover);
+  }
+
+  .data-grid__row--selected .data-grid__cell {
+    background: var(--app-row-selected, var(--app-accent-soft));
+  }
+
+  .data-grid__row--selected:hover .data-grid__cell {
+    background: var(--app-row-selected-hover, var(--app-accent-soft-strong));
   }
 
   .data-grid__header-content {
@@ -564,10 +572,7 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.35rem 0.55rem;
-    border: 1px solid var(--app-border);
-    border-radius: 999px;
-    background: var(--app-pagination-bg);
+    padding: 0;
     color: var(--app-pagination-text);
   }
 
