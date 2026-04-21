@@ -1,4 +1,4 @@
-# vue-project
+# frontend
 
 This template should help get you started developing with Vue 3 in Vite.
 
@@ -34,14 +34,14 @@ bun install
 Frontend:
 
 ```sh
-bun dev
+bun run dev
 ```
 
 Backend demo:
 
 ```sh
-cd backend
-php -S 127.0.0.1:8000
+cd ..
+php -S 127.0.0.1:8000 -t backend
 ```
 
 Open `http://localhost:5173/table`.
@@ -49,7 +49,7 @@ Open `http://localhost:5173/table`.
 ### Compile and Hot-Reload for Development
 
 ```sh
-bun dev
+bun run dev
 ```
 
 ### Type-Check, Compile and Minify for Production

@@ -1,0 +1,13 @@
+{
+  "name": "testproject",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:frontend": "bun --cwd frontend run dev",
+    "build:frontend": "bun --cwd frontend run build",
+    "type-check:frontend": "bun --cwd frontend run type-check"
+  }
+}

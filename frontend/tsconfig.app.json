@@ -1,6 +1,6 @@
 {
   "extends": "@vue/tsconfig/tsconfig.dom.json",
-  "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "../packages/datagrid/src/**/*"],
   "exclude": ["src/**/__tests__/*"],
   "compilerOptions": {
     // Extra safety for array and object lookups, but may have false positives.
@@ -8,7 +8,13 @@
 
     // Path mapping for cleaner imports.
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@testproject/datagrid": ["../packages/datagrid/src/index.ts"],
+      "@testproject/datagrid/styles.css": ["../packages/datagrid/src/styles.css"],
+      "vue": ["./node_modules/vue"],
+      "vue/*": ["./node_modules/vue/*"],
+      "@tanstack/vue-table": ["./node_modules/@tanstack/vue-table"],
+      "@tanstack/vue-virtual": ["./node_modules/@tanstack/vue-virtual"]
     },
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.

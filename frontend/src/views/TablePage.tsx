@@ -1,14 +1,14 @@
 import { defineComponent } from 'vue'
 
 import MainLayout from '@/layouts/MainLayout'
-import DataGrid from '@/components/data-grid/DataGrid'
+import { DataGrid } from '@testproject/datagrid'
 import type {
   DataGridColumn,
   DataGridFetchParams,
   DataGridFetchResult,
   DataGridFilterConfig,
   DataGridQuickFilterConfig,
-} from '@/types/data-grid'
+} from '@testproject/datagrid'
 
 type CustomerRow = {
   id: number

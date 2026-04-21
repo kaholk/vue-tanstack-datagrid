@@ -28,8 +28,8 @@ import {
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 
-import DataGridDialog from '@/components/data-grid/DataGridDialog'
-import DataGridDropdownMenu from '@/components/data-grid/DataGridDropdownMenu'
+import DataGridDialog from './components/DataGridDialog'
+import DataGridDropdownMenu from './components/DataGridDropdownMenu'
 import type {
   DataGridColumnAlign,
   DataGridColumn,
@@ -42,7 +42,7 @@ import type {
   DataGridInitialState,
   DataGridSavedView,
   DataGridSavedViewState,
-} from '@/types/data-grid'
+} from './types'
 
 type AnyRow = Record<string, unknown>
 
@@ -129,6 +129,10 @@ function buildPaginationItems(pageCount: number, pageIndex: number): PaginationI
 
   for (let index = 0; index < orderedPages.length; index += 1) {
     const page = orderedPages[index]
+    if (typeof page !== 'number') {
+      continue
+    }
+
     items.push({
       type: 'page',
       value: page,

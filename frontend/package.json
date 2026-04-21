@@ -1,5 +1,5 @@
 {
-  "name": "vue-project",
+  "name": "frontend",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
+    "@testproject/datagrid": "workspace:*",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.24",
     "pinia": "^3.0.4",

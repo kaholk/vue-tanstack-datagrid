@@ -1,4 +1,5 @@
 import './assets/main.css'
+import '@testproject/datagrid/styles.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
