@@ -2,7 +2,13 @@ import { defineComponent } from 'vue'
 
 import MainLayout from '@/layouts/MainLayout'
 import DataGrid from '@/components/data-grid/DataGrid'
-import type { DataGridColumn, DataGridFetchParams, DataGridFetchResult } from '@/types/data-grid'
+import type {
+  DataGridColumn,
+  DataGridFetchParams,
+  DataGridFetchResult,
+  DataGridFilterConfig,
+  DataGridQuickFilterConfig,
+} from '@/types/data-grid'
 
 type CustomerRow = {
   id: number
@@ -24,6 +30,26 @@ type CustomerRow = {
 } & Record<`extraCol${string}`, string>
 
 const backendBaseUrl = import.meta.env.VITE_GRID_API_URL ?? 'http://127.0.0.1:8000'
+const statusFilterOptions = ['active','active1','active2','active3','active4', 'inactive', 'pending', 'new', 'qualified', 'proposal'].map(
+  (value) => ({
+    value,
+    label: value.charAt(0).toUpperCase() + value.slice(1),
+  }),
+)
+const toolbarFilters: DataGridFilterConfig[] = [
+  {
+    id: 'datasetTag',
+    label: 'Dataset Tag',
+    group: 'Dodatkowe filtry',
+    placeholder: 'Wpisz tag danych',
+  },
+]
+const quickFilters: DataGridQuickFilterConfig[] = [
+  { id: 'status', width: 170 },
+  { id: 'plan', width: 150 },
+  { id: 'country', width: 180 },
+  { id: 'datasetTag', width: 220 },
+]
 
 const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (_, index) => {
   const columnId = `extraCol${String(index + 1).padStart(2, '0')}` as const
@@ -34,19 +60,23 @@ const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (
     header: `Extra ${String(index + 1).padStart(2, '0')}`,
     size: 140,
     serverField: columnId,
+    filterGroup: 'Pola dodatkowe',
   }
 })
 
 const columns: DataGridColumn<CustomerRow>[] = [
   {
     id: 'select',
-    header: ({ table }) => (
-      <input
-        type="checkbox"
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-        onChange={table.getToggleAllPageRowsSelectedHandler()}
-      />
+    header: 'Select',
+    headerControl: ({ table }) => (
+      <label class="data-grid__header-checkbox">
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+        />
+      </label>
     ),
     cell: ({ row }) => (
       <input
@@ -56,12 +86,11 @@ const columns: DataGridColumn<CustomerRow>[] = [
         onChange={row.getToggleSelectedHandler()}
       />
     ),
-    size: 56,
+    size: 120,
     align: 'center',
-    headerMode: 'custom',
     showFilter: false,
     pickerLabel: 'Select',
-    enableHiding: false,
+    enableHiding: true,
     enablePinning: true,
   },
   {
@@ -70,9 +99,10 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'ID',
     size: 120,
     align: 'end',
-    enableHiding: false,
+    enableHiding: true,
     enablePinning: true,
     serverField: 'id',
+    filterGroup: 'Klient',
   },
   {
     id: 'customerCode',
@@ -81,6 +111,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 120,
     enablePinning: true,
     serverField: 'customerCode',
+    filterGroup: 'Klient',
   },
   {
     id: 'firstName',
@@ -89,6 +120,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 150,
     enablePinning: true,
     serverField: 'firstName',
+    filterGroup: 'Klient',
   },
   {
     id: 'lastName',
@@ -96,6 +128,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Last Name',
     size: 150,
     serverField: 'lastName',
+    filterGroup: 'Klient',
   },
   {
     id: 'email',
@@ -103,6 +136,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Email',
     size: 260,
     serverField: 'email',
+    filterGroup: 'Kontakt i firma',
   },
   {
     id: 'company',
@@ -110,6 +144,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Company',
     size: 180,
     serverField: 'company',
+    filterGroup: 'Kontakt i firma',
   },
   {
     id: 'city',
@@ -117,6 +152,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'City',
     size: 150,
     serverField: 'city',
+    filterGroup: 'Lokalizacja',
   },
   {
     id: 'country',
@@ -124,6 +160,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Country',
     size: 140,
     serverField: 'country',
+    filterGroup: 'Lokalizacja',
   },
   {
     id: 'department',
@@ -131,6 +168,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Department',
     size: 150,
     serverField: 'department',
+    filterGroup: 'Kontakt i firma',
   },
   {
     id: 'plan',
@@ -138,6 +176,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Plan',
     size: 120,
     serverField: 'plan',
+    filterGroup: 'Status i plan',
   },
   {
     id: 'status',
@@ -146,6 +185,11 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 120,
     align: 'center',
     serverField: 'status',
+    filterGroup: 'Status i plan',
+    filterVariant: 'select',
+    filterOptions: statusFilterOptions,
+    filterIncludeEmptyOption: true,
+    filterEmptyOptionLabel: 'Pokaz puste',
     cell: ({ getValue }) => <span class="data-grid__badge">{String(getValue())}</span>,
   },
   {
@@ -155,6 +199,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 110,
     align: 'end',
     serverField: 'visits',
+    filterGroup: 'Metryki',
   },
   {
     id: 'progress',
@@ -163,6 +208,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 120,
     align: 'end',
     serverField: 'progress',
+    filterGroup: 'Metryki',
     cell: ({ getValue }) => `${getValue<number>()}%`,
   },
   {
@@ -172,6 +218,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 110,
     align: 'end',
     serverField: 'score',
+    filterGroup: 'Metryki',
   },
   {
     id: 'balance',
@@ -180,6 +227,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     size: 130,
     align: 'end',
     serverField: 'balance',
+    filterGroup: 'Metryki',
     cell: ({ getValue }) => `${Number(getValue<number>()).toFixed(2)} PLN`,
   },
   {
@@ -188,11 +236,12 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Created',
     size: 140,
     serverField: 'createdAt',
+    filterGroup: 'Status i plan',
   },
   ...extraColumns,
   {
     id: 'scoreBand',
-    header: 'Score Band',
+    header: 'Score Band long text',
     accessorFn: (row) => {
       if (row.score >= 80) return 'A'
       if (row.score >= 60) return 'B'
@@ -211,7 +260,7 @@ const columns: DataGridColumn<CustomerRow>[] = [
     header: 'Actions',
     size: 220,
     localKind: 'action',
-    enableHiding: false,
+    enableHiding: true,
     enablePinning: true,
     requiredServerFields: ['customerCode', 'email'],
     cell: ({ row }) => (
@@ -267,7 +316,10 @@ export default defineComponent({
           </p>
           <DataGrid
             columns={columns}
+            toolbarFilters={toolbarFilters}
+            quickFilters={quickFilters}
             fetchPage={fetchCustomers}
+            viewStorageKey="table-page-customer-grid-views"
             rowHeight={46}
             overscanRows={12}
             overscanColumns={4}

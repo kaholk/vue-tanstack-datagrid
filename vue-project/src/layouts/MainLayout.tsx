@@ -1,4 +1,4 @@
-import { defineComponent, type PropType } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch, type PropType } from 'vue'
 import { RouterLink } from 'vue-router'
 
 type PageIntro = {
@@ -16,6 +16,39 @@ export default defineComponent({
     },
   },
   setup(props, { slots }) {
+    const theme = ref<'light' | 'dark'>('light')
+    const themeToggleLabel = computed(() =>
+      theme.value === 'light' ? 'Przelacz na ciemny motyw' : 'Przelacz na jasny motyw',
+    )
+
+    onMounted(() => {
+      if (typeof window === 'undefined') {
+        return
+      }
+
+      const storedTheme = window.localStorage.getItem('app-theme')
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        theme.value = storedTheme
+        return
+      }
+
+      theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    })
+
+    watch(
+      theme,
+      (value) => {
+        if (typeof document !== 'undefined') {
+          document.documentElement.dataset.theme = value
+        }
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('app-theme', value)
+        }
+      },
+      { immediate: true },
+    )
+
     return () => (
       <div class="app-shell">
         <header class="app-header">
@@ -38,6 +71,17 @@ export default defineComponent({
                 </li>
               </ul>
             </nav>
+
+            <button
+              type="button"
+              class="theme-toggle"
+              aria-label={themeToggleLabel.value}
+              onClick={() => {
+                theme.value = theme.value === 'light' ? 'dark' : 'light'
+              }}
+            >
+              {theme.value === 'light' ? 'Tryb ciemny' : 'Tryb jasny'}
+            </button>
           </div>
         </header>
 
