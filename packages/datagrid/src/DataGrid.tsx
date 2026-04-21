@@ -8,7 +8,6 @@ import {
   watch,
   type CSSProperties,
   type PropType,
-  type VNodeChild,
 } from 'vue'
 import {
   FlexRender,
@@ -22,16 +21,18 @@ import {
   type ColumnSizingState,
   type ColumnSort,
   type Header,
-  type HeaderContext,
   type PaginationState,
   type RowSelectionState,
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 
 import DataGridDialog from './components/DataGridDialog'
+import DataGridColumnPickerDialog from './components/DataGridColumnPickerDialog'
 import DataGridDropdownMenu from './components/DataGridDropdownMenu'
 import DataGridFooter from './components/DataGridFooter'
+import DataGridFilterDialog from './components/DataGridFilterDialog'
 import DataGridHeaderCell from './components/DataGridHeaderCell'
+import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
 import DataGridToolbar from './components/DataGridToolbar'
 import type {
   DataGridColumnAlign,
@@ -1309,266 +1310,46 @@ export default defineComponent({
     }
 
     function renderColumnPickerDialog() {
-      const allColumns = table.getAllLeafColumns()
-
-      if (!isColumnPickerOpen.value) {
-        return null
-      }
-
       return (
-        <DataGridDialog
-          title="Columns"
-          subtitle="Visibility, width, order and pin settings."
-          ariaLabel="Column settings"
+        <DataGridColumnPickerDialog
+          isOpen={isColumnPickerOpen.value}
+          columns={table.getAllLeafColumns()}
+          renderColumnLabel={renderColumnPickerLabel}
+          getPinnedSide={getPinnedSide}
+          getPinStatusLabel={getPinStatusLabel}
+          getColumnMoveTarget={getColumnMoveTarget}
           onClose={closeColumnPicker}
-        >
-            <div class="data-grid__dialog-list">
-              {allColumns.map((column, index) => (
-                <div key={column.id} class="data-grid__dialog-row">
-                  <div class="data-grid__dialog-main">
-                    <label class="data-grid__column-option">
-                      <input
-                        type="checkbox"
-                        checked={column.getIsVisible()}
-                        disabled={!column.getCanHide()}
-                        onChange={column.getToggleVisibilityHandler()}
-                      />
-                      <span>{renderColumnPickerLabel(column)}</span>
-                    </label>
-                    <span class="data-grid__dialog-meta">{column.id}</span>
-                  </div>
-
-                  <label class="data-grid__dialog-field">
-                    <span>Width</span>
-                    <input
-                      type="number"
-                      min={column.columnDef.minSize ?? 80}
-                      value={String(column.getSize())}
-                      onInput={(event) =>
-                        updateColumnSize(column, (event.target as HTMLInputElement).value)
-                      }
-                    />
-                  </label>
-
-                  <div class="data-grid__dialog-field">
-                    <span>Pin</span>
-                    <div class="data-grid__dialog-actions">
-                      <button
-                        type="button"
-                        class={[
-                          'data-grid__dialog-action',
-                          getPinnedSide(column.id) === 'left' ? 'data-grid__dialog-action--active' : '',
-                        ]}
-                        onClick={() => setPin(column, 'left')}
-                      >
-                        Left
-                      </button>
-                      <button
-                        type="button"
-                        class={[
-                          'data-grid__dialog-action',
-                          getPinnedSide(column.id) === 'right' ? 'data-grid__dialog-action--active' : '',
-                        ]}
-                        onClick={() => setPin(column, 'right')}
-                      >
-                        Right
-                      </button>
-                      <button
-                        type="button"
-                        class={[
-                          'data-grid__dialog-action',
-                          !getPinnedSide(column.id) ? 'data-grid__dialog-action--active' : '',
-                        ]}
-                        onClick={() => setPin(column, false)}
-                      >
-                        None
-                      </button>
-                    </div>
-                    <span class="data-grid__dialog-meta">Current: {getPinStatusLabel(column.id)}</span>
-                  </div>
-
-                  <div class="data-grid__dialog-field">
-                    <span>Order</span>
-                    <div class="data-grid__dialog-actions">
-                      <button
-                        type="button"
-                        class="data-grid__dialog-action"
-                        onClick={() => moveColumn(column.id, -1)}
-                        disabled={index === 0}
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        class="data-grid__dialog-action"
-                        onClick={() => moveColumn(column.id, 1)}
-                        disabled={index === allColumns.length - 1}
-                      >
-                        Down
-                      </button>
-                    </div>
-                    <div class="data-grid__dialog-move-row">
-                      <select
-                        class="data-grid__dialog-select"
-                        value={getColumnMoveTarget(column.id)}
-                        onChange={(event) =>
-                          updateColumnMoveTarget(column.id, (event.target as HTMLSelectElement).value)
-                        }
-                      >
-                        {allColumns
-                          .filter((candidateColumn) => candidateColumn.id !== column.id)
-                          .map((candidateColumn) => (
-                            <option key={candidateColumn.id} value={candidateColumn.id}>
-                              {renderColumnPickerLabel(candidateColumn)}
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        type="button"
-                        class="data-grid__dialog-action"
-                        onClick={() =>
-                          moveColumnRelative(column.id, getColumnMoveTarget(column.id), 'before')
-                        }
-                        disabled={!getColumnMoveTarget(column.id)}
-                      >
-                        Before
-                      </button>
-                      <button
-                        type="button"
-                        class="data-grid__dialog-action"
-                        onClick={() =>
-                          moveColumnRelative(column.id, getColumnMoveTarget(column.id), 'after')
-                        }
-                        disabled={!getColumnMoveTarget(column.id)}
-                      >
-                        After
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-        </DataGridDialog>
+          onUpdateColumnSize={updateColumnSize}
+          onSetPin={setPin}
+          onMoveColumn={moveColumn}
+          onUpdateColumnMoveTarget={updateColumnMoveTarget}
+          onMoveColumnRelative={moveColumnRelative}
+        />
       )
     }
 
     function renderFilterDialog() {
-      if (!isFilterDialogOpen.value) {
-        return null
-      }
-
       return (
-        <DataGridDialog
-          title="Filtry"
-          subtitle="Alternatywne miejsce do filtrowania danych i dodatkowe filtry spoza naglowkow."
-          ariaLabel="Filter settings"
-          surfaceClass="data-grid__dialog--filters"
+        <DataGridFilterDialog
+          isOpen={isFilterDialogOpen.value}
+          sections={filterDialogSections.value}
+          renderFilterControl={(config) => renderFilterControl(config, { toolbar: true })}
           onClose={closeFilterDialog}
-        >
-            {false ? <div class="data-grid__dialog-header">
-              <div>
-                <h4 class="data-grid__dialog-title">Filtry</h4>
-                <p class="data-grid__dialog-subtitle">
-                  Alternatywne miejsce do filtrowania danych i dodatkowe filtry spoza nagłówków.
-                </p>
-              </div>
-              <button type="button" class="data-grid__dialog-close" onClick={closeFilterDialog}>
-                Close
-              </button>
-            </div> : null}
-
-            <div class="data-grid__filter-dialog-list">
-              {filterDialogSections.value.length > 0 ? (
-                filterDialogSections.value.map((section) => (
-                  <div key={section.id} class="data-grid__filter-dialog-section">
-                    <div class="data-grid__filter-dialog-section-header">
-                      <h5 class="data-grid__filter-dialog-section-title">{section.label}</h5>
-                      <span class="data-grid__dialog-meta">
-                        {section.items.length} {section.items.length === 1 ? 'filtr' : 'filtrow'}
-                      </span>
-                    </div>
-                    <div class="data-grid__filter-dialog-group">
-                      {section.items.map((config) => (
-                        <div key={config.id} class="data-grid__filter-dialog-row">
-                          <div class="data-grid__filter-dialog-main">
-                            <span class="data-grid__filter-dialog-label">{config.label}</span>
-                            <span class="data-grid__dialog-meta">{config.id}</span>
-                          </div>
-                          <div class="data-grid__filter-dialog-control">
-                            {renderFilterControl(config, { toolbar: true })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div class="data-grid__filter-dialog-empty">Brak filtrow do skonfigurowania.</div>
-              )}
-            </div>
-        </DataGridDialog>
+        />
       )
     }
 
     function renderSaveViewDialog() {
-      if (!isSaveViewDialogOpen.value) {
-        return null
-      }
-
       return (
-        <DataGridDialog
-          title="Zapisz widok"
-          subtitle="Podaj nazwe dla aktualnego ukladu kolumn i filtrow."
-          ariaLabel="Zapisz widok"
-          surfaceClass="data-grid__dialog--compact"
+        <DataGridSaveViewDialog
+          isOpen={isSaveViewDialogOpen.value}
+          viewName={newViewName.value}
           onClose={closeSaveViewDialog}
-        >
-            {false ? <div class="data-grid__dialog-header">
-              <div>
-                <h4 class="data-grid__dialog-title">Zapisz widok</h4>
-                <p class="data-grid__dialog-subtitle">
-                  Podaj nazwe dla aktualnego ukladu kolumn i filtrow.
-                </p>
-              </div>
-              <button type="button" class="data-grid__dialog-close" onClick={closeSaveViewDialog}>
-                Close
-              </button>
-            </div> : null}
-
-            <div class="data-grid__dialog-form">
-              <label class="data-grid__dialog-field">
-                <span>Nazwa widoku</span>
-                <input
-                  value={newViewName.value}
-                  placeholder="Np. Moj widok"
-                  autofocus
-                  onInput={(event) => {
-                    newViewName.value = (event.target as HTMLInputElement).value
-                  }}
-                  onKeydown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      saveNewView()
-                    }
-                  }}
-                />
-              </label>
-            </div>
-
-            <div class="data-grid__dialog-footer">
-              <button type="button" class="data-grid__dialog-close" onClick={closeSaveViewDialog}>
-                Anuluj
-              </button>
-              <button
-                type="button"
-                class="data-grid__dialog-close"
-                onClick={saveNewView}
-                disabled={!newViewName.value.trim()}
-              >
-                Zapisz
-              </button>
-            </div>
-        </DataGridDialog>
+          onSave={saveNewView}
+          onUpdateViewName={(value) => {
+            newViewName.value = value
+          }}
+        />
       )
     }
 
@@ -1604,206 +1385,6 @@ export default defineComponent({
         left: '0',
         right: 'auto',
       }
-    }
-
-    function renderHeaderCell(header: HeaderContext<AnyRow, unknown>, column: Column<AnyRow, unknown>) {
-      const columnDef = column.columnDef as DataGridColumn<AnyRow>
-      const isServerColumn = Boolean(columnDef.serverField)
-      const showFilter = columnDef.showFilter ?? isServerColumn
-      const pinnedSide = getPinnedSide(column.id)
-      const sortedState = column.getIsSorted()
-      const justifyContent = toJustifyContent(columnDef.align)
-      const isMenuOpen = openMenuColumnId.value === column.id
-      const customHeaderControl = columnDef.headerControl?.(header) as VNodeChild | undefined
-
-      if (columnDef.headerMode === 'custom') {
-        return h(
-          'div',
-          {
-            class: 'data-grid__header-content data-grid__header-content--custom',
-            style: { justifyContent },
-          },
-          [
-            h(FlexRender, {
-              render: header.header.column.columnDef.header,
-              props: header,
-            }),
-          ],
-        )
-      }
-
-      return h('div', { class: 'data-grid__header-content' }, [
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'data-grid__sort-button',
-            onClick: (event) => {
-              event.stopPropagation()
-              toggleColumnMenu(column.id)
-            },
-            style: { justifyContent },
-          },
-          [
-            h(
-              'span',
-              { class: 'data-grid__header-label' },
-              h(FlexRender, {
-                render: header.header.column.columnDef.header,
-                props: header,
-              }),
-            ),
-            h(
-              'span',
-              { class: 'data-grid__sort-indicator' },
-              column.getIsSorted() === 'asc' ? '↑' : column.getIsSorted() === 'desc' ? '↓' : '·',
-            ),
-          ],
-        ),
-        h('div', { class: 'data-grid__header-controls' }, [
-          customHeaderControl
-            ? h('div', { class: 'data-grid__header-control-slot' }, [customHeaderControl])
-            : showFilter
-              ? renderFilterControl(getColumnFilterConfig(column))
-              : h('span', { class: 'data-grid__column-kind' }, isServerColumn ? 'no filter' : 'local'),
-            isMenuOpen
-              ? h(
-                  DataGridDropdownMenu,
-                {
-                  menuClass: 'data-grid__column-menu',
-                  scopeAttr: 'data-grid-menu-root',
-                  style: getColumnMenuStyle(column),
-                },
-                {
-                  default: () => [
-                  h(
-                    'div',
-                    {
-                      class: 'data-grid__menu-column-name',
-                    },
-                    renderColumnPickerLabel(column),
-                  ),
-                  isServerColumn
-                      ? h(
-                          'div',
-                          {
-                            class: 'data-grid__menu-section',
-                          },
-                          [
-                            h('div', { class: 'data-grid__menu-title' }, 'Sort'),
-                            h('div', { class: 'data-grid__menu-row' }, [
-                              h(
-                                'button',
-                                {
-                                  type: 'button',
-                                  class: [
-                                    'data-grid__menu-item',
-                                    sortedState === 'asc' ? 'data-grid__menu-item--active' : '',
-                                  ],
-                                  onClick: () => toggleSorting(column),
-                                  disabled: sortedState === 'asc',
-                                },
-                                'ASC',
-                              ),
-                              h(
-                                'button',
-                                {
-                                  type: 'button',
-                                  class: [
-                                    'data-grid__menu-item',
-                                    sortedState === 'desc' ? 'data-grid__menu-item--active' : '',
-                                  ],
-                                  onClick: () => setSortDesc(column),
-                                  disabled: sortedState === 'desc',
-                                },
-                                'DESC',
-                              ),
-                              h(
-                                'button',
-                                {
-                                  type: 'button',
-                                  class: 'data-grid__menu-item',
-                                  onClick: () => clearSorting(column),
-                                  disabled: !sortedState,
-                                },
-                                'Clear',
-                              ),
-                            ]),
-                          ],
-                        )
-                      : null,
-                    h(
-                      'div',
-                      {
-                        class: 'data-grid__menu-section',
-                      },
-                      [
-                        h('div', { class: 'data-grid__menu-title' }, 'Pin'),
-                        h('div', { class: 'data-grid__menu-row' }, [
-                          h(
-                            'button',
-                            {
-                              type: 'button',
-                              class: [
-                                'data-grid__menu-item',
-                                pinnedSide === 'left' ? 'data-grid__menu-item--active' : '',
-                              ],
-                              onClick: () => setPin(column, 'left'),
-                              disabled: pinnedSide === 'left',
-                            },
-                            'Left',
-                          ),
-                          h(
-                            'button',
-                            {
-                              type: 'button',
-                              class: [
-                                'data-grid__menu-item',
-                                pinnedSide === 'right' ? 'data-grid__menu-item--active' : '',
-                              ],
-                              onClick: () => setPin(column, 'right'),
-                              disabled: pinnedSide === 'right',
-                            },
-                            'Right',
-                          ),
-                          h(
-                            'button',
-                            {
-                              type: 'button',
-                              class: 'data-grid__menu-item',
-                              onClick: () => setPin(column, false),
-                              disabled: !pinnedSide,
-                            },
-                            'Unpin',
-                          ),
-                        ]),
-                      ],
-                    ),
-                                        h(
-                      'div',
-                      {
-                        class: 'data-grid__menu-section',
-                      },
-                      [
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            class: 'data-grid__menu-close',
-                            onClick: () => {
-                              openMenuColumnId.value = null
-                            },
-                          },
-                          'Close',
-                        ),
-                      ],
-                    ),
-                  ],
-                },
-              )
-            : null,
-        ]),
-      ])
     }
 
     function renderColumnPickerLabel(column: Column<AnyRow, unknown>) {
