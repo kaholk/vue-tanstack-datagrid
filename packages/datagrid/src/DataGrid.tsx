@@ -35,7 +35,9 @@ import DataGridHeaderCell from './components/DataGridHeaderCell'
 import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
 import DataGridSelectionPanel from './components/DataGridSelectionPanel'
 import DataGridToolbar from './components/DataGridToolbar'
+import { useDataGridColumnPicker } from './composables/useDataGridColumnPicker'
 import { useDataGridFilters } from './composables/useDataGridFilters'
+import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import type {
   DataGridColumnAlign,
   DataGridColumn,
@@ -49,7 +51,6 @@ import type {
   DataGridPageSizeConfig,
   DataGridSelectionPanelConfig,
   DataGridSelectionPanelSumConfig,
-  DataGridSavedView,
   DataGridSavedViewState,
 } from './types'
 
@@ -316,14 +317,6 @@ export default defineComponent({
     const isSaveViewDialogOpen = ref(false)
     const newViewName = ref('')
     const columnMoveTargetById = ref<Record<string, string>>({})
-    const draftColumnVisibility = ref<DataGridColumnVisibilityState>({})
-    const draftColumnSizing = ref<ColumnSizingState>({})
-    const draftColumnPinning = ref<ColumnPinningState>({
-      left: [],
-      right: [],
-    })
-    const draftColumnOrder = ref<ColumnOrderState>([])
-    const draftColumnMoveTargetById = ref<Record<string, string>>({})
     const draftColumnFilters = ref<ColumnFiltersState>([])
     const draftGlobalFilter = ref('')
     const requestState = ref<RequestState<AnyRow>>({
@@ -334,8 +327,6 @@ export default defineComponent({
     })
     const isLoading = ref(false)
     const errorMessage = ref('')
-    const savedViews = ref<DataGridSavedView[]>([])
-    const activeViewId = ref('')
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined
     let activeController: AbortController | null = null
@@ -368,131 +359,9 @@ export default defineComponent({
       })
     }
 
-    function getCurrentViewState(): DataGridSavedViewState {
-      return {
-        columnOrder: [...columnOrder.value],
-        columnSizing: { ...columnSizing.value },
-        columnVisibility: { ...columnVisibility.value },
-        columnPinning: {
-          left: [...(columnPinning.value.left ?? [])],
-          right: [...(columnPinning.value.right ?? [])],
-        },
-        columnFilters: columnFilters.value.map((filter) => ({
-          id: filter.id,
-          value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
-        })),
-        globalFilter: globalFilter.value,
-      }
-    }
-
-    function applyViewState(state: DataGridSavedViewState) {
-      const nextState = cloneViewState(state)
-      columnOrder.value = nextState.columnOrder
-      columnSizing.value = nextState.columnSizing
-      columnVisibility.value = nextState.columnVisibility
-      columnPinning.value = nextState.columnPinning
-      columnFilters.value = nextState.columnFilters
-      globalFilter.value = nextState.globalFilter
-      pagination.value = {
-        ...pagination.value,
-        pageIndex: 0,
-      }
-      rowSelection.value = {}
-      openMenuColumnId.value = null
-      closeFilterMenus()
-      isViewsMenuOpen.value = false
-      isSaveViewDialogOpen.value = false
-      columnVirtualizer.value.measure()
-    }
-
-    function getDefaultViewState(): DataGridSavedViewState {
-      return {
-        columnOrder: [...(props.initialState.columnOrder ?? [])],
-        columnSizing: { ...(props.initialState.columnSizing ?? {}) },
-        columnVisibility: { ...(props.initialState.columnVisibility ?? {}) },
-        columnPinning: {
-          left: [...(props.initialState.columnPinning?.left ?? [])],
-          right: [...(props.initialState.columnPinning?.right ?? [])],
-        },
-        columnFilters: (props.initialState.columnFilters ?? []).map((filter) => ({
-          id: filter.id,
-          value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
-        })),
-        globalFilter: props.initialState.globalFilter ?? '',
-      }
-    }
-
-    function syncColumnDialogDraftState() {
-      draftColumnVisibility.value = { ...columnVisibility.value }
-      draftColumnSizing.value = { ...columnSizing.value }
-      draftColumnPinning.value = cloneColumnPinningState(columnPinning.value)
-      draftColumnOrder.value = [...allLeafColumns.value.map((column) => column.id)]
-      draftColumnMoveTargetById.value = { ...columnMoveTargetById.value }
-    }
-
     function syncFilterDialogDraftState() {
       draftColumnFilters.value = cloneColumnFilters(columnFilters.value)
       draftGlobalFilter.value = globalFilter.value
-    }
-
-    function loadSavedViews() {
-      if (!props.viewStorageKey || typeof window === 'undefined') {
-        savedViews.value = []
-        return
-      }
-
-      try {
-        const rawValue = window.localStorage.getItem(props.viewStorageKey)
-        if (!rawValue) {
-          savedViews.value = []
-          return
-        }
-
-        const parsed = JSON.parse(rawValue)
-        savedViews.value = Array.isArray(parsed) ? (parsed as DataGridSavedView[]) : []
-      } catch {
-        savedViews.value = []
-      }
-    }
-
-    function persistSavedViews() {
-      if (!props.viewStorageKey || typeof window === 'undefined') {
-        return
-      }
-
-      window.localStorage.setItem(props.viewStorageKey, JSON.stringify(savedViews.value))
-    }
-
-    function selectSavedView(viewId: string) {
-      activeViewId.value = viewId
-
-      if (!viewId) {
-        applyViewState(getDefaultViewState())
-        return
-      }
-
-      const selectedView = savedViews.value.find((view) => view.id === viewId)
-      if (!selectedView) {
-        activeViewId.value = ''
-        return
-      }
-
-      applyViewState(selectedView.state)
-    }
-
-    function createNewView(name: string) {
-      const now = new Date().toISOString()
-      const nextView: DataGridSavedView = {
-        id: createViewId(),
-        name,
-        state: getCurrentViewState(),
-        createdAt: now,
-        updatedAt: now,
-      }
-
-      savedViews.value = [...savedViews.value, nextView]
-      activeViewId.value = nextView.id
-      persistSavedViews()
     }
 
     function openSaveViewDialog() {
@@ -519,53 +388,6 @@ export default defineComponent({
 
       createNewView(name)
       closeSaveViewDialog()
-    }
-
-    function overwriteActiveView() {
-      if (!activeViewId.value) {
-        openSaveViewDialog()
-        return
-      }
-
-      const currentView = savedViews.value.find((view) => view.id === activeViewId.value)
-      if (!currentView) {
-        activeViewId.value = ''
-        openSaveViewDialog()
-        return
-      }
-
-      savedViews.value = savedViews.value.map((view) =>
-        view.id === activeViewId.value
-          ? {
-              ...view,
-              state: getCurrentViewState(),
-              updatedAt: new Date().toISOString(),
-            }
-          : view,
-      )
-      persistSavedViews()
-    }
-
-    function deleteActiveView() {
-      if (!activeViewId.value) {
-        return
-      }
-
-      const currentView = savedViews.value.find((view) => view.id === activeViewId.value)
-      if (!currentView) {
-        activeViewId.value = ''
-        return
-      }
-
-      const confirmed = window.confirm(`Usunac widok "${currentView.name}"?`)
-      if (!confirmed) {
-        return
-      }
-
-      savedViews.value = savedViews.value.filter((view) => view.id !== activeViewId.value)
-      activeViewId.value = ''
-      persistSavedViews()
-      selectSavedView('')
     }
 
     function toggleViewsMenu() {
@@ -745,6 +567,36 @@ export default defineComponent({
       pagination,
       renderColumnPickerLabel,
       onOpenFilterMenu: closeOverlayState,
+    })
+    const {
+      activeViewId,
+      savedViews,
+      loadSavedViews,
+      selectSavedView,
+      createNewView,
+      overwriteActiveView,
+      deleteActiveView,
+    } = useDataGridSavedViews({
+      viewStorageKey: props.viewStorageKey,
+      initialState: props.initialState,
+      columnOrder,
+      columnSizing,
+      columnVisibility,
+      columnPinning,
+      columnFilters,
+      globalFilter,
+      pagination,
+      rowSelection,
+      onAfterApplyViewState: () => {
+        openMenuColumnId.value = null
+        closeFilterMenus()
+        isViewsMenuOpen.value = false
+        isSaveViewDialogOpen.value = false
+        columnVirtualizer.value.measure()
+      },
+      onOpenSaveViewDialog: openSaveViewDialog,
+      createViewId,
+      cloneViewState,
     })
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
@@ -1097,157 +949,35 @@ export default defineComponent({
       loadSavedViews()
     })
 
-    function getOrderedLeafColumns(columnIds: string[]) {
-      const columnById = new Map(allLeafColumnsById.value)
-      const orderedColumns: Column<AnyRow, unknown>[] = []
-
-      for (const columnId of columnIds) {
-        const column = columnById.get(columnId)
-        if (column) {
-          orderedColumns.push(column)
-          columnById.delete(columnId)
-        }
-      }
-
-      return [...orderedColumns, ...columnById.values()]
-    }
-
-    const columnPickerColumns = computed(() => getOrderedLeafColumns(draftColumnOrder.value))
-
-    function getDraftPinnedSide(columnId: string): 'left' | 'right' | false {
-      if (draftColumnPinning.value.left?.includes(columnId)) {
-        return 'left'
-      }
-
-      if (draftColumnPinning.value.right?.includes(columnId)) {
-        return 'right'
-      }
-
-      return false
-    }
-
-    function getDraftColumnMoveTarget(columnId: string) {
-      const targetColumnId = draftColumnMoveTargetById.value[columnId]
-
-      if (targetColumnId) {
-        return targetColumnId
-      }
-
-      const fallbackTarget = columnPickerColumns.value.find((column) => column.id !== columnId)?.id
-      return fallbackTarget ?? ''
-    }
-
-    function toggleDraftColumnVisibility(columnId: string, isVisible: boolean) {
-      draftColumnVisibility.value = {
-        ...draftColumnVisibility.value,
-        [columnId]: isVisible,
-      }
-    }
-
-    function updateDraftColumnSize(columnId: string, rawValue: string) {
-      const column = allLeafColumnsById.value.get(columnId)
-      if (!column) {
-        return
-      }
-
-      const nextSize = toNumber(rawValue, draftColumnSizing.value[columnId] ?? column.getSize())
-      draftColumnSizing.value = {
-        ...draftColumnSizing.value,
-        [columnId]: Math.max(nextSize, column.columnDef.minSize ?? 80),
-      }
-    }
-
-    function setDraftPin(columnId: string, side: 'left' | 'right' | false) {
-      const leftPinned = (draftColumnPinning.value.left ?? []).filter((id) => id !== columnId)
-      const rightPinned = (draftColumnPinning.value.right ?? []).filter((id) => id !== columnId)
-
-      if (side === 'left') {
-        draftColumnPinning.value = {
-          left: [...leftPinned, columnId],
-          right: rightPinned,
-        }
-        return
-      }
-
-      if (side === 'right') {
-        draftColumnPinning.value = {
-          left: leftPinned,
-          right: [...rightPinned, columnId],
-        }
-        return
-      }
-
-      draftColumnPinning.value = {
-        left: leftPinned,
-        right: rightPinned,
-      }
-    }
-
-    function moveDraftColumn(columnId: string, direction: -1 | 1) {
-      const orderedIds = [...draftColumnOrder.value]
-      const currentIndex = orderedIds.indexOf(columnId)
-      const nextIndex = currentIndex + direction
-
-      if (currentIndex === -1 || nextIndex < 0 || nextIndex >= orderedIds.length) {
-        return
-      }
-
-      const nextOrder = [...orderedIds]
-      const [movedColumnId] = nextOrder.splice(currentIndex, 1)
-      if (!movedColumnId) {
-        return
-      }
-
-      nextOrder.splice(nextIndex, 0, movedColumnId)
-      draftColumnOrder.value = nextOrder
-    }
-
-    function updateDraftColumnMoveTarget(columnId: string, targetColumnId: string) {
-      draftColumnMoveTargetById.value = {
-        ...draftColumnMoveTargetById.value,
-        [columnId]: targetColumnId,
-      }
-    }
-
-    function moveDraftColumnRelative(
-      columnId: string,
-      targetColumnId: string,
-      position: 'before' | 'after',
-    ) {
-      if (!targetColumnId || targetColumnId === columnId) {
-        return
-      }
-
-      const orderedIds = [...draftColumnOrder.value]
-      const sourceIndex = orderedIds.indexOf(columnId)
-      const targetIndex = orderedIds.indexOf(targetColumnId)
-
-      if (sourceIndex === -1 || targetIndex === -1) {
-        return
-      }
-
-      const nextOrder = [...orderedIds]
-      const [movedColumnId] = nextOrder.splice(sourceIndex, 1)
-      if (!movedColumnId) {
-        return
-      }
-
-      const adjustedTargetIndex = nextOrder.indexOf(targetColumnId)
-      const insertIndex = position === 'before' ? adjustedTargetIndex : adjustedTargetIndex + 1
-
-      nextOrder.splice(insertIndex, 0, movedColumnId)
-      draftColumnOrder.value = nextOrder
-    }
-
-    function applyColumnDialogChanges() {
-      columnVisibility.value = { ...draftColumnVisibility.value }
-      columnSizing.value = { ...draftColumnSizing.value }
-      columnPinning.value = cloneColumnPinningState(draftColumnPinning.value)
-      columnOrder.value = [...draftColumnOrder.value]
-      columnMoveTargetById.value = { ...draftColumnMoveTargetById.value }
-      columnVirtualizer.value.measure()
-      closeColumnPicker()
-    }
+    const {
+      columnPickerColumns,
+      syncColumnDialogDraftState,
+      getDraftPinnedSide,
+      getDraftColumnMoveTarget,
+      toggleDraftColumnVisibility,
+      updateDraftColumnSize,
+      setDraftPin,
+      moveDraftColumn,
+      updateDraftColumnMoveTarget,
+      moveDraftColumnRelative,
+      applyColumnDialogChanges,
+      draftColumnVisibility,
+      draftColumnSizing,
+    } = useDataGridColumnPicker({
+      allLeafColumns,
+      allLeafColumnsById,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
+      columnOrder,
+      columnMoveTargetById,
+      cloneColumnPinningState,
+      toNumber,
+      onAfterApply: () => {
+        columnVirtualizer.value.measure()
+        closeColumnPicker()
+      },
+    })
 
     function applyFilterDialogChanges() {
       pagination.value = {
