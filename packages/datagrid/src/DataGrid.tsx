@@ -339,6 +339,23 @@ export default defineComponent({
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined
     let activeController: AbortController | null = null
+    let measureFrame: number | null = null
+
+    function scheduleColumnMeasure() {
+      if (typeof window === 'undefined') {
+        columnVirtualizer.value.measure()
+        return
+      }
+
+      if (measureFrame !== null) {
+        window.cancelAnimationFrame(measureFrame)
+      }
+
+      measureFrame = window.requestAnimationFrame(() => {
+        measureFrame = null
+        columnVirtualizer.value.measure()
+      })
+    }
 
     function getCurrentViewState(): DataGridSavedViewState {
       return {
@@ -626,7 +643,7 @@ export default defineComponent({
       manualSorting: true,
       manualFiltering: true,
       enableHiding: true,
-      columnResizeMode: 'onChange',
+      columnResizeMode: 'onEnd',
       defaultColumn: {
         size: 160,
         minSize: 80,
@@ -662,10 +679,19 @@ export default defineComponent({
       },
     })
 
+    const allLeafColumns = computed(() => table.getAllLeafColumns())
+    const allLeafColumnsById = computed(
+      () => new Map(allLeafColumns.value.map((column) => [column.id, column])),
+    )
     const visibleColumns = computed(() => table.getVisibleLeafColumns())
     const visibleHeaders = computed(() => table.getHeaderGroups()[0]?.headers ?? [])
     const visibleRows = computed(() => table.getRowModel().rows)
     const totalWidth = computed(() => table.getTotalSize())
+    const leftPinnedColumnIds = computed(() => new Set(columnPinning.value.left ?? []))
+    const rightPinnedColumnIds = computed(() => new Set(columnPinning.value.right ?? []))
+    const visibleColumnIndexById = computed(
+      () => new Map(visibleColumns.value.map((column, index) => [column.id, index])),
+    )
     const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig | null>(() => {
       if (!props.selectionPanelConfig) {
         return null
@@ -687,14 +713,20 @@ export default defineComponent({
           defaultSelectionPanelConfig.copyWithoutHeadersLabel,
       }
     })
-    const selectedRows = computed(() => visibleRows.value.filter((row) => row.getIsSelected()))
+    const selectedRows = computed(() => {
+      if (!mergedSelectionPanelConfig.value || Object.keys(rowSelection.value).length === 0) {
+        return []
+      }
+
+      return visibleRows.value.filter((row) => row.getIsSelected())
+    })
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
-      if (columnPinning.value.left?.includes(columnId)) {
+      if (leftPinnedColumnIds.value.has(columnId)) {
         return 'left'
       }
 
-      if (columnPinning.value.right?.includes(columnId)) {
+      if (rightPinnedColumnIds.value.has(columnId)) {
         return 'right'
       }
 
@@ -727,25 +759,79 @@ export default defineComponent({
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
     const virtualNonPinnedColumns = computed(() => columnVirtualizer.value.getVirtualItems())
     const totalRowHeight = computed(() => rowVirtualizer.value.getTotalSize())
-
-    const queryKey = computed(() =>
-      JSON.stringify({
-        pageIndex: pagination.value.pageIndex,
-        pageSize: pagination.value.pageSize,
-        sorting: sorting.value,
-        filters: columnFilters.value,
-        search: globalFilter.value,
-      }),
+    const renderedNonPinnedIds = computed(
+      () =>
+        new Set(
+          virtualNonPinnedColumns.value
+            .map((virtualColumn) => nonPinnedColumns.value[virtualColumn.index]?.id)
+            .filter((value): value is string => Boolean(value)),
+        ),
     )
+    const headerSequence = computed(() =>
+      buildRenderedColumnSequence(
+        visibleHeaders.value,
+        (header) => header.column,
+        renderedNonPinnedIds.value,
+      ),
+    )
+    const rowSequence = computed(() =>
+      buildRenderedColumnSequence(
+        visibleColumns.value,
+        (column) => column,
+        renderedNonPinnedIds.value,
+      ),
+    )
+    const cellStylesByColumnId = computed(() => {
+      const styles = new Map<string, CSSProperties>()
+      let leftOffset = 0
+      let rightOffset = 0
+      const leftColumns = visibleColumns.value.filter((column) => leftPinnedColumnIds.value.has(column.id))
+      const rightColumns = visibleColumns.value.filter((column) =>
+        rightPinnedColumnIds.value.has(column.id),
+      )
+
+      for (const [index, column] of leftColumns.entries()) {
+        styles.set(column.id, {
+          width: `${column.getSize()}px`,
+          left: `${leftOffset}px`,
+          zIndex: `${60 - index}`,
+          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
+        })
+        leftOffset += column.getSize()
+      }
+
+      for (const [reverseIndex, column] of [...rightColumns].reverse().entries()) {
+        const index = rightColumns.length - 1 - reverseIndex
+        styles.set(column.id, {
+          width: `${column.getSize()}px`,
+          right: `${rightOffset}px`,
+          zIndex: `${60 - index}`,
+          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
+        })
+        rightOffset += column.getSize()
+      }
+
+      for (const column of visibleColumns.value) {
+        if (styles.has(column.id)) {
+          continue
+        }
+
+        styles.set(column.id, {
+          width: `${column.getSize()}px`,
+          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
+        })
+      }
+
+      return styles
+    })
 
     const serverFilterColumns = computed(() =>
-      table
-        .getAllLeafColumns()
-        .filter((column) => Boolean((column.columnDef as DataGridColumn<AnyRow>).serverField)),
+      allLeafColumns.value.filter(
+        (column) => Boolean((column.columnDef as DataGridColumn<AnyRow>).serverField),
+      ),
     )
     const toolbarFilterConfigs = computed(() => {
-      const columnConfigs = table
-        .getAllLeafColumns()
+      const columnConfigs = allLeafColumns.value
         .filter((column) => {
           const columnDef = column.columnDef as DataGridColumn<AnyRow>
           const isServerColumn = Boolean(columnDef.serverField)
@@ -930,7 +1016,7 @@ export default defineComponent({
     }
 
     watch(
-      queryKey,
+      [pagination, sorting, columnFilters, globalFilter, requestedServerColumns],
       () => {
         if (debounceTimer) {
           clearTimeout(debounceTimer)
@@ -946,7 +1032,7 @@ export default defineComponent({
     watch(
       () => [columnVisibility.value, columnPinning.value, columnOrder.value, columnSizing.value],
       () => {
-        columnVirtualizer.value.measure()
+        scheduleColumnMeasure()
       },
       { deep: true },
     )
@@ -960,6 +1046,10 @@ export default defineComponent({
 
       if (activeController) {
         activeController.abort()
+      }
+
+      if (measureFrame !== null && typeof window !== 'undefined') {
+        window.cancelAnimationFrame(measureFrame)
       }
     })
 
@@ -1316,7 +1406,7 @@ export default defineComponent({
     }
 
     function getOrderedLeafColumns(columnIds: string[]) {
-      const columnById = new Map(table.getAllLeafColumns().map((column) => [column.id, column]))
+      const columnById = new Map(allLeafColumnsById.value)
       const orderedColumns: Column<AnyRow, unknown>[] = []
 
       for (const columnId of columnIds) {
@@ -1363,7 +1453,7 @@ export default defineComponent({
     }
 
     function updateDraftColumnSize(columnId: string, rawValue: string) {
-      const column = table.getAllLeafColumns().find((item) => item.id === columnId)
+      const column = allLeafColumnsById.value.get(columnId)
       if (!column) {
         return
       }
@@ -1573,7 +1663,7 @@ export default defineComponent({
           getIsColumnVisible={(columnId) => draftColumnVisibility.value[columnId] ?? true}
           getPinnedSide={getDraftPinnedSide}
           getColumnSize={(columnId) => {
-            const column = table.getAllLeafColumns().find((item) => item.id === columnId)
+            const column = allLeafColumnsById.value.get(columnId)
             return draftColumnSizing.value[columnId] ?? column?.getSize() ?? 160
           }}
           getColumnMoveTarget={getDraftColumnMoveTarget}
@@ -1632,7 +1722,7 @@ export default defineComponent({
         }
       }
 
-      const columnIndex = visibleColumns.value.findIndex((item) => item.id === column.id)
+      const columnIndex = visibleColumnIndexById.value.get(column.id) ?? -1
       const visibleCount = visibleColumns.value.length
       const isNearRightEdge = columnIndex >= Math.max(visibleCount - 2, 0)
 
@@ -1675,26 +1765,21 @@ export default defineComponent({
       })
     }
 
-    function getSelectionPanelColumns() {
+    const selectionPanelColumns = computed(() => {
       const configuredColumnIds = mergedSelectionPanelConfig.value?.copyColumnIds
-      const columns = visibleColumns.value.filter((column) => {
-        const columnDef = column.columnDef as DataGridColumn<AnyRow>
-
-        if (configuredColumnIds && configuredColumnIds.length > 0) {
-          return configuredColumnIds.includes(column.id)
-        }
-
-        return column.id !== 'select' && columnDef.localKind !== 'action'
-      })
 
       if (configuredColumnIds && configuredColumnIds.length > 0) {
+        const visibleColumnById = new Map(visibleColumns.value.map((column) => [column.id, column]))
         return configuredColumnIds
-          .map((columnId) => columns.find((column) => column.id === columnId))
+          .map((columnId) => visibleColumnById.get(columnId))
           .filter((column): column is Column<AnyRow, unknown> => Boolean(column))
       }
 
-      return columns
-    }
+      return visibleColumns.value.filter((column) => {
+        const columnDef = column.columnDef as DataGridColumn<AnyRow>
+        return column.id !== 'select' && columnDef.localKind !== 'action'
+      })
+    })
 
     function getColumnClipboardLabel(column: Column<AnyRow, unknown>) {
       return renderColumnPickerLabel(column)
@@ -1719,7 +1804,7 @@ export default defineComponent({
     }
 
     async function copySelectedRows(includeHeaders: boolean) {
-      const columns = getSelectionPanelColumns()
+      const columns = selectionPanelColumns.value
       const rows = selectedRows.value
 
       if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
@@ -1743,12 +1828,12 @@ export default defineComponent({
       await navigator.clipboard.writeText(lines.join('\n'))
     }
 
-    function getSelectionPanelSums() {
+    const selectionPanelSums = computed(() => {
       const sumConfigs = mergedSelectionPanelConfig.value?.sumColumns ?? []
 
       return sumConfigs
         .map((config) => {
-          const column = table.getAllLeafColumns().find((item) => item.id === config.columnId)
+          const column = allLeafColumnsById.value.get(config.columnId)
           if (!column) {
             return null
           }
@@ -1780,7 +1865,7 @@ export default defineComponent({
             value: string
           } => Boolean(item),
         )
-    }
+    })
 
     function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Header<AnyRow, unknown>>(
       orderedItems: TItem[],
@@ -1829,56 +1914,10 @@ export default defineComponent({
       return sequence
     }
 
-    function getStickyCellStyle(column: Column<AnyRow, unknown>) {
-      const pinnedSide = getPinnedSide(column.id)
-
-      if (pinnedSide === 'left') {
-        const leftColumns = visibleColumns.value.filter((item) => getPinnedSide(item.id) === 'left')
-        const pinnedIndex = leftColumns.findIndex((item) => item.id === column.id)
-        const stickyOffset = leftColumns
-          .slice(0, pinnedIndex)
-          .reduce((sum, item) => sum + item.getSize(), 0)
-
-        return {
-          width: `${column.getSize()}px`,
-          left: `${stickyOffset}px`,
-          zIndex: `${60 - pinnedIndex}`,
-        }
-      }
-
-      if (pinnedSide === 'right') {
-        const rightColumns = visibleColumns.value.filter((item) => getPinnedSide(item.id) === 'right')
-        const pinnedIndex = rightColumns.findIndex((item) => item.id === column.id)
-        const stickyOffset = rightColumns
-          .slice(pinnedIndex + 1)
-          .reduce((sum, item) => sum + item.getSize(), 0)
-
-        return {
-          width: `${column.getSize()}px`,
-          right: `${stickyOffset}px`,
-          zIndex: `${60 - pinnedIndex}`,
-        }
-      }
-
-      return {
-        width: `${column.getSize()}px`,
-      }
-    }
-
     return () => {
       const pageCount = requestState.value.pageCount
       const pageIndex = pagination.value.pageIndex
       const paginationItems = buildPaginationItems(pageCount, pageIndex)
-      const renderedNonPinnedIds = new Set(
-        virtualNonPinnedColumns.value
-          .map((virtualColumn) => nonPinnedColumns.value[virtualColumn.index]?.id)
-          .filter((value): value is string => Boolean(value)),
-      )
-      const headerSequence = buildRenderedColumnSequence(
-        visibleHeaders.value,
-        (header) => header.column,
-        renderedNonPinnedIds,
-      )
 
       return (
         <section class="data-grid">
@@ -1921,7 +1960,7 @@ export default defineComponent({
               >
                 <div class="data-grid__header" style={{ width: `${totalWidth.value}px` }}>
                   <div class="data-grid__row data-grid__row--header" style={{ transform: 'translateY(0px)' }}>
-                    {headerSequence.map((entry) => {
+                    {headerSequence.value.map((entry) => {
                       if (entry.type === 'spacer') {
                         return (
                           <div
@@ -1944,19 +1983,17 @@ export default defineComponent({
                             pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
                           ]}
                           style={{
-                            ...getStickyCellStyle(entry.column),
-                            justifyContent: toJustifyContent(
-                              (entry.column.columnDef as DataGridColumn<AnyRow>).align,
-                            ),
+                            ...cellStylesByColumnId.value.get(entry.column.id),
                           }}
                         >
                           <DataGridHeaderCell
                             header={entry.item.getContext()}
                             column={entry.column}
                             pickerLabel={renderColumnPickerLabel(entry.column)}
-                            justifyContent={toJustifyContent(
-                              (entry.column.columnDef as DataGridColumn<AnyRow>).align,
-                            )}
+                            justifyContent={
+                              (cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ??
+                              'flex-start'
+                            }
                             menuStyle={getColumnMenuStyle(entry.column)}
                             isMenuOpen={openMenuColumnId.value === entry.column.id}
                             pinnedSide={pinnedSide}
@@ -1985,12 +2022,6 @@ export default defineComponent({
                     }
 
                     const visibleCells = row.getVisibleCells()
-                    const cellByColumnId = new Map(visibleCells.map((cell) => [cell.column.id, cell]))
-                    const rowSequence = buildRenderedColumnSequence(
-                      visibleColumns.value,
-                      (column) => column,
-                      renderedNonPinnedIds,
-                    )
 
                     return (
                       <div
@@ -2005,7 +2036,7 @@ export default defineComponent({
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                        {rowSequence.map((entry) => {
+                        {rowSequence.value.map((entry) => {
                           if (entry.type === 'spacer') {
                             return (
                               <div
@@ -2016,7 +2047,8 @@ export default defineComponent({
                             )
                           }
 
-                          const cell = cellByColumnId.get(entry.column.id)
+                          const cellIndex = visibleColumnIndexById.value.get(entry.column.id)
+                          const cell = typeof cellIndex === 'number' ? visibleCells[cellIndex] : undefined
                           if (!cell) {
                             return null
                           }
@@ -2032,10 +2064,7 @@ export default defineComponent({
                                 pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
                               ]}
                               style={{
-                                ...getStickyCellStyle(entry.column),
-                                justifyContent: toJustifyContent(
-                                  (entry.column.columnDef as DataGridColumn<AnyRow>).align,
-                                ),
+                                ...cellStylesByColumnId.value.get(entry.column.id),
                               }}
                             >
                               {renderCell(cell)}
@@ -2055,7 +2084,7 @@ export default defineComponent({
                 selectedRowsLabel={
                   mergedSelectionPanelConfig.value.selectedRowsLabel ?? 'Zaznaczone wiersze'
                 }
-                sums={getSelectionPanelSums()}
+                sums={selectionPanelSums.value}
                 copyWithHeadersLabel={
                   mergedSelectionPanelConfig.value.copyWithHeadersLabel ??
                   'Kopiuj z naglowkami'
