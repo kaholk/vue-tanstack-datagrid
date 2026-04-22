@@ -1,0 +1,125 @@
+import { defineComponent, type PropType } from 'vue'
+
+import DataGridSelectFilterMenu from './DataGridSelectFilterMenu'
+import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
+
+export default defineComponent({
+  name: 'DataGridFilterControl',
+  props: {
+    config: {
+      type: Object as PropType<DataGridFilterConfig>,
+      required: true,
+    },
+    isToolbar: {
+      type: Boolean,
+      default: false,
+    },
+    isOpen: {
+      type: Boolean,
+      default: false,
+    },
+    inputValue: {
+      type: String,
+      default: '',
+    },
+    buttonLabel: {
+      type: String,
+      default: 'Filtr',
+    },
+    selectedCount: {
+      type: Number,
+      default: 0,
+    },
+    selectedValueKeys: {
+      type: Object as PropType<Set<string>>,
+      default: undefined,
+    },
+    visibleOptions: {
+      type: Array as PropType<DataGridFilterOption[]>,
+      default: () => [],
+    },
+    searchValue: {
+      type: String,
+      default: '',
+    },
+    onToggleMenu: {
+      type: Function as PropType<(event: MouseEvent) => void>,
+      default: undefined,
+    },
+    onInput: {
+      type: Function as PropType<(value: string) => void>,
+      default: undefined,
+    },
+    onSearchChange: {
+      type: Function as PropType<(value: string) => void>,
+      default: undefined,
+    },
+    onSelectAll: {
+      type: Function as PropType<() => void>,
+      default: undefined,
+    },
+    onClearAll: {
+      type: Function as PropType<() => void>,
+      default: undefined,
+    },
+    onToggleValue: {
+      type: Function as PropType<
+        (optionValue: DataGridFilterOption['value'], checked: boolean) => void
+      >,
+      default: undefined,
+    },
+  },
+  setup(props) {
+    return () => {
+      if (props.config.variant === 'select') {
+        return (
+          <div
+            class={[
+              'data-grid__filter-select',
+              props.isToolbar ? 'data-grid__filter-select--toolbar' : '',
+            ]}
+            data-grid-filter-root="true"
+          >
+            <button
+              type="button"
+              class={[
+                'data-grid__filter-select-trigger',
+                props.selectedCount > 0 ? 'data-grid__filter-select-trigger--active' : '',
+              ]}
+              onClick={(event) => props.onToggleMenu?.(event)}
+            >
+              <span class="data-grid__filter-select-label">{props.buttonLabel}</span>
+              <span class="data-grid__filter-select-count">
+                {props.selectedCount > 0 ? String(props.selectedCount) : ''}
+              </span>
+            </button>
+            {props.isOpen ? (
+              <DataGridSelectFilterMenu
+                config={props.config}
+                searchValue={props.searchValue}
+                visibleOptions={props.visibleOptions}
+                selectedValueKeys={props.selectedValueKeys ?? new Set<string>()}
+                onSearchChange={(value) => props.onSearchChange?.(value)}
+                onSelectAll={() => props.onSelectAll?.()}
+                onClearAll={() => props.onClearAll?.()}
+                onToggleValue={(optionValue, checked) => props.onToggleValue?.(optionValue, checked)}
+              />
+            ) : null}
+          </div>
+        )
+      }
+
+      return (
+        <input
+          class={[
+            'data-grid__filter-input',
+            props.isToolbar ? 'data-grid__filter-input--toolbar' : '',
+          ]}
+          value={props.inputValue}
+          placeholder={props.config.placeholder ?? 'Filtr'}
+          onInput={(event) => props.onInput?.((event.target as HTMLInputElement).value)}
+        />
+      )
+    }
+  },
+})

@@ -1,4 +1,4 @@
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 import MainLayout from '@/layouts/MainLayout'
 import { DataGrid } from '@testproject/datagrid'
@@ -31,6 +31,13 @@ type CustomerRow = {
   balance: number
   createdAt: string
 } & Record<`extraCol${string}`, string>
+
+type EditableCustomerField = 'company' | 'visits'
+type CustomerRowPatch = Partial<Pick<CustomerRow, EditableCustomerField>>
+type ActiveEditCell = {
+  rowId: number
+  field: EditableCustomerField
+}
 
 const backendBaseUrl = import.meta.env.VITE_GRID_API_URL ?? 'http://127.0.0.1:8000'
 const statusFilterOptions = ['active','active1','active2','active3','active4', 'inactive', 'pending', 'new', 'qualified', 'proposal'].map(
@@ -86,7 +93,21 @@ const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (
   }
 })
 
-const columns: DataGridColumn<CustomerRow>[] = [
+function buildColumns(options: {
+  getDraftValue: <TKey extends EditableCustomerField>(row: CustomerRow, key: TKey) => CustomerRow[TKey]
+  updateDraftValue: <TKey extends EditableCustomerField>(
+    row: CustomerRow,
+    key: TKey,
+    value: CustomerRow[TKey],
+  ) => void
+  submitRowUpdate: (rowId: number) => void
+  isRowDirty: (rowId: number) => boolean
+  isRowUpdating: (rowId: number) => boolean
+  isEditingCell: (rowId: number, field: EditableCustomerField) => boolean
+  startEditingCell: (rowId: number, field: EditableCustomerField) => void
+  stopEditingCell: () => void
+}) {
+  return [
   {
     id: 'select',
     header: 'Select',
@@ -163,10 +184,44 @@ const columns: DataGridColumn<CustomerRow>[] = [
   {
     id: 'company',
     accessorKey: 'company',
-    header: 'Company',
+    header: 'Company / edit',
     size: 180,
     serverField: 'company',
     filterGroup: 'Kontakt i firma',
+    cell: ({ row }) =>
+      options.isEditingCell(row.original.id, 'company') ? (
+        <input
+          type="text"
+          class="data-grid__dialog-input"
+          value={options.getDraftValue(row.original, 'company')}
+          autofocus
+          onClick={(event) => event.stopPropagation()}
+          onBlur={() => options.stopEditingCell()}
+          onKeydown={(event) => {
+            if (event.key === 'Enter' || event.key === 'Escape') {
+              options.stopEditingCell()
+            }
+          }}
+          onInput={(event) =>
+            options.updateDraftValue(
+              row.original,
+              'company',
+              (event.target as HTMLInputElement).value,
+            )
+          }
+        />
+      ) : (
+        <button
+          type="button"
+          class="data-grid__sort-button"
+          onClick={(event) => {
+            event.stopPropagation()
+            options.startEditingCell(row.original.id, 'company')
+          }}
+        >
+          <span class="data-grid__header-label">{options.getDraftValue(row.original, 'company')}</span>
+        </button>
+      ),
   },
   {
     id: 'city',
@@ -217,11 +272,47 @@ const columns: DataGridColumn<CustomerRow>[] = [
   {
     id: 'visits',
     accessorKey: 'visits',
-    header: 'Visits',
+    header: 'Visits / edit',
     size: 110,
     align: 'end',
     serverField: 'visits',
     filterGroup: 'Metryki',
+    cell: ({ row }) =>
+      options.isEditingCell(row.original.id, 'visits') ? (
+        <input
+          type="number"
+          class="data-grid__dialog-input"
+          value={String(options.getDraftValue(row.original, 'visits'))}
+          autofocus
+          onClick={(event) => event.stopPropagation()}
+          onBlur={() => options.stopEditingCell()}
+          onKeydown={(event) => {
+            if (event.key === 'Enter' || event.key === 'Escape') {
+              options.stopEditingCell()
+            }
+          }}
+          onInput={(event) =>
+            options.updateDraftValue(
+              row.original,
+              'visits',
+              Number((event.target as HTMLInputElement).value || 0),
+            )
+          }
+        />
+      ) : (
+        <button
+          type="button"
+          class="data-grid__sort-button"
+          onClick={(event) => {
+            event.stopPropagation()
+            options.startEditingCell(row.original.id, 'visits')
+          }}
+        >
+          <span class="data-grid__header-label">
+            {String(options.getDraftValue(row.original, 'visits'))}
+          </span>
+        </button>
+      ),
   },
   {
     id: 'progress',
@@ -290,13 +381,18 @@ const columns: DataGridColumn<CustomerRow>[] = [
         <button type="button" onClick={() => window.alert(`Preview ${row.original.customerCode}`)}>
           Preview
         </button>
-        <button type="button" onClick={() => window.alert(`Open ${row.original.email}`)}>
-          Open
+        <button
+          type="button"
+          disabled={!options.isRowDirty(row.original.id) || options.isRowUpdating(row.original.id)}
+          onClick={() => options.submitRowUpdate(row.original.id)}
+        >
+          {options.isRowUpdating(row.original.id) ? 'Zapisywanie...' : 'Aktualizuj'}
         </button>
       </div>
     ),
   },
-]
+  ] satisfies DataGridColumn<CustomerRow>[]
+}
 
 async function fetchCustomers(
   params: DataGridFetchParams,
@@ -321,13 +417,130 @@ async function fetchCustomers(
 export default defineComponent({
   name: 'TablePage',
   setup() {
+    const savedEdits = ref<Record<number, CustomerRowPatch>>({})
+    const draftEdits = ref<Record<number, CustomerRowPatch>>({})
+    const updatingRowId = ref<number | null>(null)
+    const lastUpdatedMessage = ref('')
+    const activeEditCell = ref<ActiveEditCell | null>(null)
+
+    function getDraftValue<TKey extends EditableCustomerField>(
+      row: CustomerRow,
+      key: TKey,
+    ): CustomerRow[TKey] {
+      const draftValue = draftEdits.value[row.id]?.[key]
+      if (draftValue !== undefined) {
+        return draftValue as CustomerRow[TKey]
+      }
+
+      const savedValue = savedEdits.value[row.id]?.[key]
+      if (savedValue !== undefined) {
+        return savedValue as CustomerRow[TKey]
+      }
+
+      return row[key]
+    }
+
+    function updateDraftValue<TKey extends EditableCustomerField>(
+      row: CustomerRow,
+      key: TKey,
+      value: CustomerRow[TKey],
+    ) {
+      draftEdits.value = {
+        ...draftEdits.value,
+        [row.id]: {
+          ...(draftEdits.value[row.id] ?? {}),
+          [key]: value,
+        },
+      }
+    }
+
+    function isRowDirty(rowId: number) {
+      return Object.keys(draftEdits.value[rowId] ?? {}).length > 0
+    }
+
+    function isRowUpdating(rowId: number) {
+      return updatingRowId.value === rowId
+    }
+
+    function isEditingCell(rowId: number, field: EditableCustomerField) {
+      return activeEditCell.value?.rowId === rowId && activeEditCell.value?.field === field
+    }
+
+    function startEditingCell(rowId: number, field: EditableCustomerField) {
+      activeEditCell.value = { rowId, field }
+    }
+
+    function stopEditingCell() {
+      activeEditCell.value = null
+    }
+
+    function clearDraft(rowId: number) {
+      const nextDrafts = { ...draftEdits.value }
+      delete nextDrafts[rowId]
+      draftEdits.value = nextDrafts
+    }
+
+    async function submitRowUpdate(rowId: number) {
+      const patch = draftEdits.value[rowId]
+      if (!patch || Object.keys(patch).length === 0) {
+        return
+      }
+
+      updatingRowId.value = rowId
+
+      try {
+        await new Promise((resolve) => window.setTimeout(resolve, 300))
+        savedEdits.value = {
+          ...savedEdits.value,
+          [rowId]: {
+            ...(savedEdits.value[rowId] ?? {}),
+            ...patch,
+          },
+        }
+        clearDraft(rowId)
+        stopEditingCell()
+        lastUpdatedMessage.value = `Zaktualizowano wiersz ID ${rowId}.`
+      } finally {
+        updatingRowId.value = null
+      }
+    }
+
+    const columns = buildColumns({
+      getDraftValue,
+      updateDraftValue,
+      submitRowUpdate: (rowId) => {
+        void submitRowUpdate(rowId)
+      },
+      isRowDirty,
+      isRowUpdating,
+      isEditingCell,
+      startEditingCell,
+      stopEditingCell,
+    })
+
+    async function fetchCustomersPage(
+      params: DataGridFetchParams,
+      signal?: AbortSignal,
+    ): Promise<DataGridFetchResult<CustomerRow>> {
+      const result = await fetchCustomers(params, signal)
+
+      return {
+        ...result,
+        rows: result.rows.map((row) => ({
+          ...row,
+          ...(savedEdits.value[row.id] ?? {}),
+          ...(draftEdits.value[row.id] ?? {}),
+        })),
+      }
+    }
+
     return () => (
       <MainLayout
         intro={{
           eyebrow: 'TanStack Data Grid',
           title: 'Server-side grid z virtualizacja wierszy i kolumn',
           description:
-            'Demo pokazuje server-side pagination, sorting, filtering, ukrywanie kolumn, sticky header oraz pinned kolumny left/right.',
+            'Demo pokazuje server-side pagination, sorting, filtering, ukrywanie kolumn, sticky header, pinned kolumny left/right oraz przyklad inline edycji komorek.',
         }}
       >
         <section aria-labelledby="table-demo">
@@ -336,6 +549,11 @@ export default defineComponent({
             Backend demo oczekuje pod <code>{backendBaseUrl}</code>. Uruchom PHP server z folderu{' '}
             <code>backend</code>.
           </p>
+          <p>
+            Kliknij komorke <code>Company / edit</code> albo <code>Visits / edit</code>, edytuj
+            wartosc, potem kliknij <code>Aktualizuj</code> w tym samym wierszu.
+            {lastUpdatedMessage.value ? ` ${lastUpdatedMessage.value}` : ''}
+          </p>
           <DataGrid
             columns={columns}
             toolbarFilters={toolbarFilters}
@@ -343,7 +561,7 @@ export default defineComponent({
             metaItems={metaItems}
             pageSizeConfig={pageSizeConfig}
             selectionPanelConfig={selectionPanelConfig}
-            fetchPage={fetchCustomers}
+            fetchPage={fetchCustomersPage}
             viewStorageKey="table-page-customer-grid-views"
             rowHeight={46}
             overscanRows={12}

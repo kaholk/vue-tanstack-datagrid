@@ -1,13 +1,10 @@
 import { FlexRender, type Column, type HeaderContext } from '@tanstack/vue-table'
 import { defineComponent, h, type CSSProperties, type PropType, type VNodeChild } from 'vue'
-import IconCloseRounded from '~icons/material-symbols/close-rounded'
-import IconLeftPanelCloseRounded from '~icons/material-symbols/left-panel-close-rounded'
 import IconNorthRounded from '~icons/material-symbols/north-rounded'
-import IconRightPanelCloseRounded from '~icons/material-symbols/right-panel-close-rounded'
 import IconSouthRounded from '~icons/material-symbols/south-rounded'
 import IconUnfoldMoreRounded from '~icons/material-symbols/unfold-more-rounded'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridColumnMenu from './DataGridColumnMenu'
 import type { DataGridColumn, DataGridFilterConfig } from '../types'
 
 type AnyRow = Record<string, unknown>
@@ -140,135 +137,19 @@ export default defineComponent({
               ? props.renderFilterControl(props.getColumnFilterConfig(props.column))
               : h('span', { class: 'data-grid__column-kind' }, isServerColumn ? 'no filter' : 'local'),
           props.isMenuOpen
-            ? h(
-                DataGridDropdownMenu,
-                {
-                  menuClass: 'data-grid__column-menu',
-                  scopeAttr: 'data-grid-menu-root',
-                  style: props.menuStyle,
-                },
-                {
-                  default: () => [
-                    h('div', { class: 'data-grid__menu-column-name' }, props.pickerLabel),
-                    isServerColumn
-                      ? h('div', { class: 'data-grid__menu-section' }, [
-                          h('div', { class: 'data-grid__menu-title' }, 'Sort'),
-                          h('div', { class: 'data-grid__menu-row' }, [
-                            h(
-                              'button',
-                              {
-                                type: 'button',
-                                class: [
-                                  'data-grid__menu-item',
-                                  sortedState === 'asc' ? 'data-grid__menu-item--active' : '',
-                                ],
-                                onClick: () => props.onToggleSorting(props.column),
-                                disabled: sortedState === 'asc',
-                              },
-                              [
-                                h(IconNorthRounded, { class: 'data-grid__menu-item-icon' }),
-                                h('span', 'ASC'),
-                              ],
-                            ),
-                            h(
-                              'button',
-                              {
-                                type: 'button',
-                                class: [
-                                  'data-grid__menu-item',
-                                  sortedState === 'desc' ? 'data-grid__menu-item--active' : '',
-                                ],
-                                onClick: () => props.onSetSortDesc(props.column),
-                                disabled: sortedState === 'desc',
-                              },
-                              [
-                                h(IconSouthRounded, { class: 'data-grid__menu-item-icon' }),
-                                h('span', 'DESC'),
-                              ],
-                            ),
-                            h(
-                              'button',
-                              {
-                                type: 'button',
-                                class: 'data-grid__menu-item',
-                                onClick: () => props.onClearSorting(props.column),
-                                disabled: !sortedState,
-                              },
-                              [
-                                h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
-                                h('span', 'Clear'),
-                              ],
-                            ),
-                          ]),
-                        ])
-                      : null,
-                    h('div', { class: 'data-grid__menu-section' }, [
-                      h('div', { class: 'data-grid__menu-title' }, 'Pin'),
-                      h('div', { class: 'data-grid__menu-row' }, [
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            class: [
-                              'data-grid__menu-item',
-                              props.pinnedSide === 'left' ? 'data-grid__menu-item--active' : '',
-                            ],
-                            onClick: () => props.onSetPin(props.column, 'left'),
-                            disabled: props.pinnedSide === 'left',
-                          },
-                          [
-                            h(IconLeftPanelCloseRounded, { class: 'data-grid__menu-item-icon' }),
-                            h('span', 'Left'),
-                          ],
-                        ),
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            class: [
-                              'data-grid__menu-item',
-                              props.pinnedSide === 'right' ? 'data-grid__menu-item--active' : '',
-                            ],
-                            onClick: () => props.onSetPin(props.column, 'right'),
-                            disabled: props.pinnedSide === 'right',
-                          },
-                          [
-                            h(IconRightPanelCloseRounded, { class: 'data-grid__menu-item-icon' }),
-                            h('span', 'Right'),
-                          ],
-                        ),
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            class: 'data-grid__menu-item',
-                            onClick: () => props.onSetPin(props.column, false),
-                            disabled: !props.pinnedSide,
-                          },
-                          [
-                            h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
-                            h('span', 'Unpin'),
-                          ],
-                        ),
-                      ]),
-                    ]),
-                    h('div', { class: 'data-grid__menu-section' }, [
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          class: 'data-grid__menu-close',
-                          onClick: props.onCloseMenu,
-                        },
-                        [
-                          h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
-                          h('span', 'Close'),
-                        ],
-                      ),
-                    ]),
-                  ],
-                },
-              )
+            ? h(DataGridColumnMenu, {
+                column: props.column,
+                pickerLabel: props.pickerLabel,
+                menuStyle: props.menuStyle,
+                isServerColumn,
+                sortedState,
+                pinnedSide: props.pinnedSide,
+                onToggleSorting: props.onToggleSorting,
+                onSetSortDesc: props.onSetSortDesc,
+                onClearSorting: props.onClearSorting,
+                onSetPin: props.onSetPin,
+                onClose: props.onCloseMenu,
+              })
             : null,
         ]),
       ])
