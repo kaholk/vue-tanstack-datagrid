@@ -38,7 +38,7 @@
     "scripts":  {
                     "build":  "vite build \u0026\u0026 vue-tsc --project tsconfig.build.json \u0026\u0026 node ./scripts/copy-css.mjs",
                     "type-check":  "vue-tsc --project tsconfig.build.json --noEmit",
-                    "prepack":  "npm run build"
+                    "prepack":  "bun run build"
                 },
     "exports":  {
                     ".":  {
