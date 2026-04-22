@@ -219,7 +219,7 @@ type DataGridFetchResult<TData> = {
 | `rowHeight` | `number` | `42` | Estimated row height for virtualization |
 | `overscanRows` | `number` | `10` | Row virtualization buffer |
 | `overscanColumns` | `number` | `3` | Column virtualization buffer |
-| `height` | `number` | `560` | Grid viewport height in px |
+| `height` | `number \| 'auto'` | `560` | Fixed viewport height in px or fill the available parent height |
 | `viewStorageKey` | `string` | `''` | `localStorage` key for saved views |
 | `savedViewsPersistence` | `DataGridSavedViewsPersistence \| undefined` | `undefined` | Custom saved views persistence |
 | `metaItems` | `DataGridMetaConfig[]` | `rows`, `fetched`, `datasetSize` | Footer metadata to display |
@@ -279,6 +279,24 @@ In most cases, public usage is limited to:
 5. Large column definition changes may require saved view migrations.
 6. The selection panel works on currently loaded rows only.
 7. Virtualization assumes a sensible `rowHeight`.
+
+## `height="auto"`
+
+`height="auto"` makes the grid fill the available height of its parent instead of using a fixed pixel value.
+
+Use it when the grid lives inside a flex or full-height layout:
+
+```tsx
+<div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
+  <DataGrid columns={columns} fetchPage={fetchUsers} height="auto" />
+</div>
+```
+
+Requirements:
+
+- the parent chain must provide a real height
+- flex parents should usually have `min-height: 0`
+- after upgrading the package in a Vite app, restart the dev server if optimizer cache is stale
 
 ## Examples
 

@@ -49,6 +49,8 @@ export type DataGridPageSizeConfig = {
   options?: number[]
 }
 
+export type DataGridHeight = number | 'auto'
+
 export type DataGridSelectionPanelPosition =
   | 'bottom-left'
   | 'bottom-right'
