@@ -26,6 +26,7 @@ import {
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 
+import DataGridBodyRow from './components/DataGridBodyRow'
 import DataGridDialog from './components/DataGridDialog'
 import DataGridColumnPickerDialog from './components/DataGridColumnPickerDialog'
 import DataGridDropdownMenu from './components/DataGridDropdownMenu'
@@ -77,6 +78,16 @@ type RenderedSequenceItem<TItem> =
 type PaginationItem =
   | { type: 'page'; value: number }
   | { type: 'ellipsis'; key: string }
+
+type CellRenderProps = {
+  table: ReturnType<Cell<AnyRow, unknown>['getContext']>['table']
+  column: ReturnType<Cell<AnyRow, unknown>['getContext']>['column']
+  row: ReturnType<Cell<AnyRow, unknown>['getContext']>['row']
+  cell: ReturnType<Cell<AnyRow, unknown>['getContext']>['cell']
+  getValue: ReturnType<Cell<AnyRow, unknown>['getContext']>['getValue']
+  renderValue: ReturnType<Cell<AnyRow, unknown>['getContext']>['renderValue']
+  align: DataGridColumnAlign
+}
 
 const headerHeight = 92
 const defaultMetaItems: DataGridMetaConfig[] = [
@@ -417,7 +428,7 @@ export default defineComponent({
       draftColumnVisibility.value = { ...columnVisibility.value }
       draftColumnSizing.value = { ...columnSizing.value }
       draftColumnPinning.value = cloneColumnPinningState(columnPinning.value)
-      draftColumnOrder.value = [...table.getAllLeafColumns().map((column) => column.id)]
+      draftColumnOrder.value = [...allLeafColumns.value.map((column) => column.id)]
       draftColumnMoveTargetById.value = { ...columnMoveTargetById.value }
     }
 
@@ -784,13 +795,19 @@ export default defineComponent({
     const cellStylesByColumnId = computed(() => {
       const styles = new Map<string, CSSProperties>()
       let leftOffset = 0
-      let rightOffset = 0
-      const leftColumns = visibleColumns.value.filter((column) => leftPinnedColumnIds.value.has(column.id))
-      const rightColumns = visibleColumns.value.filter((column) =>
-        rightPinnedColumnIds.value.has(column.id),
-      )
+      const leftPinnedIds = columnPinning.value.left ?? []
+      const rightPinnedIds = columnPinning.value.right ?? []
 
-      for (const [index, column] of leftColumns.entries()) {
+      for (let index = 0; index < leftPinnedIds.length; index += 1) {
+        const columnId = leftPinnedIds[index]
+        if (!columnId) {
+          continue
+        }
+        const column = allLeafColumnsById.value.get(columnId)
+        if (!column || !visibleColumnIndexById.value.has(columnId)) {
+          continue
+        }
+
         styles.set(column.id, {
           width: `${column.getSize()}px`,
           left: `${leftOffset}px`,
@@ -800,8 +817,17 @@ export default defineComponent({
         leftOffset += column.getSize()
       }
 
-      for (const [reverseIndex, column] of [...rightColumns].reverse().entries()) {
-        const index = rightColumns.length - 1 - reverseIndex
+      let rightOffset = 0
+      for (let index = rightPinnedIds.length - 1; index >= 0; index -= 1) {
+        const columnId = rightPinnedIds[index]
+        if (!columnId) {
+          continue
+        }
+        const column = allLeafColumnsById.value.get(columnId)
+        if (!column || !visibleColumnIndexById.value.has(columnId)) {
+          continue
+        }
+
         styles.set(column.id, {
           width: `${column.getSize()}px`,
           right: `${rightOffset}px`,
@@ -1755,14 +1781,25 @@ export default defineComponent({
 
     function renderCell(cell: Cell<AnyRow, unknown>) {
       const columnDef = cell.column.columnDef as DataGridColumn<AnyRow>
+      const context = cell.getContext()
+      const renderProps: CellRenderProps = {
+        table: context.table,
+        column: context.column,
+        row: context.row,
+        cell: context.cell,
+        getValue: context.getValue,
+        renderValue: context.renderValue,
+        align: columnDef.align ?? 'start',
+      }
 
       return h(FlexRender, {
         render: cell.column.columnDef.cell,
-        props: {
-          ...cell.getContext(),
-          align: columnDef.align ?? 'start',
-        },
+        props: renderProps,
       })
+    }
+
+    function closeColumnMenu() {
+      openMenuColumnId.value = null
     }
 
     const selectionPanelColumns = computed(() => {
@@ -1830,25 +1867,52 @@ export default defineComponent({
 
     const selectionPanelSums = computed(() => {
       const sumConfigs = mergedSelectionPanelConfig.value?.sumColumns ?? []
+      const columnsById = new Map<string, Column<AnyRow, unknown>>()
+      const totalsById = new Map<string, number>()
+
+      for (const config of sumConfigs) {
+        const column = allLeafColumnsById.value.get(config.columnId)
+        if (!column) {
+          continue
+        }
+
+        columnsById.set(config.columnId, column)
+        totalsById.set(config.columnId, 0)
+      }
+
+      if (totalsById.size === 0) {
+        return []
+      }
+
+      for (const row of selectedRows.value) {
+        for (const config of sumConfigs) {
+          if (!totalsById.has(config.columnId)) {
+            continue
+          }
+
+          const rawValue = row.getValue(config.columnId)
+          const numericValue =
+            typeof rawValue === 'number'
+              ? rawValue
+              : typeof rawValue === 'string'
+                ? Number(rawValue)
+                : Number.NaN
+
+          if (!Number.isFinite(numericValue)) {
+            continue
+          }
+
+          totalsById.set(config.columnId, (totalsById.get(config.columnId) ?? 0) + numericValue)
+        }
+      }
 
       return sumConfigs
         .map((config) => {
-          const column = allLeafColumnsById.value.get(config.columnId)
+          const column = columnsById.get(config.columnId)
           if (!column) {
             return null
           }
-
-          const sum = selectedRows.value.reduce((total, row) => {
-            const rawValue = row.getValue(config.columnId)
-            const numericValue =
-              typeof rawValue === 'number'
-                ? rawValue
-                : typeof rawValue === 'string'
-                  ? Number(rawValue)
-                  : Number.NaN
-
-            return Number.isFinite(numericValue) ? total + numericValue : total
-          }, 0)
+          const sum = totalsById.get(config.columnId) ?? 0
 
           return {
             columnId: config.columnId,
@@ -2004,9 +2068,7 @@ export default defineComponent({
                             onSetSortDesc={setSortDesc}
                             onClearSorting={clearSorting}
                             onSetPin={setPin}
-                            onCloseMenu={() => {
-                              openMenuColumnId.value = null
-                            }}
+                            onCloseMenu={closeColumnMenu}
                           />
                         </div>
                       )
@@ -2021,57 +2083,18 @@ export default defineComponent({
                       return null
                     }
 
-                    const visibleCells = row.getVisibleCells()
-
                     return (
-                      <div
+                      <DataGridBodyRow
                         key={row.id}
-                        class={[
-                          'data-grid__row',
-                          row.getIsSelected() ? 'data-grid__row--selected' : '',
-                        ]}
-                        aria-selected={row.getIsSelected() ? 'true' : 'false'}
-                        style={{
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        {rowSequence.value.map((entry) => {
-                          if (entry.type === 'spacer') {
-                            return (
-                              <div
-                                key={entry.key}
-                                class="data-grid__cell-spacer"
-                                style={{ width: `${entry.width}px` }}
-                              />
-                            )
-                          }
-
-                          const cellIndex = visibleColumnIndexById.value.get(entry.column.id)
-                          const cell = typeof cellIndex === 'number' ? visibleCells[cellIndex] : undefined
-                          if (!cell) {
-                            return null
-                          }
-
-                          const pinnedSide = getPinnedSide(entry.column.id)
-
-                          return (
-                            <div
-                              key={cell.id}
-                              class={[
-                                'data-grid__cell',
-                                pinnedSide ? 'data-grid__cell--pinned' : '',
-                                pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
-                              ]}
-                              style={{
-                                ...cellStylesByColumnId.value.get(entry.column.id),
-                              }}
-                            >
-                              {renderCell(cell)}
-                            </div>
-                          )
-                        })}
-                      </div>
+                        row={row}
+                        rowStart={virtualRow.start}
+                        rowSize={virtualRow.size}
+                        rowSequence={rowSequence.value}
+                        visibleColumnIndexById={visibleColumnIndexById.value}
+                        cellStylesByColumnId={cellStylesByColumnId.value}
+                        getPinnedSide={getPinnedSide}
+                        renderCell={renderCell}
+                      />
                     )
                   })}
                 </div>
