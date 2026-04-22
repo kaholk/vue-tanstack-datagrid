@@ -1,42 +1,67 @@
 {
-  "name": "vue-tanstack-datagrid",
-  "version": "0.1.0",
-  "private": false,
-  "type": "module",
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "sideEffects": [
-    "*.css"
-  ],
-  "scripts": {
-    "build": "vite build && vue-tsc --project tsconfig.build.json && node ./scripts/copy-css.mjs",
-    "type-check": "vue-tsc --project tsconfig.build.json --noEmit",
-    "prepack": "npm run build"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./styles.css": "./dist/styles.css"
-  },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "peerDependencies": {
-    "@tanstack/vue-table": "^8.21.3",
-    "@tanstack/vue-virtual": "^3.13.24",
-    "vue": ">=3.0.0"
-  },
-  "devDependencies": {
-    "@iconify/json": "^2.2.465",
-    "@vitejs/plugin-vue-jsx": "^5.1.5",
-    "typescript": "~6.0.0",
-    "unplugin-icons": "^23.0.1",
-    "vite": "^8.0.3",
-    "vue-tsc": "^3.2.6"
-  }
+    "name":  "vue-tanstack-datagrid",
+    "version":  "0.1.0",
+    "private":  false,
+    "description":  "Server-side DataGrid for Vue 3 built on TanStack Table and TanStack Virtual.",
+    "license":  "MPL-2.0",
+    "type":  "module",
+    "files":  [
+                  "dist",
+                  "README.md",
+                  "LICENSE"
+              ],
+    "keywords":  [
+                     "vue",
+                     "vue3",
+                     "datagrid",
+                     "data-grid",
+                     "tanstack",
+                     "tanstack-table",
+                     "virtualization",
+                     "table"
+                 ],
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/kaholk/vue-tanstack-datagrid.git",
+                       "directory":  "packages/datagrid"
+                   },
+    "homepage":  "https://github.com/kaholk/vue-tanstack-datagrid/tree/main/packages/datagrid#readme",
+    "bugs":  {
+                 "url":  "https://github.com/kaholk/vue-tanstack-datagrid/issues"
+             },
+    "publishConfig":  {
+                          "access":  "public"
+                      },
+    "sideEffects":  [
+                        "*.css"
+                    ],
+    "scripts":  {
+                    "build":  "vite build \u0026\u0026 vue-tsc --project tsconfig.build.json \u0026\u0026 node ./scripts/copy-css.mjs",
+                    "type-check":  "vue-tsc --project tsconfig.build.json --noEmit",
+                    "prepack":  "npm run build"
+                },
+    "exports":  {
+                    ".":  {
+                              "types":  "./dist/index.d.ts",
+                              "import":  "./dist/index.js",
+                              "require":  "./dist/index.cjs"
+                          },
+                    "./styles.css":  "./dist/styles.css"
+                },
+    "main":  "./dist/index.cjs",
+    "module":  "./dist/index.js",
+    "types":  "./dist/index.d.ts",
+    "peerDependencies":  {
+                             "@tanstack/vue-table":  "^8.21.3",
+                             "@tanstack/vue-virtual":  "^3.13.24",
+                             "vue":  "\u003e=3.0.0"
+                         },
+    "devDependencies":  {
+                            "@iconify/json":  "^2.2.465",
+                            "@vitejs/plugin-vue-jsx":  "^5.1.5",
+                            "typescript":  "~6.0.0",
+                            "unplugin-icons":  "^23.0.1",
+                            "vite":  "^8.0.3",
+                            "vue-tsc":  "^3.2.6"
+                        }
 }

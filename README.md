@@ -40,3 +40,7 @@ nie wskazuja juz na surowe pliki `src`.
 ```sh
 npm run build:datagrid
 ```
+
+## License
+
+Repo jest na licencji `MPL-2.0`. Szczegoly sa w pliku `LICENSE`.

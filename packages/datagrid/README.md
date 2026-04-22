@@ -1221,3 +1221,56 @@ Tam są pokazane:
 - panel sum i kopiowania
 - zapisane widoki
 - inline edycja komórek
+
+## Install
+
+Instalacja przez npm:
+
+```sh
+npm install vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
+```
+
+Instalacja przez bun:
+
+```sh
+bun add vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
+```
+
+Minimalne uzycie:
+
+```ts
+import { DataGrid } from 'vue-tanstack-datagrid'
+import 'vue-tanstack-datagrid/styles.css'
+```
+
+## Publish
+
+Checklist przed publikacja:
+
+1. Zmien `version` w `packages/datagrid/package.json`.
+2. Uruchom type-check i build.
+3. Sprawdz paczke przez `npm pack --dry-run`.
+4. Zaloguj sie do npm przez `npm login`.
+5. Opublikuj paczke z katalogu `packages/datagrid`.
+
+Komendy:
+
+```sh
+bun run type-check:datagrid
+bun run build:datagrid
+cd packages/datagrid
+npm pack --dry-run
+npm publish
+```
+
+`publishConfig.access` jest ustawione na `public`, wiec nie trzeba dodawac `--access public` przy kazdej publikacji.
+
+## License
+
+Projekt i paczka sa udostepnione na licencji `MPL-2.0`.
+
+To oznacza w praktyce:
+
+- zmiany w plikach objetych MPL musza pozostac otwarte
+- wiekszy projekt korzystajacy z paczki moze miec inna licencje
+- to jest slabszy copyleft niz GPL, ale mocniejszy niz MIT
