@@ -1,5 +1,5 @@
 {
-  "name": "testproject",
+  "name": "vue-tanstack-datagrid",
   "private": true,
   "workspaces": [
     "frontend",

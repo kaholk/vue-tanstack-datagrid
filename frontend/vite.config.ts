@@ -19,8 +19,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@testproject/datagrid/styles.css': fileURLToPath(new URL('../packages/datagrid/src/styles.css', import.meta.url)),
-      '@testproject/datagrid': fileURLToPath(new URL('../packages/datagrid/src/index.ts', import.meta.url)),
+      'vue-tanstack-datagrid/styles.css': fileURLToPath(new URL('../packages/datagrid/src/styles.css', import.meta.url)),
+      'vue-tanstack-datagrid': fileURLToPath(new URL('../packages/datagrid/src/index.ts', import.meta.url)),
       '@tanstack/vue-table': fileURLToPath(
         new URL('./node_modules/@tanstack/vue-table/build/lib/index.mjs', import.meta.url),
       ),

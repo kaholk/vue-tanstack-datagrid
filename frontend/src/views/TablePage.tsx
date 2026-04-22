@@ -9,7 +9,7 @@ import {
   DataGridInlineSelectEditor,
   deserializeDataGridSavedViews,
   serializeDataGridSavedViews,
-} from '@testproject/datagrid'
+} from 'vue-tanstack-datagrid'
 import type {
   DataGridColumn,
   DataGridFetchParams,
@@ -20,7 +20,7 @@ import type {
   DataGridQuickFilterConfig,
   DataGridSavedViewsPersistence,
   DataGridSelectionPanelConfig,
-} from '@testproject/datagrid'
+} from 'vue-tanstack-datagrid'
 
 const statusValues = [
   'active',

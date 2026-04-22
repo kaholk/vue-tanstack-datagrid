@@ -1,9 +1,9 @@
-# TESTPROJECT
+# VUE-TANSTACK-DATAGRID
 
 Docelowy uklad repo:
 
 ```text
-TESTPROJECT/
+VUE-TANSTACK-DATAGRID/
 |- .vscode/
 |- backend/
 |- frontend/

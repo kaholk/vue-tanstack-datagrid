@@ -1,5 +1,5 @@
 import './assets/main.css'
-import '@testproject/datagrid/styles.css'
+import 'vue-tanstack-datagrid/styles.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

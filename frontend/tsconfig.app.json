@@ -9,8 +9,8 @@
     // Path mapping for cleaner imports.
     "paths": {
       "@/*": ["./src/*"],
-      "@testproject/datagrid": ["../packages/datagrid/src/index.ts"],
-      "@testproject/datagrid/styles.css": ["../packages/datagrid/src/styles.css"],
+      "vue-tanstack-datagrid": ["../packages/datagrid/src/index.ts"],
+      "vue-tanstack-datagrid/styles.css": ["../packages/datagrid/src/styles.css"],
       "vue": ["./node_modules/vue"],
       "vue/*": ["./node_modules/vue/*"],
       "@tanstack/vue-table": ["./node_modules/@tanstack/vue-table"],

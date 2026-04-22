@@ -1,4 +1,4 @@
-# @testproject/datagrid
+# vue-tanstack-datagrid
 
 `DataGrid` to gotowy, server-side grid dla Vue 3 oparty o:
 
@@ -24,8 +24,8 @@ Obsługuje:
 W workspace użycie wygląda tak:
 
 ```ts
-import { DataGrid } from '@testproject/datagrid'
-import '@testproject/datagrid/styles.css'
+import { DataGrid } from 'vue-tanstack-datagrid'
+import 'vue-tanstack-datagrid/styles.css'
 ```
 
 Build paczki:
@@ -51,8 +51,8 @@ Najmniejsza sensowna integracja wymaga:
 
 ```tsx
 import { defineComponent } from 'vue'
-import { DataGrid, type DataGridColumn, type DataGridFetchParams, type DataGridFetchResult } from '@testproject/datagrid'
-import '@testproject/datagrid/styles.css'
+import { DataGrid, type DataGridColumn, type DataGridFetchParams, type DataGridFetchResult } from 'vue-tanstack-datagrid'
+import 'vue-tanstack-datagrid/styles.css'
 
 type UserRow = {
   id: number
@@ -709,7 +709,7 @@ import {
   deserializeDataGridSavedViews,
   serializeDataGridSavedViews,
   type DataGridSavedViewsPersistence,
-} from '@testproject/datagrid'
+} from 'vue-tanstack-datagrid'
 ```
 
 Przyklad persystencji przez backend:
@@ -872,8 +872,8 @@ import {
   type DataGridFilterConfig,
   type DataGridQuickFilterConfig,
   type DataGridSelectionPanelConfig,
-} from '@testproject/datagrid'
-import '@testproject/datagrid/styles.css'
+} from 'vue-tanstack-datagrid'
+import 'vue-tanstack-datagrid/styles.css'
 
 type CustomerRow = {
   id: number
