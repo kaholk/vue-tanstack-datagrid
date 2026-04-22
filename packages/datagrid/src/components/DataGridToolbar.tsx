@@ -62,6 +62,14 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    onRefresh: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onClearFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
     onToggleColumnPicker: {
       type: Function as PropType<() => void>,
       required: true,
@@ -161,6 +169,22 @@ export default defineComponent({
             data-grid-dialog-root="true"
           >
             Filtry
+          </button>
+          <button
+            type="button"
+            class="data-grid__toolbar-button"
+            onClick={props.onRefresh}
+            data-grid-dialog-root="true"
+          >
+            Odswiez
+          </button>
+          <button
+            type="button"
+            class="data-grid__toolbar-button"
+            onClick={props.onClearFilters}
+            data-grid-dialog-root="true"
+          >
+            Wyczysc filtry
           </button>
           <button
             type="button"

@@ -33,6 +33,7 @@ import DataGridFooter from './components/DataGridFooter'
 import DataGridFilterDialog from './components/DataGridFilterDialog'
 import DataGridHeaderCell from './components/DataGridHeaderCell'
 import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
+import DataGridSelectionPanel from './components/DataGridSelectionPanel'
 import DataGridToolbar from './components/DataGridToolbar'
 import type {
   DataGridColumnAlign,
@@ -44,6 +45,10 @@ import type {
   DataGridFetchParams,
   DataGridFetchResult,
   DataGridInitialState,
+  DataGridMetaConfig,
+  DataGridPageSizeConfig,
+  DataGridSelectionPanelConfig,
+  DataGridSelectionPanelSumConfig,
   DataGridSavedView,
   DataGridSavedViewState,
 } from './types'
@@ -72,6 +77,23 @@ type PaginationItem =
   | { type: 'ellipsis'; key: string }
 
 const headerHeight = 92
+const defaultMetaItems: DataGridMetaConfig[] = [
+  { key: 'rows', label: 'Rows' },
+  { key: 'fetched', label: 'Fetched' },
+  { key: 'datasetSize', label: 'Dataset' },
+]
+const defaultPageSizeConfig: DataGridPageSizeConfig = {
+  label: 'Rows',
+  options: [50, 100, 250, 500],
+}
+const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
+  position: 'bottom-right',
+  sumColumns: [],
+  copyColumnIds: undefined,
+  selectedRowsLabel: 'Zaznaczone wiersze',
+  copyWithHeadersLabel: 'Kopiuj z naglowkami',
+  copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
+}
 
 function toNumber(value: string, fallback: number) {
   const parsed = Number(value)
@@ -171,8 +193,30 @@ function cloneViewState(state: DataGridSavedViewState): DataGridSavedViewState {
   }
 }
 
+function cloneColumnFilters(filters: ColumnFiltersState): ColumnFiltersState {
+  return filters.map((filter) => ({
+    id: filter.id,
+    value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
+  }))
+}
+
+function cloneColumnPinningState(state: ColumnPinningState): ColumnPinningState {
+  return {
+    left: [...(state.left ?? [])],
+    right: [...(state.right ?? [])],
+  }
+}
+
 function toFilterGroupId(label: string) {
   return label.trim().toLocaleLowerCase().replace(/\s+/g, '-')
+}
+
+function escapeClipboardCell(value: string) {
+  if (value.includes('\t') || value.includes('\n') || value.includes('"')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+
+  return value
 }
 
 export default defineComponent({
@@ -220,6 +264,21 @@ export default defineComponent({
       type: String,
       default: '',
     },
+    metaItems: {
+      type: Array as PropType<DataGridMetaConfig[]>,
+      default: () => defaultMetaItems.map((item) => ({ ...item })),
+    },
+    pageSizeConfig: {
+      type: Object as PropType<DataGridPageSizeConfig>,
+      default: () => ({
+        label: defaultPageSizeConfig.label,
+        options: [...(defaultPageSizeConfig.options ?? [])],
+      }),
+    },
+    selectionPanelConfig: {
+      type: Object as PropType<DataGridSelectionPanelConfig | undefined>,
+      default: undefined,
+    },
   },
   setup(props) {
     const scrollElementRef = ref<HTMLDivElement | null>(null)
@@ -247,6 +306,7 @@ export default defineComponent({
     const openMenuColumnId = ref<string | null>(null)
     const openHeaderFilterColumnId = ref<string | null>(null)
     const openToolbarFilterColumnId = ref<string | null>(null)
+    const openDialogFilterColumnId = ref<string | null>(null)
     const isColumnPickerOpen = ref(false)
     const isFilterDialogOpen = ref(false)
     const isViewsMenuOpen = ref(false)
@@ -254,6 +314,16 @@ export default defineComponent({
     const newViewName = ref('')
     const columnMoveTargetById = ref<Record<string, string>>({})
     const filterSearchByColumnId = ref<Record<string, string>>({})
+    const draftColumnVisibility = ref<DataGridColumnVisibilityState>({})
+    const draftColumnSizing = ref<ColumnSizingState>({})
+    const draftColumnPinning = ref<ColumnPinningState>({
+      left: [],
+      right: [],
+    })
+    const draftColumnOrder = ref<ColumnOrderState>([])
+    const draftColumnMoveTargetById = ref<Record<string, string>>({})
+    const draftColumnFilters = ref<ColumnFiltersState>([])
+    const draftGlobalFilter = ref('')
     const requestState = ref<RequestState<AnyRow>>({
       rows: [],
       totalRows: 0,
@@ -301,6 +371,7 @@ export default defineComponent({
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
+      openDialogFilterColumnId.value = null
       isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
       columnVirtualizer.value.measure()
@@ -321,6 +392,19 @@ export default defineComponent({
         })),
         globalFilter: props.initialState.globalFilter ?? '',
       }
+    }
+
+    function syncColumnDialogDraftState() {
+      draftColumnVisibility.value = { ...columnVisibility.value }
+      draftColumnSizing.value = { ...columnSizing.value }
+      draftColumnPinning.value = cloneColumnPinningState(columnPinning.value)
+      draftColumnOrder.value = [...table.getAllLeafColumns().map((column) => column.id)]
+      draftColumnMoveTargetById.value = { ...columnMoveTargetById.value }
+    }
+
+    function syncFilterDialogDraftState() {
+      draftColumnFilters.value = cloneColumnFilters(columnFilters.value)
+      draftGlobalFilter.value = globalFilter.value
     }
 
     function loadSavedViews() {
@@ -462,6 +546,7 @@ export default defineComponent({
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
+      openDialogFilterColumnId.value = null
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
       isSaveViewDialogOpen.value = false
@@ -493,6 +578,7 @@ export default defineComponent({
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
+      openDialogFilterColumnId.value = null
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
       isViewsMenuOpen.value = false
@@ -578,6 +664,28 @@ export default defineComponent({
     const visibleHeaders = computed(() => table.getHeaderGroups()[0]?.headers ?? [])
     const visibleRows = computed(() => table.getRowModel().rows)
     const totalWidth = computed(() => table.getTotalSize())
+    const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig | null>(() => {
+      if (!props.selectionPanelConfig) {
+        return null
+      }
+
+      return {
+        position: props.selectionPanelConfig.position ?? defaultSelectionPanelConfig.position,
+        sumColumns: props.selectionPanelConfig.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
+        copyColumnIds:
+          props.selectionPanelConfig.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
+        selectedRowsLabel:
+          props.selectionPanelConfig.selectedRowsLabel ??
+          defaultSelectionPanelConfig.selectedRowsLabel,
+        copyWithHeadersLabel:
+          props.selectionPanelConfig.copyWithHeadersLabel ??
+          defaultSelectionPanelConfig.copyWithHeadersLabel,
+        copyWithoutHeadersLabel:
+          props.selectionPanelConfig.copyWithoutHeadersLabel ??
+          defaultSelectionPanelConfig.copyWithoutHeadersLabel,
+      }
+    })
+    const selectedRows = computed(() => visibleRows.value.filter((row) => row.getIsSelected()))
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
       if (columnPinning.value.left?.includes(columnId)) {
@@ -767,13 +875,18 @@ export default defineComponent({
     }
 
     function toggleColumnPicker() {
-      isColumnPickerOpen.value = !isColumnPickerOpen.value
+      const nextOpen = !isColumnPickerOpen.value
+      isColumnPickerOpen.value = nextOpen
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
       isFilterDialogOpen.value = false
       isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
+
+      if (nextOpen) {
+        syncColumnDialogDraftState()
+      }
     }
 
     function closeColumnPicker() {
@@ -781,13 +894,18 @@ export default defineComponent({
     }
 
     function toggleFilterDialog() {
-      isFilterDialogOpen.value = !isFilterDialogOpen.value
+      const nextOpen = !isFilterDialogOpen.value
+      isFilterDialogOpen.value = nextOpen
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
       isColumnPickerOpen.value = false
       isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
+
+      if (nextOpen) {
+        syncFilterDialogDraftState()
+      }
     }
 
     function closeFilterDialog() {
@@ -833,25 +951,19 @@ export default defineComponent({
       loadSavedViews()
     })
 
-    function updateColumnFilter(columnId: string, value: string) {
-      setColumnFilterValue(columnId, value.trim() ? value : undefined)
-    }
-
-    function setColumnFilterValue(columnId: string, value: unknown) {
-      pagination.value = {
-        ...pagination.value,
-        pageIndex: 0,
-      }
-
+    function getNextColumnFilters(
+      filters: ColumnFiltersState,
+      columnId: string,
+      value: unknown,
+    ): ColumnFiltersState {
       const hasValue = Array.isArray(value) ? value.length > 0 : value !== undefined && value !== ''
 
       if (!hasValue) {
-        columnFilters.value = columnFilters.value.filter((item) => item.id !== columnId)
-        return
+        return filters.filter((item) => item.id !== columnId)
       }
 
-      columnFilters.value = [
-        ...columnFilters.value.filter((item) => item.id !== columnId),
+      return [
+        ...filters.filter((item) => item.id !== columnId),
         {
           id: columnId,
           value,
@@ -859,16 +971,43 @@ export default defineComponent({
       ]
     }
 
-    function getFilterRawValue(columnId: string) {
-      return columnFilters.value.find((item) => item.id === columnId)?.value
+    function updateColumnFilter(
+      columnId: string,
+      value: string,
+      target: 'live' | 'dialog' = 'live',
+    ) {
+      setColumnFilterValue(columnId, value.trim() ? value : undefined, target)
     }
 
-    function getFilterValue(columnId: string) {
-      return String(getFilterRawValue(columnId) ?? '')
+    function setColumnFilterValue(
+      columnId: string,
+      value: unknown,
+      target: 'live' | 'dialog' = 'live',
+    ) {
+      if (target === 'dialog') {
+        draftColumnFilters.value = getNextColumnFilters(draftColumnFilters.value, columnId, value)
+        return
+      }
+
+      pagination.value = {
+        ...pagination.value,
+        pageIndex: 0,
+      }
+
+      columnFilters.value = getNextColumnFilters(columnFilters.value, columnId, value)
     }
 
-    function getSelectFilterValues(columnId: string) {
-      const rawValue = getFilterRawValue(columnId)
+    function getFilterRawValue(columnId: string, target: 'live' | 'dialog' = 'live') {
+      const filters = target === 'dialog' ? draftColumnFilters.value : columnFilters.value
+      return filters.find((item) => item.id === columnId)?.value
+    }
+
+    function getFilterValue(columnId: string, target: 'live' | 'dialog' = 'live') {
+      return String(getFilterRawValue(columnId, target) ?? '')
+    }
+
+    function getSelectFilterValues(columnId: string, target: 'live' | 'dialog' = 'live') {
+      const rawValue = getFilterRawValue(columnId, target)
 
       if (!Array.isArray(rawValue)) {
         return []
@@ -879,9 +1018,20 @@ export default defineComponent({
 
     function toggleFilterMenu(
       columnId: string,
-      options?: { keepDialogsOpen?: boolean; target?: 'toolbar' | 'header' },
+      options?: { keepDialogsOpen?: boolean; target?: 'toolbar' | 'header' | 'dialog' },
     ) {
       const target = options?.target ?? 'header'
+
+      if (target === 'dialog') {
+        openDialogFilterColumnId.value =
+          openDialogFilterColumnId.value === columnId ? null : columnId
+        openHeaderFilterColumnId.value = null
+        openToolbarFilterColumnId.value = null
+        openMenuColumnId.value = null
+        isViewsMenuOpen.value = false
+        isSaveViewDialogOpen.value = false
+        return
+      }
 
       if (target === 'toolbar') {
         openToolbarFilterColumnId.value =
@@ -894,6 +1044,8 @@ export default defineComponent({
       }
 
       openMenuColumnId.value = null
+      isViewsMenuOpen.value = false
+      isSaveViewDialogOpen.value = false
 
       if (!options?.keepDialogsOpen) {
         isFilterDialogOpen.value = false
@@ -955,8 +1107,9 @@ export default defineComponent({
       columnId: string,
       optionValue: DataGridFilterOption['value'],
       checked: boolean,
+      target: 'live' | 'dialog' = 'live',
     ) {
-      const currentValues = getSelectFilterValues(columnId)
+      const currentValues = getSelectFilterValues(columnId, target)
       const normalizedValue = toFilterOptionKey(optionValue)
       const nextValues = currentValues.filter((value) => toFilterOptionKey(value) !== normalizedValue)
 
@@ -964,25 +1117,28 @@ export default defineComponent({
         nextValues.push(optionValue)
       }
 
-      setColumnFilterValue(columnId, nextValues)
+      setColumnFilterValue(columnId, nextValues, target)
     }
 
-    function selectAllFilterOptions(config: DataGridFilterConfig) {
+    function selectAllFilterOptions(
+      config: DataGridFilterConfig,
+      target: 'live' | 'dialog' = 'live',
+    ) {
       const options = getFilterOptions(config).map((option) => option.value)
-      setColumnFilterValue(config.id, options)
+      setColumnFilterValue(config.id, options, target)
     }
 
-    function clearSelectFilterOptions(filterId: string) {
-      setColumnFilterValue(filterId, undefined)
+    function clearSelectFilterOptions(filterId: string, target: 'live' | 'dialog' = 'live') {
+      setColumnFilterValue(filterId, undefined, target)
     }
 
-    function getFilterButtonLabel(config: DataGridFilterConfig) {
+    function getFilterButtonLabel(config: DataGridFilterConfig, target: 'live' | 'dialog' = 'live') {
       if (config.variant !== 'select') {
         return 'Filtr'
       }
 
       const options = getFilterOptions(config)
-      const selectedValues = getSelectFilterValues(config.id)
+      const selectedValues = getSelectFilterValues(config.id, target)
 
       if (selectedValues.length === 0) {
         return 'Wybierz'
@@ -1008,17 +1164,24 @@ export default defineComponent({
       return `${selectedValues.length} wybrane`
     }
 
-    function renderFilterControl(config: DataGridFilterConfig, options?: { toolbar?: boolean }) {
+    function renderFilterControl(
+      config: DataGridFilterConfig,
+      options?: { toolbar?: boolean; target?: 'live' | 'dialog' },
+    ) {
       const filterOptions = getFilterOptions(config)
       const isToolbar = options?.toolbar ?? false
+      const target = options?.target ?? 'live'
 
       if (config.variant === 'select' && filterOptions.length > 0) {
-        const selectedValues = getSelectFilterValues(config.id)
+        const selectedValues = getSelectFilterValues(config.id, target)
         const selectedValueKeys = new Set(selectedValues.map((value) => toFilterOptionKey(value)))
         const visibleOptions = getVisibleFilterOptions(config)
-        const isOpen = isToolbar
-          ? openToolbarFilterColumnId.value === config.id
-          : openHeaderFilterColumnId.value === config.id
+        const isOpen =
+          target === 'dialog'
+            ? openDialogFilterColumnId.value === config.id
+            : isToolbar
+              ? openToolbarFilterColumnId.value === config.id
+              : openHeaderFilterColumnId.value === config.id
 
         return h('div', { class: ['data-grid__filter-select', isToolbar ? 'data-grid__filter-select--toolbar' : ''], 'data-grid-filter-root': 'true' }, [
           h(
@@ -1032,13 +1195,17 @@ export default defineComponent({
               onClick: (event) => {
                 event.stopPropagation()
                 toggleFilterMenu(config.id, {
-                  keepDialogsOpen: isToolbar,
-                  target: isToolbar ? 'toolbar' : 'header',
+                  keepDialogsOpen: isToolbar || target === 'dialog',
+                  target: target === 'dialog' ? 'dialog' : isToolbar ? 'toolbar' : 'header',
                 })
               },
             },
             [
-              h('span', { class: 'data-grid__filter-select-label' }, getFilterButtonLabel(config)),
+              h(
+                'span',
+                { class: 'data-grid__filter-select-label' },
+                getFilterButtonLabel(config, target),
+              ),
               h(
                 'span',
                 { class: 'data-grid__filter-select-count' },
@@ -1069,7 +1236,7 @@ export default defineComponent({
                       {
                         type: 'button',
                         class: 'data-grid__filter-select-action',
-                        onClick: () => selectAllFilterOptions(config),
+                        onClick: () => selectAllFilterOptions(config, target),
                       },
                       'Zaznacz wszystko',
                     ),
@@ -1078,7 +1245,7 @@ export default defineComponent({
                       {
                         type: 'button',
                         class: 'data-grid__filter-select-action',
-                        onClick: () => clearSelectFilterOptions(config.id),
+                        onClick: () => clearSelectFilterOptions(config.id, target),
                       },
                       'Odznacz wszystko',
                     ),
@@ -1105,6 +1272,7 @@ export default defineComponent({
                                     config.id,
                                     option.value,
                                     (event.target as HTMLInputElement).checked,
+                                    target,
                                   ),
                               }),
                               h('span', option.label),
@@ -1122,10 +1290,195 @@ export default defineComponent({
 
       return h('input', {
         class: ['data-grid__filter-input', isToolbar ? 'data-grid__filter-input--toolbar' : ''],
-        value: getFilterValue(config.id),
+        value: getFilterValue(config.id, target),
         placeholder: config.placeholder ?? 'Filtr',
-        onInput: (event) => updateColumnFilter(config.id, (event.target as HTMLInputElement).value),
+        onInput: (event) =>
+          updateColumnFilter(config.id, (event.target as HTMLInputElement).value, target),
       })
+    }
+
+    function getOrderedLeafColumns(columnIds: string[]) {
+      const columnById = new Map(table.getAllLeafColumns().map((column) => [column.id, column]))
+      const orderedColumns: Column<AnyRow, unknown>[] = []
+
+      for (const columnId of columnIds) {
+        const column = columnById.get(columnId)
+        if (column) {
+          orderedColumns.push(column)
+          columnById.delete(columnId)
+        }
+      }
+
+      return [...orderedColumns, ...columnById.values()]
+    }
+
+    const columnPickerColumns = computed(() => getOrderedLeafColumns(draftColumnOrder.value))
+
+    function getDraftPinnedSide(columnId: string): 'left' | 'right' | false {
+      if (draftColumnPinning.value.left?.includes(columnId)) {
+        return 'left'
+      }
+
+      if (draftColumnPinning.value.right?.includes(columnId)) {
+        return 'right'
+      }
+
+      return false
+    }
+
+    function getDraftColumnMoveTarget(columnId: string) {
+      const targetColumnId = draftColumnMoveTargetById.value[columnId]
+
+      if (targetColumnId) {
+        return targetColumnId
+      }
+
+      const fallbackTarget = columnPickerColumns.value.find((column) => column.id !== columnId)?.id
+      return fallbackTarget ?? ''
+    }
+
+    function toggleDraftColumnVisibility(columnId: string, isVisible: boolean) {
+      draftColumnVisibility.value = {
+        ...draftColumnVisibility.value,
+        [columnId]: isVisible,
+      }
+    }
+
+    function updateDraftColumnSize(columnId: string, rawValue: string) {
+      const column = table.getAllLeafColumns().find((item) => item.id === columnId)
+      if (!column) {
+        return
+      }
+
+      const nextSize = toNumber(rawValue, draftColumnSizing.value[columnId] ?? column.getSize())
+      draftColumnSizing.value = {
+        ...draftColumnSizing.value,
+        [columnId]: Math.max(nextSize, column.columnDef.minSize ?? 80),
+      }
+    }
+
+    function setDraftPin(columnId: string, side: 'left' | 'right' | false) {
+      const leftPinned = (draftColumnPinning.value.left ?? []).filter((id) => id !== columnId)
+      const rightPinned = (draftColumnPinning.value.right ?? []).filter((id) => id !== columnId)
+
+      if (side === 'left') {
+        draftColumnPinning.value = {
+          left: [...leftPinned, columnId],
+          right: rightPinned,
+        }
+        return
+      }
+
+      if (side === 'right') {
+        draftColumnPinning.value = {
+          left: leftPinned,
+          right: [...rightPinned, columnId],
+        }
+        return
+      }
+
+      draftColumnPinning.value = {
+        left: leftPinned,
+        right: rightPinned,
+      }
+    }
+
+    function moveDraftColumn(columnId: string, direction: -1 | 1) {
+      const orderedIds = [...draftColumnOrder.value]
+      const currentIndex = orderedIds.indexOf(columnId)
+      const nextIndex = currentIndex + direction
+
+      if (currentIndex === -1 || nextIndex < 0 || nextIndex >= orderedIds.length) {
+        return
+      }
+
+      const nextOrder = [...orderedIds]
+      const [movedColumnId] = nextOrder.splice(currentIndex, 1)
+      if (!movedColumnId) {
+        return
+      }
+
+      nextOrder.splice(nextIndex, 0, movedColumnId)
+      draftColumnOrder.value = nextOrder
+    }
+
+    function updateDraftColumnMoveTarget(columnId: string, targetColumnId: string) {
+      draftColumnMoveTargetById.value = {
+        ...draftColumnMoveTargetById.value,
+        [columnId]: targetColumnId,
+      }
+    }
+
+    function moveDraftColumnRelative(
+      columnId: string,
+      targetColumnId: string,
+      position: 'before' | 'after',
+    ) {
+      if (!targetColumnId || targetColumnId === columnId) {
+        return
+      }
+
+      const orderedIds = [...draftColumnOrder.value]
+      const sourceIndex = orderedIds.indexOf(columnId)
+      const targetIndex = orderedIds.indexOf(targetColumnId)
+
+      if (sourceIndex === -1 || targetIndex === -1) {
+        return
+      }
+
+      const nextOrder = [...orderedIds]
+      const [movedColumnId] = nextOrder.splice(sourceIndex, 1)
+      if (!movedColumnId) {
+        return
+      }
+
+      const adjustedTargetIndex = nextOrder.indexOf(targetColumnId)
+      const insertIndex = position === 'before' ? adjustedTargetIndex : adjustedTargetIndex + 1
+
+      nextOrder.splice(insertIndex, 0, movedColumnId)
+      draftColumnOrder.value = nextOrder
+    }
+
+    function applyColumnDialogChanges() {
+      columnVisibility.value = { ...draftColumnVisibility.value }
+      columnSizing.value = { ...draftColumnSizing.value }
+      columnPinning.value = cloneColumnPinningState(draftColumnPinning.value)
+      columnOrder.value = [...draftColumnOrder.value]
+      columnMoveTargetById.value = { ...draftColumnMoveTargetById.value }
+      columnVirtualizer.value.measure()
+      closeColumnPicker()
+    }
+
+    function applyFilterDialogChanges() {
+      pagination.value = {
+        ...pagination.value,
+        pageIndex: 0,
+      }
+      columnFilters.value = cloneColumnFilters(draftColumnFilters.value)
+      globalFilter.value = draftGlobalFilter.value
+      closeFilterDialog()
+    }
+
+    function refreshData() {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
+
+      void loadData()
+    }
+
+    function clearAllFilters() {
+      pagination.value = {
+        ...pagination.value,
+        pageIndex: 0,
+      }
+      columnFilters.value = []
+      globalFilter.value = ''
+      draftColumnFilters.value = []
+      draftGlobalFilter.value = ''
+      openHeaderFilterColumnId.value = null
+      openToolbarFilterColumnId.value = null
+      openDialogFilterColumnId.value = null
     }
 
     function toggleSorting(column: Column<AnyRow, unknown>) {
@@ -1159,33 +1512,6 @@ export default defineComponent({
       openMenuColumnId.value = null
     }
 
-    function cyclePin(column: Column<AnyRow, unknown>) {
-      const pinned = getPinnedSide(column.id)
-      const leftPinned = columnPinning.value.left ?? []
-      const rightPinned = columnPinning.value.right ?? []
-
-      if (pinned === 'left') {
-        columnPinning.value = {
-          left: leftPinned.filter((id) => id !== column.id),
-          right: [...rightPinned.filter((id) => id !== column.id), column.id],
-        }
-        return
-      }
-
-      if (pinned === 'right') {
-        columnPinning.value = {
-          left: leftPinned.filter((id) => id !== column.id),
-          right: rightPinned.filter((id) => id !== column.id),
-        }
-        return
-      }
-
-      columnPinning.value = {
-        left: [...leftPinned.filter((id) => id !== column.id), column.id],
-        right: rightPinned.filter((id) => id !== column.id),
-      }
-    }
-
     function setPin(column: Column<AnyRow, unknown>, side: 'left' | 'right' | false) {
       const leftPinned = (columnPinning.value.left ?? []).filter((id) => id !== column.id)
       const rightPinned = (columnPinning.value.right ?? []).filter((id) => id !== column.id)
@@ -1214,116 +1540,32 @@ export default defineComponent({
       openMenuColumnId.value = openMenuColumnId.value === columnId ? null : columnId
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
+      openDialogFilterColumnId.value = null
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
-    }
-
-    function updateColumnSize(column: Column<AnyRow, unknown>, rawValue: string) {
-      const nextSize = toNumber(rawValue, column.getSize())
-      columnSizing.value = {
-        ...columnSizing.value,
-        [column.id]: Math.max(nextSize, column.columnDef.minSize ?? 80),
-      }
-      columnVirtualizer.value.measure()
-    }
-
-    function moveColumn(columnId: string, direction: -1 | 1) {
-      const orderedIds = table.getAllLeafColumns().map((column) => column.id)
-      const currentIndex = orderedIds.indexOf(columnId)
-      const nextIndex = currentIndex + direction
-
-      if (currentIndex === -1 || nextIndex < 0 || nextIndex >= orderedIds.length) {
-        return
-      }
-
-      const nextOrder = [...orderedIds]
-      const [movedColumnId] = nextOrder.splice(currentIndex, 1)
-      if (!movedColumnId) {
-        return
-      }
-
-      nextOrder.splice(nextIndex, 0, movedColumnId)
-      columnOrder.value = nextOrder
-      columnVirtualizer.value.measure()
-    }
-
-    function getPinStatusLabel(columnId: string) {
-      const pinnedSide = getPinnedSide(columnId)
-
-      if (pinnedSide === 'left') {
-        return 'Left'
-      }
-
-      if (pinnedSide === 'right') {
-        return 'Right'
-      }
-
-      return 'None'
-    }
-
-    function updateColumnMoveTarget(columnId: string, targetColumnId: string) {
-      columnMoveTargetById.value = {
-        ...columnMoveTargetById.value,
-        [columnId]: targetColumnId,
-      }
-    }
-
-    function getColumnMoveTarget(columnId: string) {
-      const targetColumnId = columnMoveTargetById.value[columnId]
-
-      if (targetColumnId) {
-        return targetColumnId
-      }
-
-      const fallbackTarget = table
-        .getAllLeafColumns()
-        .find((column) => column.id !== columnId)?.id
-
-      return fallbackTarget ?? ''
-    }
-
-    function moveColumnRelative(columnId: string, targetColumnId: string, position: 'before' | 'after') {
-      if (!targetColumnId || targetColumnId === columnId) {
-        return
-      }
-
-      const orderedIds = table.getAllLeafColumns().map((column) => column.id)
-      const sourceIndex = orderedIds.indexOf(columnId)
-      const targetIndex = orderedIds.indexOf(targetColumnId)
-
-      if (sourceIndex === -1 || targetIndex === -1) {
-        return
-      }
-
-      const nextOrder = [...orderedIds]
-      const [movedColumnId] = nextOrder.splice(sourceIndex, 1)
-      if (!movedColumnId) {
-        return
-      }
-
-      const adjustedTargetIndex = nextOrder.indexOf(targetColumnId)
-      const insertIndex = position === 'before' ? adjustedTargetIndex : adjustedTargetIndex + 1
-
-      nextOrder.splice(insertIndex, 0, movedColumnId)
-      columnOrder.value = nextOrder
-      columnVirtualizer.value.measure()
     }
 
     function renderColumnPickerDialog() {
       return (
         <DataGridColumnPickerDialog
           isOpen={isColumnPickerOpen.value}
-          columns={table.getAllLeafColumns()}
+          columns={columnPickerColumns.value}
           renderColumnLabel={renderColumnPickerLabel}
-          getPinnedSide={getPinnedSide}
-          getPinStatusLabel={getPinStatusLabel}
-          getColumnMoveTarget={getColumnMoveTarget}
+          getIsColumnVisible={(columnId) => draftColumnVisibility.value[columnId] ?? true}
+          getPinnedSide={getDraftPinnedSide}
+          getColumnSize={(columnId) => {
+            const column = table.getAllLeafColumns().find((item) => item.id === columnId)
+            return draftColumnSizing.value[columnId] ?? column?.getSize() ?? 160
+          }}
+          getColumnMoveTarget={getDraftColumnMoveTarget}
           onClose={closeColumnPicker}
-          onUpdateColumnSize={updateColumnSize}
-          onSetPin={setPin}
-          onMoveColumn={moveColumn}
-          onUpdateColumnMoveTarget={updateColumnMoveTarget}
-          onMoveColumnRelative={moveColumnRelative}
+          onApply={applyColumnDialogChanges}
+          onToggleColumnVisibility={toggleDraftColumnVisibility}
+          onUpdateColumnSize={updateDraftColumnSize}
+          onSetPin={setDraftPin}
+          onMoveColumn={moveDraftColumn}
+          onUpdateColumnMoveTarget={updateDraftColumnMoveTarget}
+          onMoveColumnRelative={moveDraftColumnRelative}
         />
       )
     }
@@ -1333,8 +1575,9 @@ export default defineComponent({
         <DataGridFilterDialog
           isOpen={isFilterDialogOpen.value}
           sections={filterDialogSections.value}
-          renderFilterControl={(config) => renderFilterControl(config, { toolbar: true })}
+          renderFilterControl={(config) => renderFilterControl(config, { target: 'dialog' })}
           onClose={closeFilterDialog}
+          onApply={applyFilterDialogChanges}
         />
       )
     }
@@ -1411,6 +1654,113 @@ export default defineComponent({
           align: columnDef.align ?? 'start',
         },
       })
+    }
+
+    function getSelectionPanelColumns() {
+      const configuredColumnIds = mergedSelectionPanelConfig.value?.copyColumnIds
+      const columns = visibleColumns.value.filter((column) => {
+        const columnDef = column.columnDef as DataGridColumn<AnyRow>
+
+        if (configuredColumnIds && configuredColumnIds.length > 0) {
+          return configuredColumnIds.includes(column.id)
+        }
+
+        return column.id !== 'select' && columnDef.localKind !== 'action'
+      })
+
+      if (configuredColumnIds && configuredColumnIds.length > 0) {
+        return configuredColumnIds
+          .map((columnId) => columns.find((column) => column.id === columnId))
+          .filter((column): column is Column<AnyRow, unknown> => Boolean(column))
+      }
+
+      return columns
+    }
+
+    function getColumnClipboardLabel(column: Column<AnyRow, unknown>) {
+      return renderColumnPickerLabel(column)
+    }
+
+    function getClipboardCellValue(row: (typeof selectedRows.value)[number], column: Column<AnyRow, unknown>) {
+      const rawValue = row.getValue(column.id)
+
+      if (rawValue === null || rawValue === undefined) {
+        return ''
+      }
+
+      if (typeof rawValue === 'number' || typeof rawValue === 'boolean') {
+        return String(rawValue)
+      }
+
+      if (typeof rawValue === 'string') {
+        return rawValue
+      }
+
+      return JSON.stringify(rawValue)
+    }
+
+    async function copySelectedRows(includeHeaders: boolean) {
+      const columns = getSelectionPanelColumns()
+      const rows = selectedRows.value
+
+      if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
+        return
+      }
+
+      const lines: string[] = []
+
+      if (includeHeaders) {
+        lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
+      }
+
+      for (const row of rows) {
+        lines.push(
+          columns
+            .map((column) => escapeClipboardCell(getClipboardCellValue(row, column)))
+            .join('\t'),
+        )
+      }
+
+      await navigator.clipboard.writeText(lines.join('\n'))
+    }
+
+    function getSelectionPanelSums() {
+      const sumConfigs = mergedSelectionPanelConfig.value?.sumColumns ?? []
+
+      return sumConfigs
+        .map((config) => {
+          const column = table.getAllLeafColumns().find((item) => item.id === config.columnId)
+          if (!column) {
+            return null
+          }
+
+          const sum = selectedRows.value.reduce((total, row) => {
+            const rawValue = row.getValue(config.columnId)
+            const numericValue =
+              typeof rawValue === 'number'
+                ? rawValue
+                : typeof rawValue === 'string'
+                  ? Number(rawValue)
+                  : Number.NaN
+
+            return Number.isFinite(numericValue) ? total + numericValue : total
+          }, 0)
+
+          return {
+            columnId: config.columnId,
+            label: config.label ?? renderColumnPickerLabel(column),
+            value: config.formatValue ? config.formatValue(sum) : String(sum),
+          }
+        })
+        .filter(
+          (
+            item,
+          ): item is {
+            columnId: string
+            label: string
+            value: string
+          } => Boolean(item),
+        )
     }
 
     function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Header<AnyRow, unknown>>(
@@ -1527,6 +1877,8 @@ export default defineComponent({
               onOverwriteActiveView={overwriteActiveView}
               onDeleteActiveView={deleteActiveView}
               onToggleFilterDialog={toggleFilterDialog}
+              onRefresh={refreshData}
+              onClearFilters={clearAllFilters}
               onToggleColumnPicker={toggleColumnPicker}
             />
 
@@ -1676,6 +2028,30 @@ export default defineComponent({
                 </div>
               </div>
             </div>
+            {mergedSelectionPanelConfig.value && selectedRows.value.length > 0 ? (
+              <DataGridSelectionPanel
+                position={mergedSelectionPanelConfig.value.position ?? 'bottom-right'}
+                selectedRowsCount={selectedRows.value.length}
+                selectedRowsLabel={
+                  mergedSelectionPanelConfig.value.selectedRowsLabel ?? 'Zaznaczone wiersze'
+                }
+                sums={getSelectionPanelSums()}
+                copyWithHeadersLabel={
+                  mergedSelectionPanelConfig.value.copyWithHeadersLabel ??
+                  'Kopiuj z naglowkami'
+                }
+                copyWithoutHeadersLabel={
+                  mergedSelectionPanelConfig.value.copyWithoutHeadersLabel ??
+                  'Kopiuj bez naglowkow'
+                }
+                onCopyWithHeaders={() => {
+                  void copySelectedRows(true)
+                }}
+                onCopyWithoutHeaders={() => {
+                  void copySelectedRows(false)
+                }}
+              />
+            ) : null}
 
             <DataGridFooter
               isLoading={isLoading.value}
@@ -1687,6 +2063,8 @@ export default defineComponent({
                   ? requestState.value.meta.datasetSize
                   : undefined
               }
+              metaItems={props.metaItems}
+              pageSizeConfig={props.pageSizeConfig}
               pageIndex={pageIndex}
               pageSize={pagination.value.pageSize}
               paginationItems={paginationItems}

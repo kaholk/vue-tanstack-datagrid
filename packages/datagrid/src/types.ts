@@ -37,6 +37,39 @@ export type DataGridQuickFilterConfig = {
   width?: number | string
 }
 
+export type DataGridMetaKey = 'rows' | 'fetched' | 'datasetSize'
+
+export type DataGridMetaConfig = {
+  key: DataGridMetaKey
+  label?: string
+}
+
+export type DataGridPageSizeConfig = {
+  label?: string
+  options?: number[]
+}
+
+export type DataGridSelectionPanelPosition =
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'top-left'
+  | 'top-right'
+
+export type DataGridSelectionPanelSumConfig = {
+  columnId: string
+  label?: string
+  formatValue?: (value: number) => string
+}
+
+export type DataGridSelectionPanelConfig = {
+  position?: DataGridSelectionPanelPosition
+  sumColumns?: DataGridSelectionPanelSumConfig[]
+  copyColumnIds?: string[]
+  selectedRowsLabel?: string
+  copyWithHeadersLabel?: string
+  copyWithoutHeadersLabel?: string
+}
+
 export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & {
   id: string
   serverField?: string

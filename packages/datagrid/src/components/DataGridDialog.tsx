@@ -23,6 +23,10 @@ export default defineComponent({
       type: String,
       default: 'Close',
     },
+    persistent: {
+      type: Boolean,
+      default: true,
+    },
     onClose: {
       type: Function as PropType<() => void>,
       required: true,
@@ -30,7 +34,15 @@ export default defineComponent({
   },
   setup(props, { slots }) {
     return () => (
-      <div class="data-grid__dialog-backdrop" data-grid-dialog-root="true" onClick={props.onClose}>
+      <div
+        class="data-grid__dialog-backdrop"
+        data-grid-dialog-root="true"
+        onClick={() => {
+          if (!props.persistent) {
+            props.onClose()
+          }
+        }}
+      >
         <div
           class={['data-grid__dialog', props.surfaceClass]}
           role="dialog"
@@ -50,6 +62,7 @@ export default defineComponent({
           </div>
 
           {slots.default?.()}
+          {slots.footer ? <div class="data-grid__dialog-footer">{slots.footer()}</div> : null}
         </div>
       </div>
     )

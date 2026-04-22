@@ -16,7 +16,7 @@ export default defineComponent({
     },
   },
   setup(props, { slots }) {
-    const theme = ref<'light' | 'dark'>('light')
+    const theme = ref<'light' | 'dark'>('dark')
     const themeToggleLabel = computed(() =>
       theme.value === 'light' ? 'Przelacz na ciemny motyw' : 'Przelacz na jasny motyw',
     )
@@ -32,7 +32,7 @@ export default defineComponent({
         return
       }
 
-      theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      theme.value = 'dark'
     })
 
     watch(

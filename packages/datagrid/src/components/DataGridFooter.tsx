@@ -1,5 +1,7 @@
 import { defineComponent, type PropType } from 'vue'
 
+import type { DataGridMetaConfig, DataGridPageSizeConfig } from '../types'
+
 type PaginationItem =
   | { type: 'page'; value: number }
   | { type: 'ellipsis'; key: string }
@@ -22,6 +24,14 @@ export default defineComponent({
     datasetSize: {
       type: [String, Number] as PropType<string | number | undefined>,
       default: undefined,
+    },
+    metaItems: {
+      type: Array as PropType<DataGridMetaConfig[]>,
+      required: true,
+    },
+    pageSizeConfig: {
+      type: Object as PropType<DataGridPageSizeConfig>,
+      required: true,
     },
     pageIndex: {
       type: Number,
@@ -63,13 +73,31 @@ export default defineComponent({
   setup(props) {
     return () => (
       <div class="data-grid__footer">
-        <div class="data-grid__meta">
-          <span>{props.isLoading ? 'Loading...' : `Rows: ${props.totalRows}`}</span>
-          <span>{`Fetched: ${props.fetchedRows}`}</span>
-          {props.datasetSize ? <span>{`Dataset: ${props.datasetSize}`}</span> : null}
+        <div class="data-grid__meta data-grid__footer-section data-grid__footer-section--meta">
+          {props.metaItems.map((item) => {
+            if (item.key === 'datasetSize' && !props.datasetSize) {
+              return null
+            }
+
+            if (item.key === 'rows') {
+              return (
+                <span key={item.key}>
+                  {props.isLoading
+                    ? 'Loading...'
+                    : `${item.label ?? 'Rows'}: ${props.totalRows}`}
+                </span>
+              )
+            }
+
+            if (item.key === 'fetched') {
+              return <span key={item.key}>{`${item.label ?? 'Fetched'}: ${props.fetchedRows}`}</span>
+            }
+
+            return <span key={item.key}>{`${item.label ?? 'Dataset'}: ${props.datasetSize}`}</span>
+          })}
         </div>
 
-        <div class="data-grid__pagination">
+        <div class="data-grid__pagination data-grid__footer-section data-grid__footer-section--pagination">
           <button
             type="button"
             class="data-grid__pagination-nav"
@@ -113,15 +141,15 @@ export default defineComponent({
           </button>
         </div>
 
-        <label class="data-grid__page-size">
-          <span>Rows</span>
+        <label class="data-grid__page-size data-grid__footer-section data-grid__footer-section--page-size">
+          <span>{props.pageSizeConfig.label ?? 'Rows'}</span>
           <select
             value={String(props.pageSize)}
             onChange={(event) =>
               props.onPageSizeChange(Number((event.target as HTMLSelectElement).value))
             }
           >
-            {[50, 100, 250, 500].map((size) => (
+            {(props.pageSizeConfig.options ?? [50, 100, 250, 500]).map((size) => (
               <option key={size} value={size}>
                 {size}
               </option>

@@ -28,6 +28,10 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    onApply: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
   },
   setup(props) {
     return () => {
@@ -42,6 +46,13 @@ export default defineComponent({
           ariaLabel="Filter settings"
           surfaceClass="data-grid__dialog--filters"
           onClose={props.onClose}
+          v-slots={{
+            footer: () => (
+              <button type="button" class="data-grid__dialog-action" onClick={props.onApply}>
+                Filtruj
+              </button>
+            ),
+          }}
         >
           <div class="data-grid__filter-dialog-list">
             {props.sections.length > 0 ? (

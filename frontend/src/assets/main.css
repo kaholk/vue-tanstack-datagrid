@@ -103,8 +103,8 @@
     --app-accent: #7cb8ff;
     --app-accent-soft: rgb(124 184 255 / 0.2);
     --app-accent-soft-strong: rgb(124 184 255 / 0.12);
-    --app-row-selected: rgb(124 184 255 / 0.28);
-    --app-row-selected-hover: rgb(124 184 255 / 0.42);
+    --app-row-selected: #4b5f7b;
+    --app-row-selected-hover: #5d7493;
     --app-shadow: 0 16px 40px -28px rgb(0 0 0 / 0.78);
     --app-shadow-soft: 0 10px 30px rgb(0 0 0 / 0.4);
     --app-shadow-dialog: 0 30px 60px -30px rgb(0 0 0 / 0.9);
@@ -147,7 +147,7 @@
   }
 
   .container {
-    width: min(100% - 2rem, 72rem);
+    width: 80%;
     margin: 0 auto;
   }
 

@@ -2,6 +2,7 @@ import { type Column } from '@tanstack/vue-table'
 import { defineComponent, type PropType } from 'vue'
 
 import DataGridDialog from './DataGridDialog'
+import DataGridValidatedNumberInput from './DataGridValidatedNumberInput'
 
 type AnyRow = Record<string, unknown>
 
@@ -20,12 +21,16 @@ export default defineComponent({
       type: Function as PropType<(column: Column<AnyRow, unknown>) => string>,
       required: true,
     },
+    getIsColumnVisible: {
+      type: Function as PropType<(columnId: string) => boolean>,
+      required: true,
+    },
     getPinnedSide: {
       type: Function as PropType<(columnId: string) => 'left' | 'right' | false>,
       required: true,
     },
-    getPinStatusLabel: {
-      type: Function as PropType<(columnId: string) => string>,
+    getColumnSize: {
+      type: Function as PropType<(columnId: string) => number>,
       required: true,
     },
     getColumnMoveTarget: {
@@ -36,14 +41,20 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    onApply: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onToggleColumnVisibility: {
+      type: Function as PropType<(columnId: string, isVisible: boolean) => void>,
+      required: true,
+    },
     onUpdateColumnSize: {
-      type: Function as PropType<(column: Column<AnyRow, unknown>, rawValue: string) => void>,
+      type: Function as PropType<(columnId: string, rawValue: string) => void>,
       required: true,
     },
     onSetPin: {
-      type: Function as PropType<
-        (column: Column<AnyRow, unknown>, side: 'left' | 'right' | false) => void
-      >,
+      type: Function as PropType<(columnId: string, side: 'left' | 'right' | false) => void>,
       required: true,
     },
     onMoveColumn: {
@@ -73,6 +84,13 @@ export default defineComponent({
           subtitle="Visibility, width, order and pin settings."
           ariaLabel="Column settings"
           onClose={props.onClose}
+          v-slots={{
+            footer: () => (
+              <button type="button" class="data-grid__dialog-action" onClick={props.onApply}>
+                Zastosuj zmiany
+              </button>
+            ),
+          }}
         >
           <div class="data-grid__dialog-list">
             {props.columns.map((column, index) => {
@@ -84,9 +102,14 @@ export default defineComponent({
                     <label class="data-grid__column-option">
                       <input
                         type="checkbox"
-                        checked={column.getIsVisible()}
+                        checked={props.getIsColumnVisible(column.id)}
                         disabled={!column.getCanHide()}
-                        onChange={column.getToggleVisibilityHandler()}
+                        onChange={(event) =>
+                          props.onToggleColumnVisibility(
+                            column.id,
+                            (event.target as HTMLInputElement).checked,
+                          )
+                        }
                       />
                       <span>{props.renderColumnLabel(column)}</span>
                     </label>
@@ -95,13 +118,16 @@ export default defineComponent({
 
                   <label class="data-grid__dialog-field">
                     <span>Width</span>
-                    <input
-                      type="number"
+                    <DataGridValidatedNumberInput
+                      modelValue={props.getColumnSize(column.id)}
                       min={column.columnDef.minSize ?? 80}
-                      value={String(column.getSize())}
-                      onInput={(event) =>
-                        props.onUpdateColumnSize(column, (event.target as HTMLInputElement).value)
-                      }
+                      rules={[
+                        {
+                          validate: (value) => value >= (column.columnDef.minSize ?? 80),
+                          message: `Minimalna szerokosc to ${column.columnDef.minSize ?? 80}.`,
+                        },
+                      ]}
+                      onCommit={(value) => props.onUpdateColumnSize(column.id, String(value))}
                     />
                   </label>
 
@@ -116,7 +142,7 @@ export default defineComponent({
                             ? 'data-grid__dialog-action--active'
                             : '',
                         ]}
-                        onClick={() => props.onSetPin(column, 'left')}
+                        onClick={() => props.onSetPin(column.id, 'left')}
                       >
                         Left
                       </button>
@@ -128,7 +154,7 @@ export default defineComponent({
                             ? 'data-grid__dialog-action--active'
                             : '',
                         ]}
-                        onClick={() => props.onSetPin(column, 'right')}
+                        onClick={() => props.onSetPin(column.id, 'right')}
                       >
                         Right
                       </button>
@@ -140,14 +166,11 @@ export default defineComponent({
                             ? 'data-grid__dialog-action--active'
                             : '',
                         ]}
-                        onClick={() => props.onSetPin(column, false)}
+                        onClick={() => props.onSetPin(column.id, false)}
                       >
                         None
                       </button>
                     </div>
-                    <span class="data-grid__dialog-meta">
-                      Current: {props.getPinStatusLabel(column.id)}
-                    </span>
                   </div>
 
                   <div class="data-grid__dialog-field">

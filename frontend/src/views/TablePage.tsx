@@ -7,7 +7,10 @@ import type {
   DataGridFetchParams,
   DataGridFetchResult,
   DataGridFilterConfig,
+  DataGridMetaConfig,
+  DataGridPageSizeConfig,
   DataGridQuickFilterConfig,
+  DataGridSelectionPanelConfig,
 } from '@testproject/datagrid'
 
 type CustomerRow = {
@@ -50,6 +53,25 @@ const quickFilters: DataGridQuickFilterConfig[] = [
   { id: 'country', width: 180 },
   { id: 'datasetTag', width: 220 },
 ]
+const metaItems: DataGridMetaConfig[] = [{ key: 'rows', label: 'Znaleziono' }]
+const pageSizeConfig: DataGridPageSizeConfig = {
+  label: 'Wierszy na strone:',
+  options: [25, 50, 100, 200, 500, 1000],
+}
+const selectionPanelConfig: DataGridSelectionPanelConfig = {
+  position: 'bottom-right',
+  sumColumns: [
+    { columnId: 'visits', label: 'Suma visits' },
+    { columnId: 'score', label: 'Suma score' },
+    {
+      columnId: 'balance',
+      label: 'Suma balance',
+      formatValue: (value) => `${value.toFixed(2)} PLN`,
+    },
+  ],
+  copyWithHeadersLabel: 'Kopiuj z naglowkami',
+  copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
+}
 
 const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (_, index) => {
   const columnId = `extraCol${String(index + 1).padStart(2, '0')}` as const
@@ -318,6 +340,9 @@ export default defineComponent({
             columns={columns}
             toolbarFilters={toolbarFilters}
             quickFilters={quickFilters}
+            metaItems={metaItems}
+            pageSizeConfig={pageSizeConfig}
+            selectionPanelConfig={selectionPanelConfig}
             fetchPage={fetchCustomers}
             viewStorageKey="table-page-customer-grid-views"
             rowHeight={46}
