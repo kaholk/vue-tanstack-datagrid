@@ -1,65 +1,56 @@
 # vue-tanstack-datagrid
 
-`DataGrid` to gotowy, server-side grid dla Vue 3 oparty o:
+`vue-tanstack-datagrid` is a server-side data grid for Vue 3 built on top of:
 
 - `@tanstack/vue-table`
 - `@tanstack/vue-virtual`
 - JSX/TSX
 
-Obsluguje:
+It is designed for large datasets where pagination, sorting, filtering, and search are handled by the backend.
+
+## Features
 
 - server-side pagination
 - server-side sorting
 - server-side filtering
 - global search
-- wirtualizacje wierszy i kolumn
-- pinning kolumn left/right
-- zmiane kolejnosci, szerokosci i widocznosci kolumn
-- zapisywane widoki w `localStorage` albo przez backend / baze danych
-- quick filtry w toolbarze
-- panel zaznaczenia z kopiowaniem i sumami
+- row and column virtualization
+- left and right column pinning
+- column ordering, resizing, and visibility control
+- saved views in `localStorage` or via a backend / database
+- quick filters in the toolbar
+- selection panel with copy and summary support
 
-## Instalacja
+## Installation
 
-Instalacja przez npm:
+Install with npm:
 
 ```sh
 npm install vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
 ```
 
-Instalacja przez bun:
+Install with bun:
 
 ```sh
 bun add vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
 ```
 
-Minimalne uzycie:
+`vue`, `@tanstack/vue-table`, and `@tanstack/vue-virtual` are required peer dependencies and must be installed in the consuming application.
+
+Basic usage:
 
 ```ts
 import { DataGrid } from 'vue-tanstack-datagrid'
 import 'vue-tanstack-datagrid/styles.css'
 ```
 
-## Build paczki
+## Quick Start
 
-```sh
-bun run build
-```
+A minimal integration needs:
 
-Artefakty trafiaja do `dist/`:
-
-- `dist/index.js`
-- `dist/index.cjs`
-- `dist/index.d.ts`
-- `dist/styles.css`
-
-## Szybki start
-
-Najmniejsza sensowna integracja wymaga:
-
-1. kolumn
-2. `fetchPage`
-3. importu stylow
+1. column definitions
+2. a `fetchPage` function
+3. the package stylesheet
 
 ```tsx
 import { defineComponent } from 'vue'
@@ -149,31 +140,29 @@ export default defineComponent({
 })
 ```
 
-## Jak dziala grid
+## How It Works
 
-Grid jest w pelni manualny po stronie danych:
+The grid is fully manual on the data side:
 
-- paginacja jest liczona przez backend
-- sortowanie jest wykonywane przez backend
-- filtrowanie jest wykonywane przez backend
-- global search jest wykonywany przez backend
+- pagination is handled by the backend
+- sorting is handled by the backend
+- filtering is handled by the backend
+- global search is handled by the backend
 
-Frontend wysyla do `fetchPage` stan gridu i oczekuje gotowego wyniku dla aktualnej strony.
+The frontend sends the current grid state to `fetchPage` and expects a ready-to-render result for the current page.
 
-Przy zmianie:
+Whenever any of the following changes, the grid calls `fetchPage` again:
 
-- strony
-- rozmiaru strony
-- sortowania
-- filtrow
-- globalnego searcha
-- zestawu widocznych kolumn serwerowych
+- page
+- page size
+- sorting
+- filters
+- global search
+- visible server-side columns
 
-grid ponownie wywoluje `fetchPage`.
+## `fetchPage` Contract
 
-## Kontrakt `fetchPage`
-
-### Wejscie
+### Input
 
 ```ts
 type DataGridFetchParams = {
@@ -186,28 +175,28 @@ type DataGridFetchParams = {
 }
 ```
 
-Znaczenie pol:
+Field meanings:
 
-- `pageIndex`: indeks strony od `0`
-- `pageSize`: liczba wierszy na strone
-- `sorting`: sortowanie TanStack, np. `[{ id: 'email', desc: false }]`
-- `filters`: aktywne filtry kolumn, np. `[{ id: 'status', value: ['active', 'pending'] }]`
-- `search`: globalny search z dialogu filtrow
-- `include_columns`: lista pol, ktore backend ma zwrocic
+- `pageIndex`: zero-based page index
+- `pageSize`: number of rows per page
+- `sorting`: TanStack sorting, for example `[{ id: 'email', desc: false }]`
+- `filters`: active column filters, for example `[{ id: 'status', value: ['active', 'pending'] }]`
+- `search`: global search value from the filters dialog
+- `include_columns`: list of backend fields to return
 
 ### `include_columns`
 
-`include_columns` nie jest lista wszystkich zdefiniowanych kolumn.
+`include_columns` is not a list of every defined column.
 
-Grid buduje ja dynamicznie z:
+It is built dynamically from:
 
-- aktualnie widocznych kolumn, ktore maja `serverField`
-- `requiredServerFields` z kolumn lokalnych
-- zawsze pola `id`
+- currently visible columns with `serverField`
+- `requiredServerFields` from local columns
+- the `id` field
 
-To pozwala backendowi zwracac tylko potrzebne pola.
+This allows the backend to return only the fields required for the current view.
 
-### Wyjscie
+### Output
 
 ```ts
 type DataGridFetchResult<TData> = {
@@ -218,35 +207,33 @@ type DataGridFetchResult<TData> = {
 }
 ```
 
-## API komponentu `DataGrid`
+## `DataGrid` Props
 
-### Props
-
-| Prop | Typ | Domyslnie | Opis |
+| Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `columns` | `DataGridColumn<T>[]` | wymagane | Definicje kolumn |
-| `fetchPage` | `(params, signal?) => Promise<DataGridFetchResult<T>>` | wymagane | Funkcja pobierajaca dane |
-| `toolbarFilters` | `DataGridFilterConfig[]` | `[]` | Dodatkowe filtry niezwiązane 1:1 z kolumna |
-| `quickFilters` | `DataGridQuickFilterConfig[]` | `[]` | Skroty filtrow pokazywane w toolbarze |
-| `initialState` | `DataGridInitialState` | `{}` | Poczatkowy stan gridu |
-| `rowHeight` | `number` | `42` | Szacowana wysokosc wiersza do wirtualizacji |
-| `overscanRows` | `number` | `10` | Bufor wirtualizacji wierszy |
-| `overscanColumns` | `number` | `3` | Bufor wirtualizacji kolumn |
-| `height` | `number` | `560` | Wysokosc viewportu gridu w px |
-| `viewStorageKey` | `string` | `''` | Klucz `localStorage` dla zapisanych widokow |
-| `savedViewsPersistence` | `DataGridSavedViewsPersistence \| undefined` | `undefined` | Wlasna persystencja widokow |
-| `metaItems` | `DataGridMetaConfig[]` | `rows`, `fetched`, `datasetSize` | Co pokazac w stopce |
-| `pageSizeConfig` | `DataGridPageSizeConfig` | `{ label: 'Rows', options: [50,100,250,500] }` | Konfiguracja selecta page size |
-| `selectionPanelConfig` | `DataGridSelectionPanelConfig \| undefined` | `undefined` | Wlacza panel zaznaczenia |
+| `columns` | `DataGridColumn<T>[]` | required | Column definitions |
+| `fetchPage` | `(params, signal?) => Promise<DataGridFetchResult<T>>` | required | Data loading function |
+| `toolbarFilters` | `DataGridFilterConfig[]` | `[]` | Additional filters not tied 1:1 to a column |
+| `quickFilters` | `DataGridQuickFilterConfig[]` | `[]` | Filter shortcuts shown in the toolbar |
+| `initialState` | `DataGridInitialState` | `{}` | Initial grid state |
+| `rowHeight` | `number` | `42` | Estimated row height for virtualization |
+| `overscanRows` | `number` | `10` | Row virtualization buffer |
+| `overscanColumns` | `number` | `3` | Column virtualization buffer |
+| `height` | `number` | `560` | Grid viewport height in px |
+| `viewStorageKey` | `string` | `''` | `localStorage` key for saved views |
+| `savedViewsPersistence` | `DataGridSavedViewsPersistence \| undefined` | `undefined` | Custom saved views persistence |
+| `metaItems` | `DataGridMetaConfig[]` | `rows`, `fetched`, `datasetSize` | Footer metadata to display |
+| `pageSizeConfig` | `DataGridPageSizeConfig` | `{ label: 'Rows', options: [50,100,250,500] }` | Page size select config |
+| `selectionPanelConfig` | `DataGridSelectionPanelConfig \| undefined` | `undefined` | Enables the selection panel |
 
-## Zapisane widoki
+## Saved Views
 
-Masz dwa tryby:
+Saved views can be persisted in two ways:
 
-- `viewStorageKey` dla `localStorage`
-- `savedViewsPersistence` dla backendu / bazy danych
+- `viewStorageKey` for `localStorage`
+- `savedViewsPersistence` for backend / database storage
 
-Paczka eksportuje helpery:
+The package also exports helper utilities:
 
 ```ts
 import {
@@ -256,9 +243,9 @@ import {
 } from 'vue-tanstack-datagrid'
 ```
 
-## Eksporty z paczki
+## Package Exports
 
-Paczka eksportuje:
+The package exports:
 
 ```ts
 export { DataGrid }
@@ -278,48 +265,27 @@ export { serializeDataGridSavedViews }
 export * from './types'
 ```
 
-W praktyce publiczne uzycie najczesciej ogranicza sie do:
+In most cases, public usage is limited to:
 
 - `DataGrid`
-- typow z `./types`
+- exported types from `./types`
 
-## Ograniczenia i wazne uwagi
+## Notes And Limitations
 
-1. Sortowanie wymaga `serverField`.
-2. Filtrowanie jest manualne. Backend musi rozumiec `params.filters` i `params.search`.
-3. Najlepiej zawsze zwracac stabilne `id`.
-4. Quick filters bez istniejacego `id` nie pojawia sie w toolbarze.
-5. Duza zmiana definicji kolumn moze wymagac migracji zapisanych widokow.
-6. Panel zaznaczenia dziala na aktualnie zaladowanych wierszach.
-7. Wirtualizacja zaklada sensowny `rowHeight`.
+1. Sorting requires `serverField`.
+2. Filtering is manual. The backend must understand `params.filters` and `params.search`.
+3. Stable `id` values are strongly recommended.
+4. Quick filters with a missing `id` will not appear in the toolbar.
+5. Large column definition changes may require saved view migrations.
+6. The selection panel works on currently loaded rows only.
+7. Virtualization assumes a sensible `rowHeight`.
 
-## Skad brac przyklady
+## Examples
 
-Najpelniejszy dzialajacy przyklad uzycia jest w:
+The most complete working example is available in:
 
 - `frontend/src/views/TablePage.tsx`
 
-## Publish
-
-Checklist przed publikacja:
-
-1. Zmien `version` w `package.json`.
-2. Uruchom type-check i build.
-3. Sprawdz paczke przez `bun pm pack --dry-run`.
-4. Zaloguj sie do rejestru przez `bun publish --dry-run` albo `bun pm whoami`.
-5. Opublikuj paczke z katalogu `packages/datagrid`.
-
-Komendy:
-
-```sh
-bun run type-check
-bun run build
-bun pm pack --dry-run
-bun publish
-```
-
-`publishConfig.access` jest ustawione na `public`, wiec nie trzeba dodawac `--access public`.
-
 ## License
 
-Projekt i paczka sa udostepnione na licencji `MPL-2.0`.
+This project is distributed under the `MPL-2.0` license.

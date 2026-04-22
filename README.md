@@ -1,9 +1,11 @@
-# VUE-TANSTACK-DATAGRID
+# vue-tanstack-datagrid
 
-Docelowy uklad repo:
+This repository contains the extracted `vue-tanstack-datagrid` package together with a demo frontend and a lightweight backend used for local development.
+
+## Repository Layout
 
 ```text
-VUE-TANSTACK-DATAGRID/
+vue-tanstack-datagrid/
 |- .vscode/
 |- backend/
 |- frontend/
@@ -11,36 +13,87 @@ VUE-TANSTACK-DATAGRID/
 |  \- datagrid/
 ```
 
-## Po co tak
+- `frontend` contains the demo application and integration examples
+- `backend` contains a simple backend for local testing
+- `packages/datagrid` contains the publishable package
+- `.vscode` contains workspace-level editor tasks and settings
 
-- `frontend` zostaje aplikacja demo i integracja.
-- `backend` jest osobno, wiec frontend nie udaje pelnego projektu.
-- `packages/datagrid` jest miejscem na wydzielana paczke pod npm / bun.
-- `.vscode` jest na root, wiec taski dzialaja dla calego repo.
+## Development
 
-## Dev
-
-Frontend:
+Start the frontend:
 
 ```sh
 bun run dev:frontend
 ```
 
-Backend:
+Start the backend:
 
 ```sh
 php -S 127.0.0.1:8000 -t backend
 ```
 
-## Build paczki
+## Package Build
 
-Paczka `packages/datagrid` ma teraz osobny build do `dist/`, wiec eksporty paczki
-nie wskazuja juz na surowe pliki `src`.
+`packages/datagrid` has its own build output in `dist/`, so published exports point to built artifacts instead of raw `src` files.
+
+Build the package:
 
 ```sh
 bun run build:datagrid
 ```
 
+Artifacts are written to `packages/datagrid/dist/`:
+
+- `index.js`
+- `index.cjs`
+- `index.d.ts`
+- `styles.css`
+
+## Package Installation
+
+Install with npm:
+
+```sh
+npm install vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
+```
+
+Install with bun:
+
+```sh
+bun add vue vue-tanstack-datagrid @tanstack/vue-table @tanstack/vue-virtual
+```
+
+`vue`, `@tanstack/vue-table`, and `@tanstack/vue-virtual` are peer dependencies of the package and need to be present in the target application.
+
+Basic usage:
+
+```ts
+import { DataGrid } from 'vue-tanstack-datagrid'
+import 'vue-tanstack-datagrid/styles.css'
+```
+
+## Publishing
+
+Publishing applies only to `packages/datagrid`, not the root `package.json`.
+
+Recommended release flow:
+
+1. Bump `version` in `packages/datagrid/package.json`
+2. Run type-check and build
+3. Inspect the package with `bun pm pack --dry-run`
+4. Verify registry authentication with `bun pm whoami` or `bun publish --dry-run`
+5. Publish from `packages/datagrid`
+
+Commands:
+
+```sh
+bun run type-check:datagrid
+bun run build:datagrid
+cd packages/datagrid
+bun pm pack --dry-run
+bun publish
+```
+
 ## License
 
-Repo jest na licencji `MPL-2.0`. Szczegoly sa w pliku `LICENSE`.
+The repository is licensed under `MPL-2.0`. See `LICENSE` for details.

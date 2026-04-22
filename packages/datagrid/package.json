@@ -1,6 +1,6 @@
 {
     "name":  "vue-tanstack-datagrid",
-    "version":  "0.1.0",
+    "version":  "0.1.2",
     "private":  false,
     "description":  "Server-side DataGrid for Vue 3 built on TanStack Table and TanStack Virtual.",
     "license":  "MPL-2.0",
