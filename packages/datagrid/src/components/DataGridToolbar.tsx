@@ -14,9 +14,9 @@ type QuickFilterItem = {
 export default defineComponent({
   name: 'DataGridToolbar',
   props: {
-    viewStorageKey: {
-      type: String,
-      default: '',
+    showViews: {
+      type: Boolean,
+      default: false,
     },
     isViewsMenuOpen: {
       type: Boolean,
@@ -84,7 +84,7 @@ export default defineComponent({
   setup(props) {
     return () => (
       <div class="data-grid__toolbar">
-        {props.viewStorageKey ? (
+        {props.showViews ? (
           <DataGridViewsMenu
             isOpen={props.isViewsMenuOpen}
             activeViewId={props.activeViewId}

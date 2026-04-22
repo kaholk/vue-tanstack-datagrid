@@ -1,16 +1,15 @@
 import {
-  Teleport,
   defineComponent,
-  onBeforeUnmount,
-  onMounted,
   ref,
-  type CSSProperties,
-  type PropType,
 } from 'vue'
-import IconCheckRounded from '~icons/material-symbols/check-rounded'
 
 import MainLayout from '@/layouts/MainLayout'
-import { DataGrid, DataGridDropdownMenu } from '@testproject/datagrid'
+import {
+  DataGrid,
+  DataGridInlineSelectEditor,
+  deserializeDataGridSavedViews,
+  serializeDataGridSavedViews,
+} from '@testproject/datagrid'
 import type {
   DataGridColumn,
   DataGridFetchParams,
@@ -19,6 +18,7 @@ import type {
   DataGridMetaConfig,
   DataGridPageSizeConfig,
   DataGridQuickFilterConfig,
+  DataGridSavedViewsPersistence,
   DataGridSelectionPanelConfig,
 } from '@testproject/datagrid'
 
@@ -67,6 +67,7 @@ type ActiveEditCell = {
 }
 
 const backendBaseUrl = import.meta.env.VITE_GRID_API_URL ?? 'http://127.0.0.1:8000'
+const savedViewsApiUrl = `${backendBaseUrl}/index.php?resource=saved-views`
 const statusFilterOptions = statusValues.map((value) => ({
   value,
   label: value.charAt(0).toUpperCase() + value.slice(1),
@@ -108,6 +109,35 @@ const selectionPanelConfig: DataGridSelectionPanelConfig = {
   copyWithHeadersLabel: 'Kopiuj z naglowkami',
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
 }
+const savedViewsPersistence: DataGridSavedViewsPersistence = {
+  serialize: serializeDataGridSavedViews,
+  deserialize: deserializeDataGridSavedViews,
+  load: async () => {
+    const response = await fetch(savedViewsApiUrl)
+
+    if (!response.ok) {
+      throw new Error(`Nie udalo sie pobrac widokow z backendu: ${response.status}`)
+    }
+
+    const payload = (await response.json()) as { serializedViews?: string | null }
+    return payload.serializedViews ?? ''
+  },
+  save: async (payload) => {
+    const response = await fetch(savedViewsApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        serializedViews: typeof payload === 'string' ? payload : JSON.stringify(payload),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Nie udalo sie zapisac widokow w backendzie: ${response.status}`)
+    }
+  },
+}
 
 const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (_, index) => {
   const columnId = `extraCol${String(index + 1).padStart(2, '0')}` as const
@@ -120,257 +150,6 @@ const extraColumns: DataGridColumn<CustomerRow>[] = Array.from({ length: 30 }, (
     serverField: columnId,
     filterGroup: 'Pola dodatkowe',
   }
-})
-
-const InlineSelectEditor = defineComponent({
-  name: 'InlineSelectEditor',
-  props: {
-    value: {
-      type: [String, Array] as PropType<CustomerStatus | CustomerSegment[]>,
-      required: true,
-    },
-    options: {
-      type: Array as PropType<Array<{ value: string; label: string }>>,
-      required: true,
-    },
-    multiple: {
-      type: Boolean,
-      default: false,
-    },
-    emptyLabel: {
-      type: String,
-      default: 'Wybierz',
-    },
-    onSelect: {
-      type: Function as PropType<(value: CustomerStatus | CustomerSegment[]) => void>,
-      required: true,
-    },
-    onClose: {
-      type: Function as PropType<() => void>,
-      required: true,
-    },
-  },
-  setup(props) {
-    const triggerRef = ref<HTMLButtonElement | null>(null)
-    const searchValue = ref('')
-    const menuStyle = ref<CSSProperties>({
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: '180px',
-      zIndex: 500,
-    })
-
-    function updateMenuPosition() {
-      const trigger = triggerRef.value
-      if (!trigger) {
-        return
-      }
-
-      const rect = trigger.getBoundingClientRect()
-      const desiredWidth = Math.max(rect.width, 180)
-      const viewportWidth = window.innerWidth
-      const left = Math.min(rect.left, viewportWidth - desiredWidth - 12)
-
-      menuStyle.value = {
-        position: 'fixed',
-        top: `${rect.bottom + 4}px`,
-        left: `${Math.max(12, left)}px`,
-        width: `${desiredWidth}px`,
-        zIndex: 500,
-      }
-    }
-
-    function handleDocumentPointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      if (target.closest('[data-inline-status-editor="true"]')) {
-        return
-      }
-
-      props.onClose()
-    }
-
-    onMounted(() => {
-      updateMenuPosition()
-      window.addEventListener('resize', updateMenuPosition)
-      window.addEventListener('scroll', updateMenuPosition, true)
-      document.addEventListener('pointerdown', handleDocumentPointerDown)
-    })
-
-    onBeforeUnmount(() => {
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
-      document.removeEventListener('pointerdown', handleDocumentPointerDown)
-    })
-
-    function getIsSelected(optionValue: string) {
-      if (props.multiple) {
-        return Array.isArray(props.value) && props.value.includes(optionValue as CustomerSegment)
-      }
-
-      return props.value === optionValue
-    }
-
-    function getSelectedCount() {
-      if (props.multiple) {
-        return Array.isArray(props.value) ? props.value.length : 0
-      }
-
-      return props.value ? 1 : 0
-    }
-
-    function getTriggerLabel() {
-      if (props.multiple) {
-        const selectedValues = Array.isArray(props.value) ? props.value : []
-        if (selectedValues.length === 0) {
-          return props.emptyLabel
-        }
-
-        if (selectedValues.length === 1) {
-          return props.options.find((option) => option.value === selectedValues[0])?.label ?? selectedValues[0]
-        }
-
-        return `${selectedValues.length} wybrane`
-      }
-
-      return props.options.find((option) => option.value === props.value)?.label ?? String(props.value)
-    }
-
-    function getVisibleOptions() {
-      const searchTerm = searchValue.value.trim().toLocaleLowerCase()
-      if (!searchTerm) {
-        return props.options
-      }
-
-      return props.options.filter((option) => option.label.toLocaleLowerCase().includes(searchTerm))
-    }
-
-    function toggleOption(optionValue: string) {
-      if (props.multiple) {
-        const currentValues = Array.isArray(props.value) ? props.value : []
-        const nextValues = currentValues.includes(optionValue as CustomerSegment)
-          ? currentValues.filter((value) => value !== optionValue)
-          : [...currentValues, optionValue as CustomerSegment]
-
-        props.onSelect(nextValues)
-        return
-      }
-
-      props.onSelect(optionValue as CustomerStatus)
-      props.onClose()
-    }
-
-    function selectAllOptions() {
-      if (!props.multiple) {
-        return
-      }
-
-      props.onSelect(props.options.map((option) => option.value as CustomerSegment))
-    }
-
-    function clearAllOptions() {
-      if (!props.multiple) {
-        return
-      }
-
-      props.onSelect([])
-    }
-
-    return () => (
-      <div
-        class="data-grid__filter-select"
-        data-grid-filter-root="true"
-        data-inline-status-editor="true"
-      >
-        <button
-          ref={triggerRef}
-          type="button"
-          class={[
-            'data-grid__filter-select-trigger',
-            'data-grid__filter-select-trigger--active',
-          ]}
-          onClick={(event) => {
-            event.stopPropagation()
-            updateMenuPosition()
-          }}
-        >
-          <span class="data-grid__filter-select-label">{getTriggerLabel()}</span>
-          <span class="data-grid__filter-select-count">
-            {getSelectedCount() > 0 ? String(getSelectedCount()) : ''}
-          </span>
-        </button>
-        <Teleport to="body">
-          <DataGridDropdownMenu
-            menuClass="data-grid__filter-select-menu"
-            scopeAttr="data-grid-filter-root"
-            style={menuStyle.value}
-          >
-            <div class="data-grid__filter-select-options" data-inline-status-editor="true">
-              <input
-                class="data-grid__filter-select-search"
-                value={searchValue.value}
-                placeholder="Szukaj opcji"
-                data-inline-status-editor="true"
-                onClick={(event) => event.stopPropagation()}
-                onInput={(event) => {
-                  searchValue.value = (event.target as HTMLInputElement).value
-                }}
-              />
-              {props.multiple ? (
-                <div class="data-grid__filter-select-actions" data-inline-status-editor="true">
-                  <button
-                    type="button"
-                    class="data-grid__filter-select-action"
-                    data-inline-status-editor="true"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      selectAllOptions()
-                    }}
-                  >
-                    Zaznacz wszystko
-                  </button>
-                  <button
-                    type="button"
-                    class="data-grid__filter-select-action"
-                    data-inline-status-editor="true"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      clearAllOptions()
-                    }}
-                  >
-                    Wyczysc
-                  </button>
-                </div>
-              ) : null}
-              {getVisibleOptions().map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  class="data-grid__filter-select-trigger"
-                  data-inline-status-editor="true"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleOption(option.value)
-                  }}
-                >
-                  <span class="data-grid__filter-select-label">{option.label}</span>
-                  <span class="data-grid__filter-select-count">
-                    {getIsSelected(option.value) ? (
-                      <IconCheckRounded class="data-grid__icon" />
-                    ) : null}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </DataGridDropdownMenu>
-        </Teleport>
-      </div>
-    )
-  },
 })
 
 function buildColumns(options: {
@@ -549,10 +328,10 @@ function buildColumns(options: {
     filterEmptyOptionLabel: 'Pokaz puste',
     cell: ({ row }) =>
       options.isEditingCell(row.original.id, 'status') ? (
-        <InlineSelectEditor
-          value={options.getDraftValue(row.original, 'status')}
+        <DataGridInlineSelectEditor
+          modelValue={options.getDraftValue(row.original, 'status')}
           options={statusFilterOptions}
-          onSelect={(value) =>
+          onUpdateModelValue={(value) =>
             options.updateDraftValue(row.original, 'status', value as CustomerStatus)
           }
           onClose={options.stopEditingCell}
@@ -580,12 +359,12 @@ function buildColumns(options: {
     requiredServerFields: ['status', 'plan', 'country'],
     cell: ({ row }) =>
       options.isEditingCell(row.original.id, 'segments') ? (
-        <InlineSelectEditor
-          value={options.getDraftValue(row.original, 'segments')}
+        <DataGridInlineSelectEditor
+          modelValue={options.getDraftValue(row.original, 'segments')}
           options={segmentFilterOptions}
           multiple
           emptyLabel="Wybierz"
-          onSelect={(value) =>
+          onUpdateModelValue={(value) =>
             options.updateDraftValue(row.original, 'segments', value as CustomerSegment[])
           }
           onClose={options.stopEditingCell}
@@ -910,7 +689,7 @@ export default defineComponent({
           eyebrow: 'TanStack Data Grid',
           title: 'Server-side grid z virtualizacja wierszy i kolumn',
           description:
-            'Demo pokazuje server-side pagination, sorting, filtering, ukrywanie kolumn, sticky header, pinned kolumny left/right oraz przyklad inline edycji komorek tekstem, numerem i selectem.',
+            'Demo pokazuje server-side pagination, sorting, filtering, ukrywanie kolumn, sticky header, pinned kolumny left/right, inline edycje komorek oraz zapis widokow gridu serializowanych do backendu.',
         }}
       >
         <section aria-labelledby="table-demo">
@@ -918,6 +697,10 @@ export default defineComponent({
           <p>
             Backend demo oczekuje pod <code>{backendBaseUrl}</code>. Uruchom PHP server z folderu{' '}
             <code>backend</code>.
+          </p>
+          <p>
+            Zapisane widoki gridu sa serializowane do JSON i przechowywane po stronie backendu w
+            pliku demo zamiast w <code>localStorage</code>.
           </p>
           <p>
             Kliknij komorke <code>Company / edit</code>, <code>Status / edit</code> albo{' '}
@@ -933,7 +716,7 @@ export default defineComponent({
             pageSizeConfig={pageSizeConfig}
             selectionPanelConfig={selectionPanelConfig}
             fetchPage={fetchCustomersPage}
-            viewStorageKey="table-page-customer-grid-views"
+            savedViewsPersistence={savedViewsPersistence}
             rowHeight={46}
             overscanRows={12}
             overscanColumns={4}

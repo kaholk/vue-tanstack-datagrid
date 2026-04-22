@@ -49,6 +49,7 @@ import type {
   DataGridInitialState,
   DataGridMetaConfig,
   DataGridPageSizeConfig,
+  DataGridSavedViewsPersistence,
   DataGridSelectionPanelConfig,
   DataGridSelectionPanelSumConfig,
   DataGridSavedViewState,
@@ -271,6 +272,10 @@ export default defineComponent({
       type: String,
       default: '',
     },
+    savedViewsPersistence: {
+      type: Object as PropType<DataGridSavedViewsPersistence | undefined>,
+      default: undefined,
+    },
     metaItems: {
       type: Array as PropType<DataGridMetaConfig[]>,
       default: () => defaultMetaItems.map((item) => ({ ...item })),
@@ -386,7 +391,7 @@ export default defineComponent({
         return
       }
 
-      createNewView(name)
+      void createNewView(name)
       closeSaveViewDialog()
     }
 
@@ -578,6 +583,7 @@ export default defineComponent({
       deleteActiveView,
     } = useDataGridSavedViews({
       viewStorageKey: props.viewStorageKey,
+      savedViewsPersistence: props.savedViewsPersistence,
       initialState: props.initialState,
       columnOrder,
       columnSizing,
@@ -595,9 +601,16 @@ export default defineComponent({
         columnVirtualizer.value.measure()
       },
       onOpenSaveViewDialog: openSaveViewDialog,
+      onPersistenceError: (error) => {
+        errorMessage.value =
+          error instanceof Error ? error.message : 'Nie udalo sie zapisac widokow gridu.'
+      },
       createViewId,
       cloneViewState,
     })
+    const showViewsMenu = computed(
+      () => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence),
+    )
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
       if (leftPinnedColumnIds.value.has(columnId)) {
@@ -946,7 +959,7 @@ export default defineComponent({
 
     onMounted(() => {
       document.addEventListener('click', handleDocumentClick)
-      loadSavedViews()
+      void loadSavedViews()
     })
 
     const {
@@ -1365,7 +1378,7 @@ export default defineComponent({
         <section class="data-grid">
           <div class="data-grid__table-shell">
             <DataGridToolbar
-              viewStorageKey={props.viewStorageKey}
+              showViews={showViewsMenu.value}
               isViewsMenuOpen={isViewsMenuOpen.value}
               activeViewId={activeViewId.value}
               savedViews={savedViews.value}
@@ -1375,8 +1388,12 @@ export default defineComponent({
               onToggleViewsMenu={toggleViewsMenu}
               onSelectSavedView={selectSavedView}
               onOpenSaveViewDialog={openSaveViewDialog}
-              onOverwriteActiveView={overwriteActiveView}
-              onDeleteActiveView={deleteActiveView}
+              onOverwriteActiveView={() => {
+                void overwriteActiveView()
+              }}
+              onDeleteActiveView={() => {
+                void deleteActiveView()
+              }}
               onToggleFilterDialog={toggleFilterDialog}
               onRefresh={refreshData}
               onClearFilters={clearAllFilters}

@@ -1,10 +1,18 @@
 import { ref, type Ref } from 'vue'
 import { type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type PaginationState, type RowSelectionState } from '@tanstack/vue-table'
 
-import type { DataGridColumnVisibilityState, DataGridInitialState, DataGridSavedView, DataGridSavedViewState } from '../types'
+import { deserializeDataGridSavedViews, serializeDataGridSavedViews } from '../savedViews'
+import type {
+  DataGridColumnVisibilityState,
+  DataGridInitialState,
+  DataGridSavedView,
+  DataGridSavedViewsPersistence,
+  DataGridSavedViewState,
+} from '../types'
 
 type UseDataGridSavedViewsOptions = {
   viewStorageKey: string
+  savedViewsPersistence?: DataGridSavedViewsPersistence
   initialState: DataGridInitialState
   columnOrder: Ref<ColumnOrderState>
   columnSizing: Ref<ColumnSizingState>
@@ -16,6 +24,7 @@ type UseDataGridSavedViewsOptions = {
   rowSelection: Ref<RowSelectionState>
   onAfterApplyViewState: () => void
   onOpenSaveViewDialog: () => void
+  onPersistenceError: (error: unknown) => void
   createViewId: () => string
   cloneViewState: (state: DataGridSavedViewState) => DataGridSavedViewState
 }
@@ -74,32 +83,51 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     }
   }
 
-  function loadSavedViews() {
-    if (!options.viewStorageKey || typeof window === 'undefined') {
-      savedViews.value = []
-      return
-    }
-
+  async function loadSavedViews() {
     try {
+      if (options.savedViewsPersistence) {
+        const deserialize =
+          options.savedViewsPersistence.deserialize ?? deserializeDataGridSavedViews
+        const payload = await options.savedViewsPersistence.load()
+        savedViews.value = deserialize(payload)
+        return
+      }
+
+      if (!options.viewStorageKey || typeof window === 'undefined') {
+        savedViews.value = []
+        return
+      }
+
       const rawValue = window.localStorage.getItem(options.viewStorageKey)
       if (!rawValue) {
         savedViews.value = []
         return
       }
 
-      const parsed = JSON.parse(rawValue)
-      savedViews.value = Array.isArray(parsed) ? (parsed as DataGridSavedView[]) : []
+      savedViews.value = deserializeDataGridSavedViews(rawValue)
     } catch {
       savedViews.value = []
+      options.onPersistenceError(new Error('Nie udalo sie zaladowac zapisanych widokow.'))
     }
   }
 
-  function persistSavedViews() {
-    if (!options.viewStorageKey || typeof window === 'undefined') {
-      return
-    }
+  async function persistSavedViews(nextViews: DataGridSavedView[] = savedViews.value) {
+    try {
+      if (options.savedViewsPersistence) {
+        const serialize = options.savedViewsPersistence.serialize ?? serializeDataGridSavedViews
+        const payload = serialize(nextViews)
+        await options.savedViewsPersistence.save(payload, nextViews)
+        return
+      }
 
-    window.localStorage.setItem(options.viewStorageKey, JSON.stringify(savedViews.value))
+      if (!options.viewStorageKey || typeof window === 'undefined') {
+        return
+      }
+
+      window.localStorage.setItem(options.viewStorageKey, JSON.stringify(nextViews))
+    } catch (error) {
+      options.onPersistenceError(error)
+    }
   }
 
   function selectSavedView(viewId: string) {
@@ -119,7 +147,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     applyViewState(selectedView.state)
   }
 
-  function createNewView(name: string) {
+  async function createNewView(name: string) {
     const now = new Date().toISOString()
     const nextView: DataGridSavedView = {
       id: options.createViewId(),
@@ -131,10 +159,10 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
     savedViews.value = [...savedViews.value, nextView]
     activeViewId.value = nextView.id
-    persistSavedViews()
+    await persistSavedViews(savedViews.value)
   }
 
-  function overwriteActiveView() {
+  async function overwriteActiveView() {
     if (!activeViewId.value) {
       options.onOpenSaveViewDialog()
       return
@@ -156,10 +184,10 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
           }
         : view,
     )
-    persistSavedViews()
+    await persistSavedViews(savedViews.value)
   }
 
-  function deleteActiveView() {
+  async function deleteActiveView() {
     if (!activeViewId.value) {
       return
     }
@@ -177,7 +205,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
     savedViews.value = savedViews.value.filter((view) => view.id !== activeViewId.value)
     activeViewId.value = ''
-    persistSavedViews()
+    await persistSavedViews(savedViews.value)
     selectSavedView('')
   }
 

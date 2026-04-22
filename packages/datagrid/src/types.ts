@@ -131,3 +131,13 @@ export type DataGridSavedView = {
   createdAt: string
   updatedAt: string
 }
+
+export type DataGridSavedViewsSerialize = (views: DataGridSavedView[]) => unknown
+export type DataGridSavedViewsDeserialize = (payload: unknown) => DataGridSavedView[]
+
+export type DataGridSavedViewsPersistence = {
+  load: () => Promise<unknown>
+  save: (payload: unknown, views: DataGridSavedView[]) => Promise<void>
+  serialize?: DataGridSavedViewsSerialize
+  deserialize?: DataGridSavedViewsDeserialize
+}

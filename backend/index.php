@@ -12,6 +12,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+$resource = (string) ($_GET['resource'] ?? '');
+$savedViewsFile = __DIR__ . DIRECTORY_SEPARATOR . 'saved-views.json';
+
+if ($resource === 'saved-views') {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $serializedViews = '';
+
+        if (is_file($savedViewsFile)) {
+            $storedValue = file_get_contents($savedViewsFile);
+            $serializedViews = is_string($storedValue) ? $storedValue : '';
+        }
+
+        echo json_encode(
+            [
+                'serializedViews' => $serializedViews,
+            ],
+            JSON_THROW_ON_ERROR
+        );
+        exit;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed'], JSON_THROW_ON_ERROR);
+        exit;
+    }
+
+    $rawBody = file_get_contents('php://input');
+    $payload = json_decode($rawBody ?: '{}', true);
+
+    if (!is_array($payload)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON payload'], JSON_THROW_ON_ERROR);
+        exit;
+    }
+
+    $serializedViews = (string) ($payload['serializedViews'] ?? '');
+    file_put_contents($savedViewsFile, $serializedViews);
+
+    echo json_encode(
+        [
+            'ok' => true,
+            'updatedAt' => gmdate(DATE_ATOM),
+        ],
+        JSON_THROW_ON_ERROR
+    );
+    exit;
+}
+
 $rawBody = file_get_contents('php://input');
 $payload = json_decode($rawBody ?: '{}', true);
 
