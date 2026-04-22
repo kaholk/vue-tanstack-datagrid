@@ -68,6 +68,8 @@ type FilterDialogSection = {
   items: DataGridFilterConfig[]
 }
 
+type FilterControlTarget = 'live' | 'dialog'
+
 type RenderedSequenceItem<TItem> =
   | { type: 'spacer'; key: string; width: number }
   | { type: 'item'; key: string; item: TItem; column: Column<AnyRow, unknown> }
@@ -808,6 +810,10 @@ export default defineComponent({
             Boolean(quickFilter),
         )
     })
+    const activeFilterCount = computed(() => {
+      const searchFilterCount = globalFilter.value.trim() ? 1 : 0
+      return columnFilters.value.length + searchFilterCount
+    })
 
     const requestedServerColumns = computed(() => {
       const requested = new Set<string>(['id'])
@@ -893,23 +899,34 @@ export default defineComponent({
       isColumnPickerOpen.value = false
     }
 
-    function toggleFilterDialog() {
-      const nextOpen = !isFilterDialogOpen.value
-      isFilterDialogOpen.value = nextOpen
+    function resetDialogFilterDraftState() {
+      syncFilterDialogDraftState()
+      openDialogFilterColumnId.value = null
+    }
+
+    function openFilterDialog() {
+      isFilterDialogOpen.value = true
       openMenuColumnId.value = null
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
       isColumnPickerOpen.value = false
       isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
+      resetDialogFilterDraftState()
+    }
 
-      if (nextOpen) {
-        syncFilterDialogDraftState()
+    function toggleFilterDialog() {
+      if (isFilterDialogOpen.value) {
+        closeFilterDialog()
+        return
       }
+
+      openFilterDialog()
     }
 
     function closeFilterDialog() {
       isFilterDialogOpen.value = false
+      resetDialogFilterDraftState()
     }
 
     watch(
@@ -971,19 +988,11 @@ export default defineComponent({
       ]
     }
 
-    function updateColumnFilter(
-      columnId: string,
-      value: string,
-      target: 'live' | 'dialog' = 'live',
-    ) {
+    function updateColumnFilter(columnId: string, value: string, target: FilterControlTarget = 'live') {
       setColumnFilterValue(columnId, value.trim() ? value : undefined, target)
     }
 
-    function setColumnFilterValue(
-      columnId: string,
-      value: unknown,
-      target: 'live' | 'dialog' = 'live',
-    ) {
+    function setColumnFilterValue(columnId: string, value: unknown, target: FilterControlTarget = 'live') {
       if (target === 'dialog') {
         draftColumnFilters.value = getNextColumnFilters(draftColumnFilters.value, columnId, value)
         return
@@ -997,16 +1006,16 @@ export default defineComponent({
       columnFilters.value = getNextColumnFilters(columnFilters.value, columnId, value)
     }
 
-    function getFilterRawValue(columnId: string, target: 'live' | 'dialog' = 'live') {
+    function getFilterRawValue(columnId: string, target: FilterControlTarget = 'live') {
       const filters = target === 'dialog' ? draftColumnFilters.value : columnFilters.value
       return filters.find((item) => item.id === columnId)?.value
     }
 
-    function getFilterValue(columnId: string, target: 'live' | 'dialog' = 'live') {
+    function getFilterValue(columnId: string, target: FilterControlTarget = 'live') {
       return String(getFilterRawValue(columnId, target) ?? '')
     }
 
-    function getSelectFilterValues(columnId: string, target: 'live' | 'dialog' = 'live') {
+    function getSelectFilterValues(columnId: string, target: FilterControlTarget = 'live') {
       const rawValue = getFilterRawValue(columnId, target)
 
       if (!Array.isArray(rawValue)) {
@@ -1053,15 +1062,20 @@ export default defineComponent({
       }
     }
 
-    function updateSelectFilterSearch(columnId: string, value: string) {
+    function getFilterSearchStateKey(columnId: string, target: FilterControlTarget) {
+      return `${target}:${columnId}`
+    }
+
+    function updateSelectFilterSearch(columnId: string, value: string, target: FilterControlTarget = 'live') {
+      const stateKey = getFilterSearchStateKey(columnId, target)
       filterSearchByColumnId.value = {
         ...filterSearchByColumnId.value,
-        [columnId]: value,
+        [stateKey]: value,
       }
     }
 
-    function getSelectFilterSearch(columnId: string) {
-      return filterSearchByColumnId.value[columnId] ?? ''
+    function getSelectFilterSearch(columnId: string, target: FilterControlTarget = 'live') {
+      return filterSearchByColumnId.value[getFilterSearchStateKey(columnId, target)] ?? ''
     }
 
     function getFilterOptions(config: DataGridFilterConfig) {
@@ -1092,9 +1106,9 @@ export default defineComponent({
       }
     }
 
-    function getVisibleFilterOptions(config: DataGridFilterConfig) {
+    function getVisibleFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
       const options = getFilterOptions(config)
-      const searchTerm = getSelectFilterSearch(config.id).trim().toLocaleLowerCase()
+      const searchTerm = getSelectFilterSearch(config.id, target).trim().toLocaleLowerCase()
 
       if (!searchTerm) {
         return options
@@ -1107,7 +1121,7 @@ export default defineComponent({
       columnId: string,
       optionValue: DataGridFilterOption['value'],
       checked: boolean,
-      target: 'live' | 'dialog' = 'live',
+      target: FilterControlTarget = 'live',
     ) {
       const currentValues = getSelectFilterValues(columnId, target)
       const normalizedValue = toFilterOptionKey(optionValue)
@@ -1122,17 +1136,17 @@ export default defineComponent({
 
     function selectAllFilterOptions(
       config: DataGridFilterConfig,
-      target: 'live' | 'dialog' = 'live',
+      target: FilterControlTarget = 'live',
     ) {
       const options = getFilterOptions(config).map((option) => option.value)
       setColumnFilterValue(config.id, options, target)
     }
 
-    function clearSelectFilterOptions(filterId: string, target: 'live' | 'dialog' = 'live') {
+    function clearSelectFilterOptions(filterId: string, target: FilterControlTarget = 'live') {
       setColumnFilterValue(filterId, undefined, target)
     }
 
-    function getFilterButtonLabel(config: DataGridFilterConfig, target: 'live' | 'dialog' = 'live') {
+    function getFilterButtonLabel(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
       if (config.variant !== 'select') {
         return 'Filtr'
       }
@@ -1166,7 +1180,7 @@ export default defineComponent({
 
     function renderFilterControl(
       config: DataGridFilterConfig,
-      options?: { toolbar?: boolean; target?: 'live' | 'dialog' },
+      options?: { toolbar?: boolean; target?: FilterControlTarget },
     ) {
       const filterOptions = getFilterOptions(config)
       const isToolbar = options?.toolbar ?? false
@@ -1175,7 +1189,7 @@ export default defineComponent({
       if (config.variant === 'select' && filterOptions.length > 0) {
         const selectedValues = getSelectFilterValues(config.id, target)
         const selectedValueKeys = new Set(selectedValues.map((value) => toFilterOptionKey(value)))
-        const visibleOptions = getVisibleFilterOptions(config)
+        const visibleOptions = getVisibleFilterOptions(config, target)
         const isOpen =
           target === 'dialog'
             ? openDialogFilterColumnId.value === config.id
@@ -1224,11 +1238,15 @@ export default defineComponent({
                   default: () => [
                   h('input', {
                     class: 'data-grid__filter-select-search',
-                    value: getSelectFilterSearch(config.id),
+                    value: getSelectFilterSearch(config.id, target),
                     placeholder: 'Szukaj opcji',
                     onClick: (event) => event.stopPropagation(),
                     onInput: (event) =>
-                      updateSelectFilterSearch(config.id, (event.target as HTMLInputElement).value),
+                      updateSelectFilterSearch(
+                        config.id,
+                        (event.target as HTMLInputElement).value,
+                        target,
+                      ),
                   }),
                   h('div', { class: 'data-grid__filter-select-actions' }, [
                     h(
@@ -1456,6 +1474,7 @@ export default defineComponent({
       }
       columnFilters.value = cloneColumnFilters(draftColumnFilters.value)
       globalFilter.value = draftGlobalFilter.value
+      syncFilterDialogDraftState()
       closeFilterDialog()
     }
 
@@ -1870,6 +1889,7 @@ export default defineComponent({
               activeViewId={activeViewId.value}
               savedViews={savedViews.value}
               quickFilters={quickFilterConfigs.value}
+              activeFilterCount={activeFilterCount.value}
               renderFilterControl={renderFilterControl}
               onToggleViewsMenu={toggleViewsMenu}
               onSelectSavedView={selectSavedView}

@@ -1,4 +1,11 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
+import IconDeleteRounded from '~icons/material-symbols/delete-rounded'
+import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
+import IconRefreshRounded from '~icons/material-symbols/refresh-rounded'
+import IconSaveRounded from '~icons/material-symbols/save-rounded'
+import IconTuneRounded from '~icons/material-symbols/tune-rounded'
+import IconViewColumnOutlineRounded from '~icons/material-symbols/view-column-outline-rounded'
+import IconSaveAsOutlineSharp from '~icons/material-symbols/save-as-outline-sharp'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
 import type { DataGridFilterConfig, DataGridSavedView } from '../types'
@@ -31,6 +38,10 @@ export default defineComponent({
     quickFilters: {
       type: Array as PropType<QuickFilterItem[]>,
       required: true,
+    },
+    activeFilterCount: {
+      type: Number,
+      default: 0,
     },
     renderFilterControl: {
       type: Function as PropType<
@@ -86,7 +97,8 @@ export default defineComponent({
               onClick={props.onToggleViewsMenu}
               data-grid-view-root="true"
             >
-              Widoki
+              <IconTuneRounded class="data-grid__button-icon" />
+              <span>Widoki</span>
             </button>
             {props.isViewsMenuOpen ? (
               <DataGridDropdownMenu menuClass="data-grid__views-menu" scopeAttr="data-grid-view-root">
@@ -113,7 +125,8 @@ export default defineComponent({
                     onClick={props.onOpenSaveViewDialog}
                     data-grid-view-root="true"
                   >
-                    Zapisz
+                    <IconSaveRounded class="data-grid__button-icon" />
+                    <span>Nowy</span>
                   </button>
                   <button
                     type="button"
@@ -122,7 +135,8 @@ export default defineComponent({
                     disabled={!props.savedViews.length}
                     data-grid-view-root="true"
                   >
-                    Nadpisz
+                    <IconSaveAsOutlineSharp class="data-grid__button-icon" />
+                    <span>Zapisz</span>
                   </button>
                   <button
                     type="button"
@@ -131,7 +145,8 @@ export default defineComponent({
                     disabled={!props.activeViewId}
                     data-grid-view-root="true"
                   >
-                    Usun
+                    <IconDeleteRounded class="data-grid__button-icon" />
+                    <span>Usuń</span>
                   </button>
                 </div>
               </DataGridDropdownMenu>
@@ -162,29 +177,48 @@ export default defineComponent({
         </div>
 
         <div class="data-grid__toolbar-actions" data-grid-dialog-root="true">
-          <button
-            type="button"
-            class="data-grid__toolbar-button"
-            onClick={props.onToggleFilterDialog}
-            data-grid-dialog-root="true"
-          >
-            Filtry
-          </button>
+          <div class="data-grid__toolbar-button-group" data-grid-dialog-root="true">
+            <button
+              type="button"
+              class={[
+                'data-grid__toolbar-button',
+                props.activeFilterCount > 0 ? 'data-grid__toolbar-button--group-start' : '',
+              ]}
+              onClick={props.onToggleFilterDialog}
+              data-grid-dialog-root="true"
+            >
+              <IconFilterAltOutline class="data-grid__button-icon" />
+              <span>Filtry</span>
+              {props.activeFilterCount > 0 ? (
+                <span class="data-grid__badge">{props.activeFilterCount}</span>
+              ) : null}
+            </button>
+            {props.activeFilterCount > 0 ? (
+              <button
+                type="button"
+                class={[
+                  'data-grid__toolbar-button',
+                  'data-grid__toolbar-button--danger',
+                  'data-grid__toolbar-button--icon-only',
+                  'data-grid__toolbar-button--group-end',
+                ]}
+                onClick={props.onClearFilters}
+                aria-label="Wyczysc filtry"
+                title="Wyczysc filtry"
+                data-grid-dialog-root="true"
+              >
+                <IconDeleteRounded class="data-grid__button-icon" />
+              </button>
+            ) : null}
+          </div>
           <button
             type="button"
             class="data-grid__toolbar-button"
             onClick={props.onRefresh}
             data-grid-dialog-root="true"
           >
-            Odswiez
-          </button>
-          <button
-            type="button"
-            class="data-grid__toolbar-button"
-            onClick={props.onClearFilters}
-            data-grid-dialog-root="true"
-          >
-            Wyczysc filtry
+            <IconRefreshRounded class="data-grid__button-icon" />
+            <span>Odswiez</span>
           </button>
           <button
             type="button"
@@ -192,7 +226,8 @@ export default defineComponent({
             onClick={props.onToggleColumnPicker}
             data-grid-dialog-root="true"
           >
-            Columns
+            <IconViewColumnOutlineRounded class="data-grid__button-icon" />
+            <span>Kolumny</span>
           </button>
         </div>
       </div>

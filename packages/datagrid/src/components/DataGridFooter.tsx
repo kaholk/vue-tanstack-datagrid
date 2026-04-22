@@ -1,4 +1,6 @@
 import { defineComponent, type PropType } from 'vue'
+import IconArrowBackRounded from '~icons/material-symbols/arrow-back-rounded'
+import IconArrowForwardRounded from '~icons/material-symbols/arrow-forward-rounded'
 
 import type { DataGridMetaConfig, DataGridPageSizeConfig } from '../types'
 
@@ -105,7 +107,7 @@ export default defineComponent({
             disabled={!props.canPreviousPage}
             aria-label="Previous page"
           >
-            {'<'}
+            <IconArrowBackRounded class="data-grid__icon" />
           </button>
           <div class="data-grid__pagination-pages" aria-label="Pagination">
             {props.paginationItems.map((item) =>
@@ -137,7 +139,7 @@ export default defineComponent({
             disabled={!props.canNextPage}
             aria-label="Next page"
           >
-            {'>'}
+            <IconArrowForwardRounded class="data-grid__icon" />
           </button>
         </div>
 

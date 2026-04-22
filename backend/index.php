@@ -31,7 +31,7 @@ $includeColumns = array_values(array_filter(
     static fn (mixed $value): bool => is_string($value) && $value !== ''
 ));
 
-$statuses = ['active', 'pending', 'blocked', 'lead'];
+$statuses = ['active', 'active1', 'active2', 'active3', 'active4', 'inactive', 'pending', 'new', 'qualified', 'proposal'];
 $plans = ['free', 'starter', 'growth', 'enterprise'];
 $countries = ['Poland', 'Germany', 'France', 'Spain', 'Italy', 'Sweden', 'USA', 'Canada'];
 $cities = ['Warsaw', 'Berlin', 'Paris', 'Madrid', 'Rome', 'Stockholm', 'Chicago', 'Toronto'];
@@ -126,9 +126,43 @@ foreach ($filters as $filter) {
     }
 
     $id = (string) ($filter['id'] ?? '');
-    $value = trim((string) ($filter['value'] ?? ''));
+    $rawValue = $filter['value'] ?? '';
 
-    if ($id === '' || $value === '') {
+    if ($id === '') {
+        continue;
+    }
+
+    if (is_array($rawValue)) {
+        $needles = array_values(array_filter(
+            array_map(
+                static fn (mixed $value): string => mb_strtolower(trim((string) $value)),
+                $rawValue
+            ),
+            static fn (string $value): bool => $value !== ''
+        ));
+
+        if ($needles === []) {
+            continue;
+        }
+
+        $needleLookup = array_flip($needles);
+        $dataset = array_values(array_filter(
+            $dataset,
+            static function (array $row) use ($id, $needleLookup): bool {
+                if (!array_key_exists($id, $row)) {
+                    return true;
+                }
+
+                return isset($needleLookup[mb_strtolower((string) $row[$id])]);
+            }
+        ));
+
+        continue;
+    }
+
+    $value = trim((string) $rawValue);
+
+    if ($value === '') {
         continue;
     }
 

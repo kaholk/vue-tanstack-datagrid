@@ -1,5 +1,11 @@
 import { FlexRender, type Column, type HeaderContext } from '@tanstack/vue-table'
 import { defineComponent, h, type CSSProperties, type PropType, type VNodeChild } from 'vue'
+import IconCloseRounded from '~icons/material-symbols/close-rounded'
+import IconLeftPanelCloseRounded from '~icons/material-symbols/left-panel-close-rounded'
+import IconNorthRounded from '~icons/material-symbols/north-rounded'
+import IconRightPanelCloseRounded from '~icons/material-symbols/right-panel-close-rounded'
+import IconSouthRounded from '~icons/material-symbols/south-rounded'
+import IconUnfoldMoreRounded from '~icons/material-symbols/unfold-more-rounded'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
 import type { DataGridColumn, DataGridFilterConfig } from '../types'
@@ -96,6 +102,13 @@ export default defineComponent({
         )
       }
 
+      const sortIndicator =
+        sortedState === 'asc'
+          ? h(IconNorthRounded, { class: 'data-grid__icon' })
+          : sortedState === 'desc'
+            ? h(IconSouthRounded, { class: 'data-grid__icon' })
+            : h(IconUnfoldMoreRounded, { class: 'data-grid__icon' })
+
       return h('div', { class: 'data-grid__header-content' }, [
         h(
           'button',
@@ -117,11 +130,7 @@ export default defineComponent({
                 props: props.header,
               }),
             ),
-            h(
-              'span',
-              { class: 'data-grid__sort-indicator' },
-              sortedState === 'asc' ? '↑' : sortedState === 'desc' ? '↓' : '·',
-            ),
+            h('span', { class: 'data-grid__sort-indicator' }, sortIndicator),
           ],
         ),
         h('div', { class: 'data-grid__header-controls' }, [
@@ -156,7 +165,10 @@ export default defineComponent({
                                 onClick: () => props.onToggleSorting(props.column),
                                 disabled: sortedState === 'asc',
                               },
-                              'ASC',
+                              [
+                                h(IconNorthRounded, { class: 'data-grid__menu-item-icon' }),
+                                h('span', 'ASC'),
+                              ],
                             ),
                             h(
                               'button',
@@ -169,7 +181,10 @@ export default defineComponent({
                                 onClick: () => props.onSetSortDesc(props.column),
                                 disabled: sortedState === 'desc',
                               },
-                              'DESC',
+                              [
+                                h(IconSouthRounded, { class: 'data-grid__menu-item-icon' }),
+                                h('span', 'DESC'),
+                              ],
                             ),
                             h(
                               'button',
@@ -179,7 +194,10 @@ export default defineComponent({
                                 onClick: () => props.onClearSorting(props.column),
                                 disabled: !sortedState,
                               },
-                              'Clear',
+                              [
+                                h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
+                                h('span', 'Clear'),
+                              ],
                             ),
                           ]),
                         ])
@@ -198,7 +216,10 @@ export default defineComponent({
                             onClick: () => props.onSetPin(props.column, 'left'),
                             disabled: props.pinnedSide === 'left',
                           },
-                          'Left',
+                          [
+                            h(IconLeftPanelCloseRounded, { class: 'data-grid__menu-item-icon' }),
+                            h('span', 'Left'),
+                          ],
                         ),
                         h(
                           'button',
@@ -211,7 +232,10 @@ export default defineComponent({
                             onClick: () => props.onSetPin(props.column, 'right'),
                             disabled: props.pinnedSide === 'right',
                           },
-                          'Right',
+                          [
+                            h(IconRightPanelCloseRounded, { class: 'data-grid__menu-item-icon' }),
+                            h('span', 'Right'),
+                          ],
                         ),
                         h(
                           'button',
@@ -221,7 +245,10 @@ export default defineComponent({
                             onClick: () => props.onSetPin(props.column, false),
                             disabled: !props.pinnedSide,
                           },
-                          'Unpin',
+                          [
+                            h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
+                            h('span', 'Unpin'),
+                          ],
                         ),
                       ]),
                     ]),
@@ -233,7 +260,10 @@ export default defineComponent({
                           class: 'data-grid__menu-close',
                           onClick: props.onCloseMenu,
                         },
-                        'Close',
+                        [
+                          h(IconCloseRounded, { class: 'data-grid__menu-item-icon' }),
+                          h('span', 'Close'),
+                        ],
                       ),
                     ]),
                   ],
