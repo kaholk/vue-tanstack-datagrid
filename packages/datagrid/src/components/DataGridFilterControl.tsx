@@ -1,4 +1,4 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, ref, watch, type PropType } from 'vue'
 
 import DataGridSelectFilterMenu from './DataGridSelectFilterMenu'
 import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
@@ -70,6 +70,23 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const draftValue = ref(props.inputValue)
+
+    watch(
+      () => props.inputValue,
+      (value) => {
+        draftValue.value = value
+      },
+    )
+
+    const commitInputValue = () => {
+      props.onInput?.(draftValue.value)
+    }
+
+    const resetInputValue = () => {
+      draftValue.value = props.inputValue
+    }
+
     return () => {
       if (props.config.variant === 'select') {
         return (
@@ -115,9 +132,23 @@ export default defineComponent({
             'data-grid__filter-input',
             props.isToolbar ? 'data-grid__filter-input--toolbar' : '',
           ]}
-          value={props.inputValue}
+          value={draftValue.value}
           placeholder={props.config.placeholder ?? 'Filtr'}
-          onInput={(event) => props.onInput?.((event.target as HTMLInputElement).value)}
+          onInput={(event) => {
+            draftValue.value = (event.target as HTMLInputElement).value
+          }}
+          onKeydown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commitInputValue()
+              return
+            }
+
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              resetInputValue()
+            }
+          }}
         />
       )
     }

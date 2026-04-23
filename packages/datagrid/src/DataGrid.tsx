@@ -21,10 +21,12 @@ import {
   type ColumnSizingState,
   type ColumnSort,
   type Header,
+  type HeaderContext,
   type PaginationState,
   type RowSelectionState,
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import IconCheckSmallRounded from '~icons/material-symbols/check-small-rounded'
 
 import DataGridBodyRow from './components/DataGridBodyRow'
 import DataGridDialog from './components/DataGridDialog'
@@ -48,11 +50,14 @@ import type {
   DataGridFetchResult,
   DataGridInitialState,
   DataGridHeight,
+  DataGridLoadingConfig,
   DataGridMetaConfig,
   DataGridPageSizeConfig,
+  DataGridRowSelectionConfig,
   DataGridSavedViewsPersistence,
   DataGridSelectionPanelConfig,
   DataGridSelectionPanelSumConfig,
+  DataGridSelectionPanelPosition,
   DataGridSavedViewState,
 } from './types'
 
@@ -106,6 +111,188 @@ const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
   selectedRowsLabel: 'Zaznaczone wiersze',
   copyWithHeadersLabel: 'Kopiuj z naglowkami',
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
+  allowPositionChange: true,
+  positionStorageKey: '',
+}
+const defaultRowSelectionColumnId = '__select'
+const defaultRowSelectionPreset = 'default'
+const defaultLoadingConfig: DataGridLoadingConfig = {
+  variant: 'overlay',
+  label: 'Ladowanie danych',
+}
+
+function renderSelectionCheckbox(
+  checked: boolean,
+  onToggle: (nextChecked: boolean, event: MouseEvent | KeyboardEvent) => void,
+  options?: {
+    ariaLabel?: string
+    indeterminate?: boolean
+  },
+) {
+  return h(
+    'button',
+    {
+      type: 'button',
+      role: 'checkbox',
+      'aria-checked': options?.indeterminate ? 'mixed' : checked ? 'true' : 'false',
+      'aria-label': options?.ariaLabel,
+      class: [
+        'data-grid__select-checkbox',
+        checked ? 'data-grid__select-checkbox--checked' : '',
+        options?.indeterminate ? 'data-grid__select-checkbox--indeterminate' : '',
+      ],
+      onClick: (event: MouseEvent) => {
+        event.stopPropagation()
+        onToggle(!checked, event)
+      },
+      onKeydown: (event: KeyboardEvent) => {
+        if (event.key !== ' ' && event.key !== 'Enter') {
+          return
+        }
+
+        event.stopPropagation()
+        event.preventDefault()
+        onToggle(!checked, event)
+      },
+    },
+    [
+      checked
+        ? h(IconCheckSmallRounded, { class: 'data-grid__select-checkbox-icon' })
+        : options?.indeterminate
+          ? h('span', { class: 'data-grid__select-checkbox-dash' })
+          : null,
+    ],
+  )
+}
+
+function normalizeColumnSize<TData extends AnyRow>(column: DataGridColumn<TData>): DataGridColumn<TData> {
+  if (typeof column.size !== 'number') {
+    return column
+  }
+
+  return {
+    ...column,
+    minSize: column.size,
+    maxSize: column.size,
+  }
+}
+
+function getFixedColumnSize<TData extends AnyRow>(column?: Partial<DataGridColumn<TData>>): number | null {
+  return typeof column?.size === 'number' ? column.size : null
+}
+
+function appendMissingColumnId(columnOrder: ColumnOrderState, columnId: string): ColumnOrderState {
+  if (columnOrder.includes(columnId)) {
+    return [...columnOrder]
+  }
+
+  return [columnId, ...columnOrder]
+}
+
+function appendMissingPinnedColumnId(
+  columnPinning: ColumnPinningState,
+  columnId: string,
+  defaultPin: 'left' | 'right' | false,
+): ColumnPinningState {
+  const left = [...(columnPinning.left ?? [])]
+  const right = [...(columnPinning.right ?? [])]
+
+  if (left.includes(columnId) || right.includes(columnId) || !defaultPin) {
+    return { left, right }
+  }
+
+  if (defaultPin === 'left') {
+    return {
+      left: [columnId, ...left],
+      right,
+    }
+  }
+
+  return {
+    left,
+    right: [columnId, ...right],
+  }
+}
+
+function buildRowSelectionColumn(
+  config: DataGridRowSelectionConfig<AnyRow>,
+  options?: {
+    onToggleAll?: (
+      nextChecked: boolean,
+      context: { table: HeaderContext<AnyRow, unknown>['table'] },
+      event: MouseEvent | KeyboardEvent,
+    ) => void
+    onToggleRow?: (
+      nextChecked: boolean,
+      context: {
+        row: CellRenderProps['row']
+        table: CellRenderProps['table']
+      },
+      event: MouseEvent | KeyboardEvent,
+    ) => void
+  },
+): DataGridColumn<AnyRow> {
+  const columnId = config.columnId?.trim() || defaultRowSelectionColumnId
+  const columnOverrides = config.column ?? {}
+  const preset = config.preset ?? defaultRowSelectionPreset
+  const presetColumn: Partial<DataGridColumn<AnyRow>> =
+    preset === 'compact-left' || preset === 'compact-right'
+      ? {
+          size: 44,
+          minSize: 44,
+          maxSize: 44,
+          pickerLabel: 'Select',
+        }
+      : {
+          size: 52,
+          minSize: 52,
+          maxSize: 52,
+          pickerLabel: 'Select',
+        }
+  const defaultLabel =
+    (typeof columnOverrides.pickerLabel === 'string' && columnOverrides.pickerLabel.trim()) ||
+    'Select'
+  const baseColumn: DataGridColumn<AnyRow> = {
+    id: columnId,
+    ...presetColumn,
+    header: defaultLabel,
+    align: 'center',
+    localKind: 'action',
+    enableSorting: false,
+    showFilter: false,
+    pickerLabel: defaultLabel,
+    headerControl: ({ table }) =>
+      renderSelectionCheckbox(
+        table.getIsAllPageRowsSelected(),
+        (checked, event) =>
+          options?.onToggleAll?.(checked, { table }, event) ?? table.toggleAllPageRowsSelected(checked),
+        {
+          ariaLabel: 'Zaznacz wszystkie wiersze na stronie',
+          indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+        },
+      ),
+    cell: ({ row, table }) =>
+      renderSelectionCheckbox(
+        row.getIsSelected(),
+        (checked, event) =>
+          options?.onToggleRow?.(checked, { row, table }, event) ??
+          row.toggleSelected(checked),
+        {
+          ariaLabel: 'Zaznacz wiersz',
+        },
+      ),
+  }
+
+  return {
+    ...baseColumn,
+    ...columnOverrides,
+    id: columnId,
+    localKind: columnOverrides.localKind ?? 'action',
+    enableSorting: columnOverrides.enableSorting ?? false,
+    showFilter: columnOverrides.showFilter ?? false,
+    pickerLabel: columnOverrides.pickerLabel ?? defaultLabel,
+    headerControl: columnOverrides.headerControl ?? baseColumn.headerControl,
+  }
 }
 
 function toNumber(value: string, fallback: number) {
@@ -266,8 +453,12 @@ export default defineComponent({
       default: 3,
     },
     height: {
-      type: [Number, String] as PropType<DataGridHeight>,
+      type: Number as PropType<DataGridHeight>,
       default: 560,
+    },
+    loadingConfig: {
+      type: Object as PropType<DataGridLoadingConfig | undefined>,
+      default: undefined,
     },
     viewStorageKey: {
       type: String,
@@ -292,29 +483,134 @@ export default defineComponent({
       type: Object as PropType<DataGridSelectionPanelConfig | undefined>,
       default: undefined,
     },
+    rowSelectionConfig: {
+      type: Object as PropType<DataGridRowSelectionConfig<any> | undefined>,
+      default: undefined,
+    },
   },
   setup(props) {
+    const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
+      variant: props.loadingConfig?.variant ?? defaultLoadingConfig.variant,
+      label: props.loadingConfig?.label ?? defaultLoadingConfig.label,
+    }))
+    const lastSelectedRowId = ref<string | null>(null)
+    const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(
+      props.selectionPanelConfig?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right',
+    )
+    const mergedRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | null>(() => {
+      if (!props.rowSelectionConfig?.enabled) {
+        return null
+      }
+
+      const preset = props.rowSelectionConfig.preset ?? defaultRowSelectionPreset
+
+      return {
+        enabled: true,
+        preset,
+        columnId: props.rowSelectionConfig.columnId?.trim() || defaultRowSelectionColumnId,
+        defaultPin:
+          props.rowSelectionConfig.defaultPin ??
+          (preset === 'compact-left'
+            ? 'left'
+            : preset === 'compact-right'
+              ? 'right'
+              : false),
+        column: props.rowSelectionConfig.column ?? {},
+      }
+    })
+    const rowSelectionColumnSize = computed(() =>
+      getFixedColumnSize(mergedRowSelectionConfig.value?.column),
+    )
+    const mergedColumns = computed<DataGridColumn<AnyRow>[]>(() => {
+      const rowSelectionConfig = mergedRowSelectionConfig.value
+      const normalizedColumns = props.columns.map((column) => normalizeColumnSize(column))
+      if (!rowSelectionConfig) {
+        return normalizedColumns
+      }
+
+      const selectionColumn = normalizeColumnSize(
+        buildRowSelectionColumn(rowSelectionConfig, {
+          onToggleAll: (checked, context) => {
+            context.table.toggleAllPageRowsSelected(checked)
+            lastSelectedRowId.value = null
+          },
+          onToggleRow: (checked, context, event) => {
+            const rows = context.table.getRowModel().rows
+            const currentIndex = rows.findIndex((row) => row.id === context.row.id)
+            const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
+
+            if (event.shiftKey && currentIndex >= 0 && anchorIndex >= 0) {
+              const [start, end] =
+                currentIndex < anchorIndex
+                  ? [currentIndex, anchorIndex]
+                  : [anchorIndex, currentIndex]
+
+              for (let index = start; index <= end; index += 1) {
+                rows[index]?.toggleSelected(checked)
+              }
+            } else {
+              context.row.toggleSelected(checked)
+            }
+
+            lastSelectedRowId.value = context.row.id
+          },
+        }),
+      )
+      const remainingColumns = normalizedColumns.filter((column) => column.id !== selectionColumn.id)
+      return [selectionColumn, ...remainingColumns]
+    })
+    const mergedInitialState = computed<DataGridInitialState>(() => {
+      const initialState = props.initialState ?? {}
+      const rowSelectionConfig = mergedRowSelectionConfig.value
+
+      if (!rowSelectionConfig) {
+        return initialState
+      }
+
+      const columnId = rowSelectionConfig.columnId ?? defaultRowSelectionColumnId
+      const forcedSize = getFixedColumnSize(rowSelectionConfig.column)
+
+      return {
+        ...initialState,
+        columnOrder: appendMissingColumnId(initialState.columnOrder ?? [], columnId),
+        columnSizing:
+          typeof forcedSize === 'number'
+            ? {
+                ...(initialState.columnSizing ?? {}),
+                [columnId]: forcedSize,
+              }
+            : initialState.columnSizing,
+        columnPinning: appendMissingPinnedColumnId(
+          initialState.columnPinning ?? {
+            left: [],
+            right: [],
+          },
+          columnId,
+          rowSelectionConfig.defaultPin ?? false,
+        ),
+      }
+    })
     const scrollElementRef = ref<HTMLDivElement | null>(null)
     const pagination = ref<PaginationState>(
-      props.initialState.pagination ?? {
+      mergedInitialState.value.pagination ?? {
         pageIndex: 0,
         pageSize: 100,
       },
     )
-    const sorting = ref<ColumnSort[]>(props.initialState.sorting ?? [])
-    const columnOrder = ref<ColumnOrderState>(props.initialState.columnOrder ?? [])
-    const columnSizing = ref<ColumnSizingState>(props.initialState.columnSizing ?? {})
+    const sorting = ref<ColumnSort[]>(mergedInitialState.value.sorting ?? [])
+    const columnOrder = ref<ColumnOrderState>(mergedInitialState.value.columnOrder ?? [])
+    const columnSizing = ref<ColumnSizingState>(mergedInitialState.value.columnSizing ?? {})
     const columnVisibility = ref<DataGridColumnVisibilityState>(
-      props.initialState.columnVisibility ?? {},
+      mergedInitialState.value.columnVisibility ?? {},
     )
     const columnPinning = ref<ColumnPinningState>(
-      props.initialState.columnPinning ?? {
+      mergedInitialState.value.columnPinning ?? {
         left: [],
         right: [],
       },
     )
-    const columnFilters = ref<ColumnFiltersState>(props.initialState.columnFilters ?? [])
-    const globalFilter = ref(props.initialState.globalFilter ?? '')
+    const columnFilters = ref<ColumnFiltersState>(mergedInitialState.value.columnFilters ?? [])
+    const globalFilter = ref(mergedInitialState.value.globalFilter ?? '')
     const rowSelection = ref<RowSelectionState>({})
     const openMenuColumnId = ref<string | null>(null)
     const isColumnPickerOpen = ref(false)
@@ -436,12 +732,64 @@ export default defineComponent({
       isSaveViewDialogOpen.value = false
     }
 
+    function updateSelectionPanelPosition(position: DataGridSelectionPanelPosition) {
+      selectionPanelPosition.value = position
+    }
+
+    onMounted(() => {
+      const storageKey = selectionPanelPositionStorageKey.value
+      if (!storageKey || typeof window === 'undefined') {
+        return
+      }
+
+      const storedPosition = window.localStorage.getItem(storageKey) as
+        | DataGridSelectionPanelPosition
+        | null
+
+      if (
+        storedPosition === 'bottom-left' ||
+        storedPosition === 'bottom-right' ||
+        storedPosition === 'top-left' ||
+        storedPosition === 'top-right'
+      ) {
+        selectionPanelPosition.value = storedPosition
+      }
+    })
+
+    watch(selectionPanelPosition, (position) => {
+      const storageKey = selectionPanelPositionStorageKey.value
+      if (!storageKey || typeof window === 'undefined') {
+        return
+      }
+
+      window.localStorage.setItem(storageKey, position)
+    })
+    watch(
+      [mergedRowSelectionConfig, rowSelectionColumnSize, columnSizing],
+      ([rowSelectionConfig, forcedSize, sizingState]) => {
+        if (!rowSelectionConfig || typeof forcedSize !== 'number') {
+          return
+        }
+
+        const columnId = rowSelectionConfig.columnId ?? defaultRowSelectionColumnId
+        if (sizingState[columnId] === forcedSize) {
+          return
+        }
+
+        columnSizing.value = {
+          ...sizingState,
+          [columnId]: forcedSize,
+        }
+      },
+      { immediate: true },
+    )
+
     const table = useVueTable({
       get data() {
         return requestState.value.rows
       },
       get columns() {
-        return props.columns
+        return mergedColumns.value
       },
       state: {
         get pagination() {
@@ -521,6 +869,17 @@ export default defineComponent({
     const totalWidth = computed(() => table.getTotalSize())
     const leftPinnedColumnIds = computed(() => new Set(columnPinning.value.left ?? []))
     const rightPinnedColumnIds = computed(() => new Set(columnPinning.value.right ?? []))
+    const selectionPanelPositionStorageKey = computed(() => {
+      if (props.selectionPanelConfig?.positionStorageKey) {
+        return props.selectionPanelConfig.positionStorageKey
+      }
+
+      if (props.viewStorageKey) {
+        return `${props.viewStorageKey}:selection-panel-position`
+      }
+
+      return ''
+    })
     const visibleColumnIndexById = computed(
       () => new Map(visibleColumns.value.map((column, index) => [column.id, index])),
     )
@@ -530,7 +889,10 @@ export default defineComponent({
       }
 
       return {
-        position: props.selectionPanelConfig.position ?? defaultSelectionPanelConfig.position,
+        position:
+          selectionPanelPosition.value ??
+          props.selectionPanelConfig.position ??
+          defaultSelectionPanelConfig.position,
         sumColumns: props.selectionPanelConfig.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
         copyColumnIds:
           props.selectionPanelConfig.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
@@ -543,6 +905,12 @@ export default defineComponent({
         copyWithoutHeadersLabel:
           props.selectionPanelConfig.copyWithoutHeadersLabel ??
           defaultSelectionPanelConfig.copyWithoutHeadersLabel,
+        allowPositionChange:
+          props.selectionPanelConfig.allowPositionChange ??
+          defaultSelectionPanelConfig.allowPositionChange,
+        positionStorageKey:
+          props.selectionPanelConfig.positionStorageKey ??
+          defaultSelectionPanelConfig.positionStorageKey,
       }
     })
     const selectedRows = computed(() => {
@@ -585,7 +953,7 @@ export default defineComponent({
     } = useDataGridSavedViews({
       viewStorageKey: props.viewStorageKey,
       savedViewsPersistence: props.savedViewsPersistence,
-      initialState: props.initialState,
+      initialState: mergedInitialState.value,
       columnOrder,
       columnSizing,
       columnVisibility,
@@ -612,7 +980,7 @@ export default defineComponent({
     const showViewsMenu = computed(
       () => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence),
     )
-    const isAutoHeight = computed(() => props.height === 'auto')
+    const isAutoHeight = computed(() => props.height === -1)
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
       if (leftPinnedColumnIds.value.has(columnId)) {
@@ -1198,6 +1566,8 @@ export default defineComponent({
 
     const selectionPanelColumns = computed(() => {
       const configuredColumnIds = mergedSelectionPanelConfig.value?.copyColumnIds
+      const rowSelectionColumnId =
+        mergedRowSelectionConfig.value?.columnId ?? defaultRowSelectionColumnId
 
       if (configuredColumnIds && configuredColumnIds.length > 0) {
         const visibleColumnById = new Map(visibleColumns.value.map((column) => [column.id, column]))
@@ -1208,7 +1578,7 @@ export default defineComponent({
 
       return visibleColumns.value.filter((column) => {
         const columnDef = column.columnDef as DataGridColumn<AnyRow>
-        return column.id !== 'select' && columnDef.localKind !== 'action'
+        return column.id !== rowSelectionColumnId && columnDef.localKind !== 'action'
       })
     })
 
@@ -1445,8 +1815,7 @@ export default defineComponent({
             </div>
 
             <div
-              ref={scrollElementRef}
-              class="data-grid__viewport"
+              class="data-grid__viewport-shell"
               style={
                 {
                   ...(isAutoHeight.value ? {} : { height: `${props.height}px` }),
@@ -1455,89 +1824,107 @@ export default defineComponent({
               }
             >
               <div
-                class="data-grid__inner"
-                style={{
-                  width: `${totalWidth.value}px`,
-                  height: `${totalRowHeight.value + headerHeight}px`,
-                }}
+                ref={scrollElementRef}
+                class={[
+                  'data-grid__viewport',
+                  isLoading.value && mergedLoadingConfig.value.variant === 'overlay'
+                    ? 'data-grid__viewport--loading'
+                    : '',
+                ]}
               >
-                <div class="data-grid__header" style={{ width: `${totalWidth.value}px` }}>
-                  <div class="data-grid__row data-grid__row--header" style={{ transform: 'translateY(0px)' }}>
-                    {headerSequence.value.map((entry) => {
-                      if (entry.type === 'spacer') {
+                <div
+                  class="data-grid__inner"
+                  style={{
+                    width: `${totalWidth.value}px`,
+                    height: `${totalRowHeight.value + headerHeight}px`,
+                  }}
+                >
+                  <div class="data-grid__header" style={{ width: `${totalWidth.value}px` }}>
+                    <div class="data-grid__row data-grid__row--header" style={{ transform: 'translateY(0px)' }}>
+                      {headerSequence.value.map((entry) => {
+                        if (entry.type === 'spacer') {
+                          return (
+                            <div
+                              key={entry.key}
+                              class="data-grid__cell-spacer"
+                              style={{ width: `${entry.width}px` }}
+                            />
+                          )
+                        }
+
+                        const pinnedSide = getPinnedSide(entry.column.id)
+
                         return (
                           <div
                             key={entry.key}
-                            class="data-grid__cell-spacer"
-                            style={{ width: `${entry.width}px` }}
-                          />
+                            class={[
+                              'data-grid__cell',
+                              'data-grid__cell--header',
+                              pinnedSide ? 'data-grid__cell--pinned' : '',
+                              pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
+                            ]}
+                            style={{
+                              ...cellStylesByColumnId.value.get(entry.column.id),
+                            }}
+                          >
+                            <DataGridHeaderCell
+                              header={entry.item.getContext()}
+                              column={entry.column}
+                              pickerLabel={renderColumnPickerLabel(entry.column)}
+                              justifyContent={
+                                (cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ??
+                                'flex-start'
+                              }
+                              menuStyle={getColumnMenuStyle(entry.column)}
+                              isMenuOpen={openMenuColumnId.value === entry.column.id}
+                              pinnedSide={pinnedSide}
+                              renderFilterControl={(config) => renderFilterControl(config)}
+                              getColumnFilterConfig={getColumnFilterConfig}
+                              onToggleMenu={toggleColumnMenu}
+                              onToggleSorting={toggleSorting}
+                              onSetSortDesc={setSortDesc}
+                              onClearSorting={clearSorting}
+                              onSetPin={setPin}
+                              onCloseMenu={closeColumnMenu}
+                            />
+                          </div>
                         )
+                      })}
+                    </div>
+                  </div>
+
+                  <div class="data-grid__body" style={{ width: `${totalWidth.value}px` }}>
+                    {virtualRows.value.map((virtualRow) => {
+                      const row = visibleRows.value[virtualRow.index]
+                      if (!row) {
+                        return null
                       }
 
-                      const pinnedSide = getPinnedSide(entry.column.id)
-
                       return (
-                        <div
-                          key={entry.key}
-                          class={[
-                            'data-grid__cell',
-                            'data-grid__cell--header',
-                            pinnedSide ? 'data-grid__cell--pinned' : '',
-                            pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
-                          ]}
-                          style={{
-                            ...cellStylesByColumnId.value.get(entry.column.id),
-                          }}
-                        >
-                          <DataGridHeaderCell
-                            header={entry.item.getContext()}
-                            column={entry.column}
-                            pickerLabel={renderColumnPickerLabel(entry.column)}
-                            justifyContent={
-                              (cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ??
-                              'flex-start'
-                            }
-                            menuStyle={getColumnMenuStyle(entry.column)}
-                            isMenuOpen={openMenuColumnId.value === entry.column.id}
-                            pinnedSide={pinnedSide}
-                            renderFilterControl={(config) => renderFilterControl(config)}
-                            getColumnFilterConfig={getColumnFilterConfig}
-                            onToggleMenu={toggleColumnMenu}
-                            onToggleSorting={toggleSorting}
-                            onSetSortDesc={setSortDesc}
-                            onClearSorting={clearSorting}
-                            onSetPin={setPin}
-                            onCloseMenu={closeColumnMenu}
-                          />
-                        </div>
+                        <DataGridBodyRow
+                          key={row.id}
+                          row={row}
+                          rowStart={virtualRow.start}
+                          rowSize={virtualRow.size}
+                          rowSequence={rowSequence.value}
+                          visibleColumnIndexById={visibleColumnIndexById.value}
+                          cellStylesByColumnId={cellStylesByColumnId.value}
+                          getPinnedSide={getPinnedSide}
+                          renderCell={renderCell}
+                        />
                       )
                     })}
                   </div>
                 </div>
-
-                <div class="data-grid__body" style={{ width: `${totalWidth.value}px` }}>
-                  {virtualRows.value.map((virtualRow) => {
-                    const row = visibleRows.value[virtualRow.index]
-                    if (!row) {
-                      return null
-                    }
-
-                    return (
-                      <DataGridBodyRow
-                        key={row.id}
-                        row={row}
-                        rowStart={virtualRow.start}
-                        rowSize={virtualRow.size}
-                        rowSequence={rowSequence.value}
-                        visibleColumnIndexById={visibleColumnIndexById.value}
-                        cellStylesByColumnId={cellStylesByColumnId.value}
-                        getPinnedSide={getPinnedSide}
-                        renderCell={renderCell}
-                      />
-                    )
-                  })}
-                </div>
               </div>
+              {isLoading.value && mergedLoadingConfig.value.variant === 'overlay' ? (
+                <div class="data-grid__loading-overlay" aria-live="polite">
+                  <div class="data-grid__loading-spinner" />
+                  <span class="data-grid__loading-label">
+                    {mergedLoadingConfig.value.label ?? 'Ladowanie danych'}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {mergedSelectionPanelConfig.value && selectedRows.value.length > 0 ? (
               <DataGridSelectionPanel
@@ -1555,12 +1942,14 @@ export default defineComponent({
                   mergedSelectionPanelConfig.value.copyWithoutHeadersLabel ??
                   'Kopiuj bez naglowkow'
                 }
+                allowPositionChange={mergedSelectionPanelConfig.value.allowPositionChange ?? true}
                 onCopyWithHeaders={() => {
                   void copySelectedRows(true)
                 }}
                 onCopyWithoutHeaders={() => {
                   void copySelectedRows(false)
                 }}
+                onUpdatePosition={updateSelectionPanelPosition}
               />
             ) : null}
 

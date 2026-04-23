@@ -49,7 +49,14 @@ export type DataGridPageSizeConfig = {
   options?: number[]
 }
 
-export type DataGridHeight = number | 'auto'
+export type DataGridHeight = number
+
+export type DataGridLoadingVariant = 'none' | 'overlay'
+
+export type DataGridLoadingConfig = {
+  variant?: DataGridLoadingVariant
+  label?: string
+}
 
 export type DataGridSelectionPanelPosition =
   | 'bottom-left'
@@ -70,6 +77,16 @@ export type DataGridSelectionPanelConfig = {
   selectedRowsLabel?: string
   copyWithHeadersLabel?: string
   copyWithoutHeadersLabel?: string
+  allowPositionChange?: boolean
+  positionStorageKey?: string
+}
+
+export type DataGridRowSelectionConfig<TData extends RowData> = {
+  enabled?: boolean
+  preset?: 'default' | 'compact-left' | 'compact-right'
+  columnId?: string
+  defaultPin?: 'left' | 'right' | false
+  column?: Partial<DataGridColumn<TData>>
 }
 
 export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & {
