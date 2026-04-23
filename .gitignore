@@ -38,3 +38,6 @@ packages/*/dist
 
 # Vite
 *.timestamp-*-*.mjs
+
+
+.npmrc
