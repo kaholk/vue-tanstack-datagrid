@@ -1,6 +1,7 @@
 import { defineComponent, type PropType } from 'vue'
 import IconDeleteRounded from '~icons/material-symbols/delete-rounded'
 import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
+import IconHelpOutlineRounded from '~icons/material-symbols/help-outline-rounded'
 import IconRefreshRounded from '~icons/material-symbols/refresh-rounded'
 import IconViewColumnOutlineRounded from '~icons/material-symbols/view-column-outline-rounded'
 
@@ -20,6 +21,10 @@ export default defineComponent({
       required: true,
     },
     onClearFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onToggleFilterHelpDialog: {
       type: Function as PropType<() => void>,
       required: true,
     },
@@ -65,6 +70,15 @@ export default defineComponent({
             </button>
           ) : null}
         </div>
+        <button
+          type="button"
+          class="data-grid__toolbar-button"
+          onClick={props.onToggleFilterHelpDialog}
+          data-grid-dialog-root="true"
+        >
+          <IconHelpOutlineRounded class="data-grid__button-icon" />
+          <span>Jak używać filtrów</span>
+        </button>
         <button
           type="button"
           class="data-grid__toolbar-button"

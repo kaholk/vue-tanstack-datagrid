@@ -68,6 +68,10 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    onToggleFilterHelpDialog: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
     onRefresh: {
       type: Function as PropType<() => void>,
       required: true,
@@ -105,6 +109,7 @@ export default defineComponent({
         <DataGridToolbarActions
           activeFilterCount={props.activeFilterCount}
           onToggleFilterDialog={props.onToggleFilterDialog}
+          onToggleFilterHelpDialog={props.onToggleFilterHelpDialog}
           onRefresh={props.onRefresh}
           onClearFilters={props.onClearFilters}
           onToggleColumnPicker={props.onToggleColumnPicker}

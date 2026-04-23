@@ -33,6 +33,7 @@ import DataGridDialog from './components/DataGridDialog'
 import DataGridColumnPickerDialog from './components/DataGridColumnPickerDialog'
 import DataGridFooter from './components/DataGridFooter'
 import DataGridFilterDialog from './components/DataGridFilterDialog'
+import DataGridFilterHelpDialog from './components/DataGridFilterHelpDialog'
 import DataGridHeaderCell from './components/DataGridHeaderCell'
 import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
 import DataGridSelectionPanel from './components/DataGridSelectionPanel'
@@ -615,6 +616,7 @@ export default defineComponent({
     const openMenuColumnId = ref<string | null>(null)
     const isColumnPickerOpen = ref(false)
     const isFilterDialogOpen = ref(false)
+    const isFilterHelpDialogOpen = ref(false)
     const isViewsMenuOpen = ref(false)
     const isSaveViewDialogOpen = ref(false)
     const newViewName = ref('')
@@ -632,7 +634,9 @@ export default defineComponent({
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined
     let activeController: AbortController | null = null
+    let activeRequestId = 0
     let measureFrame: number | null = null
+    let isUnmounted = false
 
     function closeOverlayState(options?: { keepDialogsOpen?: boolean }) {
       openMenuColumnId.value = null
@@ -641,6 +645,7 @@ export default defineComponent({
 
       if (!options?.keepDialogsOpen) {
         isFilterDialogOpen.value = false
+        isFilterHelpDialogOpen.value = false
         isColumnPickerOpen.value = false
       }
     }
@@ -674,6 +679,7 @@ export default defineComponent({
       closeFilterMenus()
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
+      isFilterHelpDialogOpen.value = false
     }
 
     function closeSaveViewDialog() {
@@ -698,6 +704,17 @@ export default defineComponent({
       closeFilterMenus()
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
+      isFilterHelpDialogOpen.value = false
+      isSaveViewDialogOpen.value = false
+    }
+
+    function toggleFilterHelpDialog() {
+      isFilterHelpDialogOpen.value = !isFilterHelpDialogOpen.value
+      openMenuColumnId.value = null
+      closeFilterMenus()
+      isColumnPickerOpen.value = false
+      isFilterDialogOpen.value = false
+      isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
     }
 
@@ -728,6 +745,7 @@ export default defineComponent({
       closeFilterMenus()
       isColumnPickerOpen.value = false
       isFilterDialogOpen.value = false
+      isFilterHelpDialogOpen.value = false
       isViewsMenuOpen.value = false
       isSaveViewDialogOpen.value = false
     }
@@ -1196,11 +1214,10 @@ export default defineComponent({
     })
 
     async function loadData() {
-      if (activeController) {
-        activeController.abort()
-      }
-
-      activeController = new AbortController()
+      const requestId = activeRequestId + 1
+      activeRequestId = requestId
+      const controller = new AbortController()
+      activeController = controller
       isLoading.value = true
       errorMessage.value = ''
 
@@ -1214,8 +1231,12 @@ export default defineComponent({
             search: globalFilter.value.trim() || undefined,
             include_columns: requestedServerColumns.value,
           },
-          activeController.signal,
+          controller.signal,
         )
+
+        if (isUnmounted || requestId !== activeRequestId) {
+          return
+        }
 
         requestState.value = {
           rows: response.rows,
@@ -1226,7 +1247,13 @@ export default defineComponent({
 
         rowVirtualizer.value.scrollToOffset(0)
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        if (
+          isUnmounted ||
+          requestId !== activeRequestId ||
+          controller.signal.aborted ||
+          (error instanceof DOMException && error.name === 'AbortError') ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
           return
         }
 
@@ -1238,7 +1265,13 @@ export default defineComponent({
           meta: undefined,
         }
       } finally {
-        isLoading.value = false
+        if (activeController === controller) {
+          activeController = null
+        }
+
+        if (!isUnmounted && requestId === activeRequestId) {
+          isLoading.value = false
+        }
       }
     }
 
@@ -1312,6 +1345,8 @@ export default defineComponent({
     )
 
     onBeforeUnmount(() => {
+      isUnmounted = true
+      activeRequestId += 1
       document.removeEventListener('click', handleDocumentClick)
 
       if (debounceTimer) {
@@ -1489,6 +1524,17 @@ export default defineComponent({
           renderFilterControl={(config) => renderFilterControl(config, { target: 'dialog' })}
           onClose={closeFilterDialog}
           onApply={applyFilterDialogChanges}
+        />
+      )
+    }
+
+    function renderFilterHelpDialog() {
+      return (
+        <DataGridFilterHelpDialog
+          isOpen={isFilterHelpDialogOpen.value}
+          onClose={() => {
+            isFilterHelpDialogOpen.value = false
+          }}
         />
       )
     }
@@ -1808,6 +1854,7 @@ export default defineComponent({
                   void deleteActiveView()
                 }}
                 onToggleFilterDialog={toggleFilterDialog}
+                onToggleFilterHelpDialog={toggleFilterHelpDialog}
                 onRefresh={refreshData}
                 onClearFilters={clearAllFilters}
                 onToggleColumnPicker={toggleColumnPicker}
@@ -1989,6 +2036,7 @@ export default defineComponent({
           ) : null}
           {errorMessage.value ? <p class="data-grid__error">{errorMessage.value}</p> : null}
           {renderFilterDialog()}
+          {renderFilterHelpDialog()}
           {renderColumnPickerDialog()}
           {renderSaveViewDialog()}
         </section>
