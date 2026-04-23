@@ -8,7 +8,6 @@ import {
   type CSSProperties,
   type PropType,
 } from 'vue'
-import IconCheckRounded from '~icons/material-symbols/check-rounded'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
 import type { DataGridFilterOption, DataGridFilterOptionValue } from '../types'
@@ -282,25 +281,28 @@ export default defineComponent({
                   </button>
                 </div>
               ) : null}
-              {visibleOptions.value.map((option) => (
-                <button
-                  key={toOptionKey(option.value)}
-                  type="button"
-                  class="data-grid__filter-select-trigger"
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleOption(option.value)
-                  }}
-                >
-                  <span class="data-grid__filter-select-label">{option.label}</span>
-                  <span class="data-grid__filter-select-count">
-                    {selectedValueKeys.value.has(toOptionKey(option.value)) ? (
-                      <IconCheckRounded class="data-grid__icon" />
-                    ) : null}
-                  </span>
-                </button>
-              ))}
+              {visibleOptions.value.length > 0 ? (
+                visibleOptions.value.map((option) => (
+                  <label
+                    key={toOptionKey(option.value)}
+                    class="data-grid__filter-select-option"
+                    data-grid-inline-select-root="true"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedValueKeys.value.has(toOptionKey(option.value))}
+                      data-grid-inline-select-root="true"
+                      onChange={() => toggleOption(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))
+              ) : (
+                <div class="data-grid__filter-select-empty" data-grid-inline-select-root="true">
+                  Brak opcji
+                </div>
+              )}
             </div>
           </DataGridDropdownMenu>
         </Teleport>

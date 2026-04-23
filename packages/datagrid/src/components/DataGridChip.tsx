@@ -21,7 +21,10 @@ export default defineComponent({
   setup(props) {
     return () => (
       <span
-        class={['data-grid__chip', props.color ? '' : `data-grid__chip--${props.tone}`]}
+        class={[
+          'data-grid__chip',
+          props.color ? 'data-grid__chip--custom' : `data-grid__chip--${props.tone}`,
+        ]}
         style={props.color ? { '--data-grid-chip-color': props.color } : undefined}
       >
         {props.label}
