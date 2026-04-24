@@ -27,6 +27,10 @@ export default defineComponent({
       type: Function as PropType<(value: string) => void>,
       required: true,
     },
+    onEnter: {
+      type: Function as PropType<(value: string) => void>,
+      default: undefined,
+    },
     onClose: {
       type: Function as PropType<() => void>,
       default: undefined,
@@ -62,6 +66,7 @@ export default defineComponent({
           if (event.key === 'Enter') {
             event.preventDefault()
             submit()
+            props.onEnter?.(localValue.value)
           }
 
           if (event.key === 'Escape') {

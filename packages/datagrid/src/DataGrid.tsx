@@ -49,6 +49,7 @@ import type {
   DataGridColumnVisibilityState,
   DataGridFetchParams,
   DataGridFetchResult,
+  DataGridFloatingPosition,
   DataGridInitialState,
   DataGridHeight,
   DataGridLoadingConfig,
@@ -114,6 +115,7 @@ const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
   allowPositionChange: true,
   positionStorageKey: '',
+  floatingPosition: { x: 16, y: 16 },
 }
 const defaultRowSelectionColumnId = '__select'
 const defaultRowSelectionPreset = 'default'
@@ -128,6 +130,8 @@ function renderSelectionCheckbox(
   options?: {
     ariaLabel?: string
     indeterminate?: boolean
+    onPointerEnter?: (event: PointerEvent) => void
+    onPointerLeave?: (event: PointerEvent) => void
   },
 ) {
   return h(
@@ -155,6 +159,8 @@ function renderSelectionCheckbox(
         event.preventDefault()
         onToggle(!checked, event)
       },
+      onPointerenter: options?.onPointerEnter,
+      onPointerleave: options?.onPointerLeave,
     },
     [
       checked
@@ -231,6 +237,14 @@ function buildRowSelectionColumn(
       },
       event: MouseEvent | KeyboardEvent,
     ) => void
+    onPreviewRowSelection?: (
+      context: {
+        row: CellRenderProps['row']
+        table: CellRenderProps['table']
+      },
+      event: PointerEvent,
+    ) => void
+    onClearRowSelectionPreview?: () => void
   },
 ): DataGridColumn<AnyRow> {
   const columnId = config.columnId?.trim() || defaultRowSelectionColumnId
@@ -280,6 +294,8 @@ function buildRowSelectionColumn(
           row.toggleSelected(checked),
         {
           ariaLabel: 'Zaznacz wiersz',
+          onPointerEnter: (event) => options?.onPreviewRowSelection?.({ row, table }, event),
+          onPointerLeave: () => options?.onClearRowSelectionPreview?.(),
         },
       ),
   }
@@ -495,8 +511,13 @@ export default defineComponent({
       label: props.loadingConfig?.label ?? defaultLoadingConfig.label,
     }))
     const lastSelectedRowId = ref<string | null>(null)
+    const previewSelectionRowIds = ref<Set<string>>(new Set())
     const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(
       props.selectionPanelConfig?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right',
+    )
+    const selectionPanelFloatingPosition = ref<DataGridFloatingPosition>(
+      props.selectionPanelConfig?.floatingPosition ??
+        defaultSelectionPanelConfig.floatingPosition ?? { x: 16, y: 16 },
     )
     const mergedRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | null>(() => {
       if (!props.rowSelectionConfig?.enabled) {
@@ -534,6 +555,7 @@ export default defineComponent({
           onToggleAll: (checked, context) => {
             context.table.toggleAllPageRowsSelected(checked)
             lastSelectedRowId.value = null
+            previewSelectionRowIds.value = new Set()
           },
           onToggleRow: (checked, context, event) => {
             const rows = context.table.getRowModel().rows
@@ -554,6 +576,34 @@ export default defineComponent({
             }
 
             lastSelectedRowId.value = context.row.id
+            previewSelectionRowIds.value = new Set()
+          },
+          onPreviewRowSelection: (context, event) => {
+            if (!event.shiftKey) {
+              previewSelectionRowIds.value = new Set()
+              return
+            }
+
+            const rows = context.table.getRowModel().rows
+            const currentIndex = rows.findIndex((row) => row.id === context.row.id)
+            const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
+
+            if (currentIndex < 0 || anchorIndex < 0) {
+              previewSelectionRowIds.value = new Set()
+              return
+            }
+
+            const [start, end] =
+              currentIndex < anchorIndex
+                ? [currentIndex, anchorIndex]
+                : [anchorIndex, currentIndex]
+
+            previewSelectionRowIds.value = new Set(
+              rows.slice(start, end + 1).map((row) => row.id),
+            )
+          },
+          onClearRowSelectionPreview: () => {
+            previewSelectionRowIds.value = new Set()
           },
         }),
       )
@@ -754,6 +804,16 @@ export default defineComponent({
       selectionPanelPosition.value = position
     }
 
+    function updateSelectionPanelFloatingPosition(position: DataGridFloatingPosition) {
+      selectionPanelFloatingPosition.value = position
+    }
+
+    function clearSelectionPreviewIfShiftReleased(event: KeyboardEvent) {
+      if (event.key === 'Shift') {
+        previewSelectionRowIds.value = new Set()
+      }
+    }
+
     onMounted(() => {
       const storageKey = selectionPanelPositionStorageKey.value
       if (!storageKey || typeof window === 'undefined') {
@@ -768,10 +828,27 @@ export default defineComponent({
         storedPosition === 'bottom-left' ||
         storedPosition === 'bottom-right' ||
         storedPosition === 'top-left' ||
-        storedPosition === 'top-right'
+        storedPosition === 'top-right' ||
+        storedPosition === 'floating'
       ) {
         selectionPanelPosition.value = storedPosition
       }
+
+      const storedFloatingPosition = window.localStorage.getItem(
+        `${storageKey}:floating`,
+      )
+      if (storedFloatingPosition) {
+        try {
+          const parsed = JSON.parse(storedFloatingPosition) as Partial<DataGridFloatingPosition>
+          if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+            selectionPanelFloatingPosition.value = { x: parsed.x, y: parsed.y }
+          }
+        } catch {
+          // Ignore invalid storage payloads.
+        }
+      }
+
+      window.addEventListener('keyup', clearSelectionPreviewIfShiftReleased)
     })
 
     watch(selectionPanelPosition, (position) => {
@@ -781,6 +858,19 @@ export default defineComponent({
       }
 
       window.localStorage.setItem(storageKey, position)
+    })
+    watch(selectionPanelFloatingPosition, (position) => {
+      const storageKey = selectionPanelPositionStorageKey.value
+      if (!storageKey || typeof window === 'undefined') {
+        return
+      }
+
+      window.localStorage.setItem(`${storageKey}:floating`, JSON.stringify(position))
+    })
+    onBeforeUnmount(() => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('keyup', clearSelectionPreviewIfShiftReleased)
+      }
     })
     watch(
       [mergedRowSelectionConfig, rowSelectionColumnSize, columnSizing],
@@ -929,6 +1019,10 @@ export default defineComponent({
         positionStorageKey:
           props.selectionPanelConfig.positionStorageKey ??
           defaultSelectionPanelConfig.positionStorageKey,
+        floatingPosition:
+          selectionPanelFloatingPosition.value ??
+          props.selectionPanelConfig.floatingPosition ??
+          defaultSelectionPanelConfig.floatingPosition,
       }
     })
     const selectedRows = computed(() => {
@@ -1958,6 +2052,7 @@ export default defineComponent({
                           cellStylesByColumnId={cellStylesByColumnId.value}
                           getPinnedSide={getPinnedSide}
                           renderCell={renderCell}
+                          isSelectionPreviewed={previewSelectionRowIds.value.has(row.id)}
                         />
                       )
                     })}
@@ -1976,6 +2071,7 @@ export default defineComponent({
             {mergedSelectionPanelConfig.value && selectedRows.value.length > 0 ? (
               <DataGridSelectionPanel
                 position={mergedSelectionPanelConfig.value.position ?? 'bottom-right'}
+                floatingPosition={mergedSelectionPanelConfig.value.floatingPosition ?? null}
                 selectedRowsCount={selectedRows.value.length}
                 selectedRowsLabel={
                   mergedSelectionPanelConfig.value.selectedRowsLabel ?? 'Zaznaczone wiersze'
@@ -1997,6 +2093,7 @@ export default defineComponent({
                   void copySelectedRows(false)
                 }}
                 onUpdatePosition={updateSelectionPanelPosition}
+                onUpdateFloatingPosition={updateSelectionPanelFloatingPosition}
               />
             ) : null}
 

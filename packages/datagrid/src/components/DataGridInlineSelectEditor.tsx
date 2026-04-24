@@ -215,6 +215,10 @@ export default defineComponent({
       }
     }
 
+    function isOptionSelected(optionValue: DataGridFilterOptionValue) {
+      return selectedValueKeys.value.has(toOptionKey(optionValue))
+    }
+
     return () => (
       <div
         class="data-grid__filter-select"
@@ -290,10 +294,25 @@ export default defineComponent({
                     onClick={(event) => event.stopPropagation()}
                   >
                     <input
-                      type="checkbox"
-                      checked={selectedValueKeys.value.has(toOptionKey(option.value))}
+                      class="data-grid__filter-select-native-control"
+                      type={props.multiple ? 'checkbox' : 'radio'}
+                      name={props.multiple ? undefined : 'data-grid-inline-select-single'}
+                      checked={isOptionSelected(option.value)}
                       data-grid-inline-select-root="true"
                       onChange={() => toggleOption(option.value)}
+                    />
+                    <span
+                      class={[
+                        'data-grid__filter-select-control',
+                        props.multiple
+                          ? 'data-grid__filter-select-control--checkbox'
+                          : 'data-grid__filter-select-control--radio',
+                        isOptionSelected(option.value)
+                          ? 'data-grid__filter-select-control--checked'
+                          : '',
+                      ]}
+                      data-grid-inline-select-root="true"
+                      aria-hidden="true"
                     />
                     <span>{option.label}</span>
                   </label>

@@ -11,6 +11,8 @@ import {
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
 
+import IconSaveRounded from '~icons/material-symbols/save-rounded';
+
 export default defineComponent({
   name: 'DataGridStepQuantityEditor',
   props: {
@@ -32,6 +34,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const instanceId = `step-editor-${Math.random().toString(36).slice(2, 10)}`
     const triggerRef = ref<HTMLButtonElement | null>(null)
     const quantityValue = ref(props.modelValue >= 1 ? String(props.modelValue) : '1')
     const menuOpen = ref(false)
@@ -59,7 +62,7 @@ export default defineComponent({
       }
 
       const rect = trigger.getBoundingClientRect()
-      const desiredWidth = Math.max(rect.width + 180, 260)
+      const desiredWidth = Math.max(rect.width + 240, 308)
       const viewportWidth = window.innerWidth
       const left = Math.min(rect.left, viewportWidth - desiredWidth - 12)
 
@@ -99,9 +102,26 @@ export default defineComponent({
         return
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('data-grid-step-editor-open', {
+            detail: { instanceId },
+          }),
+        )
+      }
+
       quantityValue.value = props.modelValue >= 1 ? String(props.modelValue) : '1'
       menuOpen.value = true
       updateMenuPosition()
+    }
+
+    function handleStepEditorOpen(event: Event) {
+      const customEvent = event as CustomEvent<{ instanceId?: string }>
+      if (customEvent.detail?.instanceId === instanceId) {
+        return
+      }
+
+      closeMenu()
     }
 
     function handleDocumentPointerDown(event: PointerEvent) {
@@ -126,12 +146,14 @@ export default defineComponent({
 
     onMounted(() => {
       document.addEventListener('pointerdown', handleDocumentPointerDown)
+      window.addEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
       window.addEventListener('resize', updateMenuPosition)
       window.addEventListener('scroll', updateMenuPosition, true)
     })
 
     onBeforeUnmount(() => {
       document.removeEventListener('pointerdown', handleDocumentPointerDown)
+      window.removeEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
     })
@@ -189,17 +211,19 @@ export default defineComponent({
                       closeMenu()
                     }}
                   >
-                    Finished
+                    <span class="data-grid__step-editor-action-icon">{'\u2713'}</span>
+                    <span>Ukonczone</span>
                   </button>
                   <button
                     type="button"
-                    class="data-grid__step-editor-action"
+                    class="data-grid__step-editor-action data-grid__step-editor-action--neutral"
                     onClick={() => {
                       props.onUpdateModelValue(0)
                       closeMenu()
                     }}
                   >
-                    Not done
+                    <span class="data-grid__step-editor-action-icon">{'\u2715'}</span>
+                    <span>Nie</span>
                   </button>
                   <button
                     type="button"
@@ -209,37 +233,51 @@ export default defineComponent({
                       closeMenu()
                     }}
                   >
-                    Blocked
+                    <span class="data-grid__step-editor-action-icon">{'\u2298'}</span>
+                    <span>Blokada</span>
                   </button>
                 </div>
-                <input
-                  class="data-grid__filter-select-search"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={quantityValue.value}
-                  onInput={(event) => {
-                    quantityValue.value = (event.target as HTMLInputElement).value
-                  }}
-                  onKeydown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      submitQuantity()
-                    }
+                <div class="data-grid__step-editor-quantity">
+                  <label class="data-grid__step-editor-field-label">Ilosc (pomaranczowe)</label>
+                  <input
+                    class="data-grid__step-editor-input"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={quantityValue.value}
+                    onInput={(event) => {
+                      quantityValue.value = (event.target as HTMLInputElement).value
+                    }}
+                    onKeydown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        submitQuantity()
+                      }
 
-                    if (event.key === 'Escape') {
-                      event.preventDefault()
-                      closeMenu()
-                    }
-                  }}
-                />
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        closeMenu()
+                      }
+                    }}
+                  />
+                </div>
                 <div class="data-grid__step-editor-footer">
+                  <button
+                    type="button"
+                    class="data-grid__step-editor-cancel"
+                    onClick={closeMenu}
+                  >
+                    Anuluj
+                  </button>
                   <button
                     type="button"
                     class="data-grid__step-editor-save"
                     onClick={submitQuantity}
                   >
-                    Save quantity
+                    <span class="data-grid__step-editor-save-icon">
+                      <IconSaveRounded />
+                    </span>
+                    <span>Zapisz ilosc</span>
                   </button>
                 </div>
               </div>

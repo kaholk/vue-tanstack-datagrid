@@ -22,9 +22,9 @@ export default defineComponent({
 
       return (
         <DataGridDialog
-          title="Jak używać filtrów"
-          subtitle="Instrukcja tworzenia zaawansowanych zapytań wyszukiwania."
-          ariaLabel="Pomoc dotycząca filtrowania"
+          title="Jak uzywac filtrow"
+          subtitle="Skrocona instrukcja budowania filtrow tekstowych, liczbowych i dat."
+          ariaLabel="Pomoc dotyczaca filtrowania"
           surfaceClass="data-grid__dialog--filter-help"
           onClose={props.onClose}
           v-slots={{
@@ -35,65 +35,85 @@ export default defineComponent({
             ),
           }}
         >
-          <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>1. Zwykłe wpisywanie</h5>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                Wpisanie tekstu np. <strong>BME</strong> wyszuka wszystkie rekordy zawierające ten tekst w danym polu.
+          <div class="data-grid__filter-help-content">
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">1. Zwykle wpisywanie</h5>
+              <p class="data-grid__filter-help-text">
+                Wpisanie tekstu, np. <code>BME</code>, wyszukuje rekordy zawierajace te wartosc.
               </p>
-            </div>
+            </section>
 
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>2. Operatory logiczne</h5>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                <li style={{ marginBottom: '4px' }}>
-                  <strong>& (AND)</strong> - musi spełniać oba warunki. Np. <code>tag1&tag2</code>
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">2. Operatory logiczne</h5>
+              <ul class="data-grid__filter-help-list">
+                <li>
+                  <strong>&amp;</strong> oznacza AND, np. <code>tag1&amp;tag2</code>
                 </li>
                 <li>
-                  <strong>| (OR)</strong> - musi spełniać przynajmniej jeden z warunków. Np. <code>BME|VDL</code>
+                  <strong>|</strong> oznacza OR, np. <code>BME|VDL</code>
                 </li>
               </ul>
-            </div>
+            </section>
 
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>3. Dokładne dopasowanie</h5>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                Użyj podwójnych <code>""</code> lub pojedynczych <code>''</code> cudzysłowów, aby znaleźć dokładną wartość.
-                Np. wpisanie <code>"BME"</code> znajdzie dokładnie <strong>BME</strong> (ale już nie <strong>BMEX</strong>).
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">3. Dokladne dopasowanie</h5>
+              <p class="data-grid__filter-help-text">
+                Uzyj cudzyslowu, np. <code>"BME"</code>, aby dopasowac dokladna wartosc.
               </p>
-            </div>
+            </section>
 
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>4. Puste wartości</h5>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                Aby znaleźć wartości puste (brak przypisania), wpisz <code>""</code> lub <code>''</code>. Możesz również użyć <code>&lt;&gt;""</code> aby znaleźć pola, które <strong>nie są</strong> puste.
-              </p>
-            </div>
-
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>5. Operatory porównania i wykluczenia</h5>
-              <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                Dostępne operatory (muszą znajdować się na początku zapytania): <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>&lt;&gt;</code> (różne).
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                <li style={{ marginBottom: '4px' }}>
-                  <code>&lt;&gt;BME</code> - odfiltruje rekordy, które zawierają "BME".
-                </li>
-                <li style={{ marginBottom: '4px' }}>
-                  <code>&gt;100</code> - liczby większe niż 100.
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">4. Operatory porownania</h5>
+              <ul class="data-grid__filter-help-list">
+                <li>
+                  <code>&gt;100</code>, <code>&gt;=100</code>, <code>&lt;50</code>, <code>&lt;=50</code>
                 </li>
                 <li>
-                  <code>&lt;&gt;BME&amp;&lt;&gt;VDL</code> - odfiltruje wszystko co zawiera "BME" oraz "VDL".
+                  <code>&lt;&gt;BME</code> wyklucza wartosci zawierajace <code>BME</code>
+                </li>
+                <li>
+                  <code>*</code> dziala jako wildcard, np. <code>BM*</code>
                 </li>
               </ul>
-            </div>
+            </section>
 
-            <div>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600 }}>6. Zastępowanie znaków (Wildcards)</h5>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--app-text-muted)' }}>
-                Użyj <code>*</code> aby zastąpić dowolny ciąg znaków. Np. <code>BM*</code> znajdzie wartości zaczynające się na "BM".
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">5. Daty</h5>
+              <p class="data-grid__filter-help-text">
+                Backend w tym gridzie obsluguje filtrowanie dat dla kolumn:
+                <code> transport_date</code>, <code>confirmed_date</code>, <code>hidden_confirmed_date</code>
+                i <code>received_date</code>. Dla <code>received_date</code> porownanie idzie po samej dacie,
+                bez czasu.
               </p>
-            </div>
+              <ul class="data-grid__filter-help-list">
+                <li>
+                  Wymagany, bezpieczny format: <code>YYYY-MM-DD</code>, np. <code>2026-04-24</code>
+                </li>
+                <li>
+                  Dokladna data: <code>"2026-04-24"</code>
+                </li>
+                <li>
+                  Od daty: <code>&gt;=2026-04-01</code>
+                </li>
+                <li>
+                  Do daty: <code>&lt;=2026-04-30</code>
+                </li>
+                <li>
+                  Zakres dat: <code>&gt;=2026-04-01&amp;&lt;=2026-04-30</code>
+                </li>
+                <li>
+                  Kilka mozliwych dat: <code>"2026-04-24"|"2026-04-25"</code>
+                </li>
+              </ul>
+            </section>
+
+            <section class="data-grid__filter-help-section">
+              <h5 class="data-grid__filter-help-title">6. Puste wartosci</h5>
+              <p class="data-grid__filter-help-text">
+                Aby znalezc puste pola uzyj <code>""</code> albo <code>''</code>. Aby znalezc niepuste:
+                <code>&lt;&gt;""</code>
+              </p>
+            </section>
           </div>
         </DataGridDialog>
       )

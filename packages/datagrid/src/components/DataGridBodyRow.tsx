@@ -42,6 +42,10 @@ export default defineComponent({
       type: Function as PropType<(cell: Cell<AnyRow, unknown>) => VNodeChild>,
       required: true,
     },
+    isSelectionPreviewed: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props) {
     return () => {
@@ -51,7 +55,11 @@ export default defineComponent({
 
       return (
         <div
-          class={['data-grid__row', isSelected ? 'data-grid__row--selected' : '']}
+          class={[
+            'data-grid__row',
+            isSelected ? 'data-grid__row--selected' : '',
+            !isSelected && props.isSelectionPreviewed ? 'data-grid__row--selection-preview' : '',
+          ]}
           aria-selected={isSelected ? 'true' : 'false'}
           style={{
             height: `${props.rowSize}px`,

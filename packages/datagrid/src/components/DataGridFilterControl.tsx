@@ -88,7 +88,7 @@ export default defineComponent({
     }
 
     return () => {
-      if (props.config.variant === 'select') {
+      if (props.config.variant === 'select' || props.config.variant === 'radio') {
         return (
           <div
             class={[

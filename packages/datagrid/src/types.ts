@@ -14,7 +14,7 @@ export type DataGridLocalKind = 'computed' | 'action'
 export type DataGridColumnVisibilityState = Record<string, boolean>
 export type DataGridColumnAlign = 'start' | 'center' | 'end'
 export type DataGridHeaderMode = 'default' | 'custom'
-export type DataGridFilterVariant = 'text' | 'select'
+export type DataGridFilterVariant = 'text' | 'select' | 'radio'
 export type DataGridFilterOptionValue = string | number | null
 export type DataGridFilterOption = {
   label: string
@@ -63,6 +63,12 @@ export type DataGridSelectionPanelPosition =
   | 'bottom-right'
   | 'top-left'
   | 'top-right'
+  | 'floating'
+
+export type DataGridFloatingPosition = {
+  x: number
+  y: number
+}
 
 export type DataGridSelectionPanelSumConfig = {
   columnId: string
@@ -79,6 +85,7 @@ export type DataGridSelectionPanelConfig = {
   copyWithoutHeadersLabel?: string
   allowPositionChange?: boolean
   positionStorageKey?: string
+  floatingPosition?: DataGridFloatingPosition
 }
 
 export type DataGridRowSelectionConfig<TData extends RowData> = {

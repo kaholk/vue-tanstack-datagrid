@@ -82,6 +82,16 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     return String(getFilterRawValue(columnId, target) ?? '')
   }
 
+  function getSingleSelectFilterValue(columnId: string, target: FilterControlTarget = 'live') {
+    const rawValue = getFilterRawValue(columnId, target)
+
+    if (Array.isArray(rawValue)) {
+      return rawValue[0]
+    }
+
+    return rawValue as DataGridFilterOption['value'] | undefined
+  }
+
   function getSelectFilterValues(columnId: string, target: FilterControlTarget = 'live') {
     const rawValue = getFilterRawValue(columnId, target)
 
@@ -196,6 +206,24 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     setColumnFilterValue(columnId, nextValues, target)
   }
 
+  function setSingleSelectFilterValue(
+    columnId: string,
+    optionValue: DataGridFilterOption['value'],
+    checked: boolean,
+    target: FilterControlTarget = 'live',
+  ) {
+    const currentValue = getSingleSelectFilterValue(columnId, target)
+    const currentKey = currentValue === undefined ? '' : toFilterOptionKey(currentValue)
+    const nextKey = toFilterOptionKey(optionValue)
+
+    if (!checked || currentKey === nextKey) {
+      setColumnFilterValue(columnId, undefined, target)
+      return
+    }
+
+    setColumnFilterValue(columnId, optionValue, target)
+  }
+
   function selectAllFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
     const filterOptions = getFilterOptions(config).map((option) => option.value)
     setColumnFilterValue(config.id, filterOptions, target)
@@ -206,12 +234,18 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function getFilterButtonLabel(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
-    if (config.variant !== 'select') {
+    if (config.variant !== 'select' && config.variant !== 'radio') {
       return 'Filtr'
     }
 
     const filterOptions = getFilterOptions(config)
-    const selectedValues = getSelectFilterValues(config.id, target)
+    const selectedValues =
+      config.variant === 'radio'
+        ? (() => {
+            const singleValue = getSingleSelectFilterValue(config.id, target)
+            return singleValue === undefined ? [] : [singleValue]
+          })()
+        : getSelectFilterValues(config.id, target)
 
     if (selectedValues.length === 0) {
       return 'Wybierz'
@@ -243,7 +277,13 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   ): VNodeChild {
     const isToolbar = renderOptions?.toolbar ?? false
     const target = renderOptions?.target ?? 'live'
-    const selectedValues = getSelectFilterValues(config.id, target)
+    const selectedValues =
+      config.variant === 'radio'
+        ? (() => {
+            const singleValue = getSingleSelectFilterValue(config.id, target)
+            return singleValue === undefined ? [] : [singleValue]
+          })()
+        : getSelectFilterValues(config.id, target)
     const selectedValueKeys = new Set(selectedValues.map((value) => toFilterOptionKey(value)))
     const isOpen =
       target === 'dialog'
@@ -274,7 +314,9 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       onSelectAll: () => selectAllFilterOptions(config, target),
       onClearAll: () => clearSelectFilterOptions(config.id, target),
       onToggleValue: (optionValue: DataGridFilterOption['value'], checked: boolean) =>
-        toggleSelectFilterValue(config.id, optionValue, checked, target),
+        config.variant === 'radio'
+          ? setSingleSelectFilterValue(config.id, optionValue, checked, target)
+          : toggleSelectFilterValue(config.id, optionValue, checked, target),
     })
   }
 
