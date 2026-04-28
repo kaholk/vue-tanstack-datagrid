@@ -1,11 +1,9 @@
 import {
-  Teleport,
   defineComponent,
   onBeforeUnmount,
   onMounted,
   ref,
   watch,
-  type CSSProperties,
   type PropType,
 } from 'vue'
 
@@ -38,13 +36,6 @@ export default defineComponent({
     const triggerRef = ref<HTMLButtonElement | null>(null)
     const quantityValue = ref(props.modelValue >= 1 ? String(props.modelValue) : '1')
     const menuOpen = ref(false)
-    const menuStyle = ref<CSSProperties>({
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: '260px',
-      zIndex: 520,
-    })
 
     watch(
       () => props.modelValue,
@@ -54,26 +45,6 @@ export default defineComponent({
         }
       },
     )
-
-    function updateMenuPosition() {
-      const trigger = triggerRef.value
-      if (!trigger) {
-        return
-      }
-
-      const rect = trigger.getBoundingClientRect()
-      const desiredWidth = Math.max(rect.width + 240, 308)
-      const viewportWidth = window.innerWidth
-      const left = Math.min(rect.left, viewportWidth - desiredWidth - 12)
-
-      menuStyle.value = {
-        position: 'fixed',
-        top: `${rect.bottom + 4}px`,
-        left: `${Math.max(12, left)}px`,
-        width: `${desiredWidth}px`,
-        zIndex: 520,
-      }
-    }
 
     function closeMenu() {
       menuOpen.value = false
@@ -112,25 +83,11 @@ export default defineComponent({
 
       quantityValue.value = props.modelValue >= 1 ? String(props.modelValue) : '1'
       menuOpen.value = true
-      updateMenuPosition()
     }
 
     function handleStepEditorOpen(event: Event) {
       const customEvent = event as CustomEvent<{ instanceId?: string }>
       if (customEvent.detail?.instanceId === instanceId) {
-        return
-      }
-
-      closeMenu()
-    }
-
-    function handleDocumentPointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      if (target.closest('[data-grid-inline-select-root="true"]')) {
         return
       }
 
@@ -145,17 +102,11 @@ export default defineComponent({
     }
 
     onMounted(() => {
-      document.addEventListener('pointerdown', handleDocumentPointerDown)
       window.addEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
-      window.addEventListener('resize', updateMenuPosition)
-      window.addEventListener('scroll', updateMenuPosition, true)
     })
 
     onBeforeUnmount(() => {
-      document.removeEventListener('pointerdown', handleDocumentPointerDown)
       window.removeEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
     })
 
     return () => (
@@ -194,12 +145,18 @@ export default defineComponent({
           ) : null}
         </button>
         {menuOpen.value ? (
-          <Teleport to="body">
-            <DataGridDropdownMenu
-              menuClass="data-grid__step-editor-menu"
-              scopeAttr="data-grid-filter-root"
-              style={menuStyle.value}
-            >
+          <DataGridDropdownMenu
+            triggerRef={triggerRef}
+            teleport
+            menuClass="data-grid__step-editor-menu"
+            scopeAttr="data-grid-filter-root"
+            minWidth={308}
+            widthOffset={240}
+            desiredHeight={280}
+            zIndex={520}
+            outsideClickRootAttr="data-grid-inline-select-root"
+            onOutsidePointerDown={closeMenu}
+          >
               <div class="data-grid__step-editor-panel" data-grid-inline-select-root="true">
                 <div class="data-grid__step-editor-title">{props.label || 'Step'}</div>
                 <div class="data-grid__step-editor-actions">
@@ -281,8 +238,7 @@ export default defineComponent({
                   </button>
                 </div>
               </div>
-            </DataGridDropdownMenu>
-          </Teleport>
+          </DataGridDropdownMenu>
         ) : null}
       </div>
     )

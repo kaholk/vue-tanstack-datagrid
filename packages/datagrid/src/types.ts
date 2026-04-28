@@ -5,8 +5,10 @@ import type {
   ColumnPinningState,
   ColumnSizingState,
   ColumnSort,
+  Cell,
   HeaderContext,
   PaginationState,
+  Row,
   RowData,
 } from '@tanstack/vue-table'
 
@@ -19,6 +21,12 @@ export type DataGridFilterOptionValue = string | number | null
 export type DataGridFilterOption = {
   label: string
   value: DataGridFilterOptionValue
+}
+
+export type DataGridCellContext<TData extends RowData> = {
+  cell: Cell<TData, unknown>
+  row: Row<TData>
+  event: MouseEvent
 }
 
 export type DataGridFilterConfig = {
@@ -112,6 +120,8 @@ export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & 
   filterIncludeEmptyOption?: boolean
   filterEmptyOptionLabel?: string
   filterPlaceholder?: string
+  cellClass?: string | ((context: Omit<DataGridCellContext<TData>, 'event'>) => string)
+  onCellClick?: (context: DataGridCellContext<TData>) => void
 }
 
 export type DataGridFetchParams = {

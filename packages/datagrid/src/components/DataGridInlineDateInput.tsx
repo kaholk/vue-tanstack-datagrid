@@ -1,4 +1,13 @@
-import { defineComponent, ref, watch, type PropType } from 'vue'
+import {
+  defineComponent,
+  nextTick,
+  onMounted,
+  ref,
+  watch,
+  type PropType,
+} from 'vue'
+
+import DataGridDropdownMenu from './DataGridDropdownMenu'
 
 export default defineComponent({
   name: 'DataGridInlineDateInput',
@@ -21,6 +30,8 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const triggerRef = ref<HTMLButtonElement | null>(null)
+    const inputRef = ref<HTMLInputElement | null>(null)
     const localValue = ref(props.modelValue ?? '')
 
     watch(
@@ -30,50 +41,92 @@ export default defineComponent({
       },
     )
 
-    function submit(value: string) {
-      props.onUpdateModelValue(value.trim() === '' ? null : value)
+    onMounted(() => {
+      nextTick(() => inputRef.value?.focus())
+    })
+
+    function submitAndClose() {
+      props.onUpdateModelValue(localValue.value.trim() === '' ? null : localValue.value)
+      props.onClose?.()
     }
 
     return () => (
       <div class="data-grid__inline-date-input-wrap" data-grid-inline-select-root="true">
-        <input
-          class="data-grid__inline-date-input"
-          type="date"
-          value={localValue.value}
-          autofocus
-          onInput={(event) => {
-            localValue.value = (event.target as HTMLInputElement).value
+        <button
+          ref={triggerRef}
+          type="button"
+          class="data-grid__filter-select-trigger data-grid__filter-select-trigger--active"
+          data-grid-inline-select-root="true"
+          onClick={(event) => {
+            event.stopPropagation()
+            props.onClose?.()
           }}
-          onBlur={() => {
-            submit(localValue.value)
-          }}
-          onKeydown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              submit(localValue.value)
-            }
+        >
+          <span class="data-grid__filter-select-label">{localValue.value || 'Data'}</span>
+        </button>
+        <DataGridDropdownMenu
+          triggerRef={triggerRef}
+          teleport
+          menuClass="data-grid__filter-select-menu data-grid__inline-input-menu"
+          scopeAttr="data-grid-filter-root"
+          minWidth={260}
+          desiredHeight={120}
+          zIndex={500}
+          outsideClickRootAttr="data-grid-inline-select-root"
+          onOutsidePointerDown={() => props.onClose?.()}
+        >
+            <div class="data-grid__inline-input-panel" data-grid-inline-select-root="true">
+              <input
+                ref={inputRef}
+                class="data-grid__inline-date-input"
+                type="date"
+                value={localValue.value}
+                data-grid-inline-select-root="true"
+                onInput={(event) => {
+                  localValue.value = (event.target as HTMLInputElement).value
+                }}
+                onKeydown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    submitAndClose()
+                  }
 
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              props.onClose?.()
-            }
-          }}
-        />
-        {props.clearable ? (
-          <button
-            type="button"
-            class="data-grid__inline-date-clear"
-            title="Clear"
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              localValue.value = ''
-              props.onUpdateModelValue(null)
-            }}
-          >
-            ×
-          </button>
-        ) : null}
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    props.onClose?.()
+                  }
+                }}
+              />
+              <div class="data-grid__inline-input-actions" data-grid-inline-select-root="true">
+                {props.clearable ? (
+                  <button
+                    type="button"
+                    class="data-grid__filter-select-action"
+                    data-grid-inline-select-root="true"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      localValue.value = ''
+                    }}
+                  >
+                    Wyczyść
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  class="data-grid__filter-select-action data-grid__filter-select-action--primary"
+                  data-grid-inline-select-root="true"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    submitAndClose()
+                  }}
+                >
+                  Zapisz
+                </button>
+              </div>
+            </div>
+        </DataGridDropdownMenu>
       </div>
     )
   },

@@ -1,5 +1,6 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 import { type Cell, type Column, type Row } from '@tanstack/vue-table'
+import type { DataGridColumn } from '../types'
 
 type AnyRow = Record<string, unknown>
 
@@ -84,6 +85,11 @@ export default defineComponent({
             }
 
             const pinnedSide = props.getPinnedSide(entry.column.id)
+            const columnDef = entry.column.columnDef as DataGridColumn<AnyRow>
+            const customCellClass =
+              typeof columnDef.cellClass === 'function'
+                ? columnDef.cellClass({ cell, row })
+                : columnDef.cellClass
 
             return (
               <div
@@ -92,8 +98,13 @@ export default defineComponent({
                   'data-grid__cell',
                   pinnedSide ? 'data-grid__cell--pinned' : '',
                   pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
+                  customCellClass ?? '',
                 ]}
+                data-grid-column-id={entry.column.id}
                 style={props.cellStylesByColumnId.get(entry.column.id)}
+                onClick={(event) => {
+                  columnDef.onCellClick?.({ cell, row, event })
+                }}
               >
                 {props.renderCell(cell)}
               </div>

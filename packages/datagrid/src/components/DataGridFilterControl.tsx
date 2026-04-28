@@ -1,4 +1,9 @@
-import { defineComponent, ref, watch, type PropType } from 'vue'
+import {
+  defineComponent,
+  ref,
+  watch,
+  type PropType,
+} from 'vue'
 
 import DataGridSelectFilterMenu from './DataGridSelectFilterMenu'
 import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
@@ -70,6 +75,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const triggerRef = ref<HTMLButtonElement | null>(null)
     const draftValue = ref(props.inputValue)
 
     watch(
@@ -98,12 +104,15 @@ export default defineComponent({
             data-grid-filter-root="true"
           >
             <button
+              ref={triggerRef}
               type="button"
               class={[
                 'data-grid__filter-select-trigger',
                 props.selectedCount > 0 ? 'data-grid__filter-select-trigger--active' : '',
               ]}
-              onClick={(event) => props.onToggleMenu?.(event)}
+              onClick={(event) => {
+                props.onToggleMenu?.(event)
+              }}
             >
               <span class="data-grid__filter-select-label">{props.buttonLabel}</span>
               <span class="data-grid__filter-select-count">
@@ -116,6 +125,7 @@ export default defineComponent({
                 searchValue={props.searchValue}
                 visibleOptions={props.visibleOptions}
                 selectedValueKeys={props.selectedValueKeys ?? new Set<string>()}
+                triggerRef={triggerRef}
                 onSearchChange={(value) => props.onSearchChange?.(value)}
                 onSelectAll={() => props.onSelectAll?.()}
                 onClearAll={() => props.onClearAll?.()}

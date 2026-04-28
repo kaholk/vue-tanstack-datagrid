@@ -1,5 +1,4 @@
 import {
-  Teleport,
   computed,
   defineComponent,
   nextTick,
@@ -7,7 +6,6 @@ import {
   onMounted,
   ref,
   watch,
-  type CSSProperties,
   type PropType,
 } from 'vue'
 
@@ -81,13 +79,6 @@ export default defineComponent({
     const options = ref<DataGridAsyncSelectOption[]>([])
     const selectedOption = ref<DataGridAsyncSelectOption | null>(null)
     const requestId = ref(0)
-    const menuStyle = ref<CSSProperties>({
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: `${props.minMenuWidth}px`,
-      zIndex: props.zIndex,
-    })
     let searchTimer: ReturnType<typeof window.setTimeout> | null = null
 
     const mergedOptions = computed(() => {
@@ -107,26 +98,6 @@ export default defineComponent({
 
       return props.emptyLabel
     })
-
-    function updateMenuPosition() {
-      const trigger = triggerRef.value
-      if (!trigger) {
-        return
-      }
-
-      const rect = trigger.getBoundingClientRect()
-      const desiredWidth = Math.max(rect.width, props.minMenuWidth)
-      const viewportWidth = window.innerWidth
-      const left = Math.min(rect.left, viewportWidth - desiredWidth - 12)
-
-      menuStyle.value = {
-        position: 'fixed',
-        top: `${rect.bottom + 4}px`,
-        left: `${Math.max(12, left)}px`,
-        width: `${desiredWidth}px`,
-        zIndex: props.zIndex,
-      }
-    }
 
     async function runSearch(query: string) {
       const currentRequestId = ++requestId.value
@@ -170,34 +141,13 @@ export default defineComponent({
       selectedOption.value = await props.loadSelectedOption(props.modelValue)
     }
 
-    function handleDocumentPointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      if (target.closest('[data-grid-inline-select-root="true"]')) {
-        return
-      }
-
-      props.onClose?.()
-    }
-
     onMounted(() => {
-      updateMenuPosition()
-      document.addEventListener('pointerdown', handleDocumentPointerDown)
-      window.addEventListener('resize', updateMenuPosition)
-      window.addEventListener('scroll', updateMenuPosition, true)
       void ensureSelectedOption()
       void runSearch('')
       void nextTick(() => searchRef.value?.focus())
     })
 
     onBeforeUnmount(() => {
-      document.removeEventListener('pointerdown', handleDocumentPointerDown)
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
-
       if (searchTimer !== null) {
         window.clearTimeout(searchTimer)
       }
@@ -221,19 +171,31 @@ export default defineComponent({
           ]}
           onClick={(event) => {
             event.stopPropagation()
-            updateMenuPosition()
-            void nextTick(() => searchRef.value?.focus())
+            props.onClose?.()
           }}
         >
           <span class="data-grid__filter-select-label">{triggerLabel.value}</span>
         </button>
-        <Teleport to="body">
-          <DataGridDropdownMenu
-            menuClass="data-grid__filter-select-menu"
-            scopeAttr="data-grid-filter-root"
-            style={menuStyle.value}
-          >
-            <div class="data-grid__filter-select-options" data-grid-inline-select-root="true">
+        <DataGridDropdownMenu
+          triggerRef={triggerRef}
+          teleport
+          menuClass="data-grid__filter-select-menu"
+          scopeAttr="data-grid-filter-root"
+          minWidth={props.minMenuWidth}
+          desiredHeight={320}
+          minAvailableHeight={160}
+          chromeHeight={72}
+          maxOptionsHeightMin={88}
+          zIndex={props.zIndex}
+          menuMaxHeightVar="--data-grid-filter-select-menu-max-height"
+          optionsMaxHeightVar="--data-grid-filter-select-options-max-height"
+          outsideClickRootAttr="data-grid-inline-select-root"
+          onOutsidePointerDown={() => props.onClose?.()}
+        >
+            <div
+              class="data-grid__inline-async-select-content"
+              data-grid-inline-select-root="true"
+            >
               <div class="data-grid__inline-async-select-toolbar" data-grid-inline-select-root="true">
                 <input
                   ref={searchRef}
@@ -259,47 +221,48 @@ export default defineComponent({
                   {props.clearLabel}
                 </button>
               </div>
-              {loading.value ? (
-                <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
-                  {props.loadingLabel}
-                </div>
-              ) : null}
-              {!loading.value && mergedOptions.value.length === 0 ? (
-                <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
-                  {props.noOptionsLabel}
-                </div>
-              ) : null}
-              {!loading.value
-                ? mergedOptions.value.map((option) => (
-                    <button
-                      key={String(option.value ?? '__null__')}
-                      type="button"
-                      class={[
-                        'data-grid__inline-async-select-option',
-                        option.value === props.modelValue
-                          ? 'data-grid__inline-async-select-option--active'
-                          : '',
-                      ]}
-                      data-grid-inline-select-root="true"
-                      onClick={() => {
-                        props.onUpdateModelValue(option.value)
-                        props.onClose?.()
-                      }}
-                    >
-                      <span class="data-grid__inline-async-select-copy">
-                        <span class="data-grid__inline-async-select-label">{option.label}</span>
-                        {option.description ? (
-                          <span class="data-grid__inline-async-select-description">
-                            {option.description}
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  ))
-                : null}
+              <div class="data-grid__inline-async-select-options" data-grid-inline-select-root="true">
+                {loading.value ? (
+                  <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
+                    {props.loadingLabel}
+                  </div>
+                ) : null}
+                {!loading.value && mergedOptions.value.length === 0 ? (
+                  <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
+                    {props.noOptionsLabel}
+                  </div>
+                ) : null}
+                {!loading.value
+                  ? mergedOptions.value.map((option) => (
+                      <button
+                        key={String(option.value ?? '__null__')}
+                        type="button"
+                        class={[
+                          'data-grid__inline-async-select-option',
+                          option.value === props.modelValue
+                            ? 'data-grid__inline-async-select-option--active'
+                            : '',
+                        ]}
+                        data-grid-inline-select-root="true"
+                        onClick={() => {
+                          props.onUpdateModelValue(option.value)
+                          props.onClose?.()
+                        }}
+                      >
+                        <span class="data-grid__inline-async-select-copy">
+                          <span class="data-grid__inline-async-select-label">{option.label}</span>
+                          {option.description ? (
+                            <span class="data-grid__inline-async-select-description">
+                              {option.description}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    ))
+                  : null}
+              </div>
             </div>
-          </DataGridDropdownMenu>
-        </Teleport>
+        </DataGridDropdownMenu>
       </div>
     )
   },

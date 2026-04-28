@@ -1,11 +1,8 @@
 import {
-  Teleport,
   computed,
   defineComponent,
-  onBeforeUnmount,
-  onMounted,
   ref,
-  type CSSProperties,
+  watch,
   type PropType,
 } from 'vue'
 
@@ -20,10 +17,10 @@ export default defineComponent({
   name: 'DataGridInlineSelectEditor',
   props: {
     modelValue: {
-      type: [String, Number, Array] as PropType<
+      type: [String, Number, Array, null] as PropType<
         DataGridFilterOptionValue | DataGridFilterOptionValue[]
       >,
-      required: true,
+      default: null,
     },
     options: {
       type: Array as PropType<DataGridFilterOption[]>,
@@ -49,9 +46,21 @@ export default defineComponent({
       type: String,
       default: 'Wyczysc',
     },
+    cancelLabel: {
+      type: String,
+      default: 'Anuluj',
+    },
+    saveLabel: {
+      type: String,
+      default: 'Zapisz',
+    },
     minMenuWidth: {
       type: Number,
       default: 180,
+    },
+    minMenuHeight: {
+      type: Number,
+      default: 280,
     },
     zIndex: {
       type: Number,
@@ -71,84 +80,42 @@ export default defineComponent({
   setup(props) {
     const triggerRef = ref<HTMLButtonElement | null>(null)
     const searchValue = ref('')
-    const menuStyle = ref<CSSProperties>({
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: `${props.minMenuWidth}px`,
-      zIndex: props.zIndex,
-    })
+    const draftValue = ref<DataGridFilterOptionValue | DataGridFilterOptionValue[]>(
+      Array.isArray(props.modelValue) ? [...props.modelValue] : (props.modelValue ?? null),
+    )
+
+    watch(
+      () => props.modelValue,
+      (value) => {
+        draftValue.value = Array.isArray(value) ? [...value] : (value ?? null)
+      },
+      { deep: true },
+    )
 
     const normalizedSelectedValues = computed(() =>
       props.multiple
-        ? Array.isArray(props.modelValue)
-          ? props.modelValue
+        ? Array.isArray(draftValue.value)
+          ? draftValue.value
           : []
-        : [props.modelValue as DataGridFilterOptionValue],
+        : [draftValue.value as DataGridFilterOptionValue],
     )
     const selectedValueKeys = computed(
       () => new Set(normalizedSelectedValues.value.map((value) => toOptionKey(value))),
     )
 
-    function updateMenuPosition() {
-      const trigger = triggerRef.value
-      if (!trigger) {
-        return
-      }
-
-      const rect = trigger.getBoundingClientRect()
-      const desiredWidth = Math.max(rect.width, props.minMenuWidth)
-      const viewportWidth = window.innerWidth
-      const left = Math.min(rect.left, viewportWidth - desiredWidth - 12)
-
-      menuStyle.value = {
-        position: 'fixed',
-        top: `${rect.bottom + 4}px`,
-        left: `${Math.max(12, left)}px`,
-        width: `${desiredWidth}px`,
-        zIndex: props.zIndex,
-      }
-    }
-
-    function handleDocumentPointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) {
-        return
-      }
-
-      if (target.closest('[data-grid-inline-select-root="true"]')) {
-        return
-      }
-
-      props.onClose?.()
-    }
-
-    onMounted(() => {
-      updateMenuPosition()
-      window.addEventListener('resize', updateMenuPosition)
-      window.addEventListener('scroll', updateMenuPosition, true)
-      document.addEventListener('pointerdown', handleDocumentPointerDown)
-    })
-
-    onBeforeUnmount(() => {
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
-      document.removeEventListener('pointerdown', handleDocumentPointerDown)
-    })
-
     function getSelectedCount() {
       return props.multiple
-        ? Array.isArray(props.modelValue)
-          ? props.modelValue.length
+        ? Array.isArray(draftValue.value)
+          ? draftValue.value.length
           : 0
-        : props.modelValue === null || props.modelValue === undefined || props.modelValue === ''
+        : draftValue.value === null || draftValue.value === undefined || draftValue.value === ''
           ? 0
           : 1
     }
 
     function getTriggerLabel() {
       if (props.multiple) {
-        const selectedValues = Array.isArray(props.modelValue) ? props.modelValue : []
+        const selectedValues = Array.isArray(draftValue.value) ? draftValue.value : []
         if (selectedValues.length === 0) {
           return props.emptyLabel
         }
@@ -163,9 +130,9 @@ export default defineComponent({
         return `${selectedValues.length} wybrane`
       }
 
-      const singleValue = Array.isArray(props.modelValue)
+      const singleValue = Array.isArray(draftValue.value)
         ? null
-        : (props.modelValue ?? null)
+        : (draftValue.value ?? null)
       const selectedOption = props.options.find(
         (option) => toOptionKey(option.value) === toOptionKey(singleValue),
       )
@@ -183,7 +150,7 @@ export default defineComponent({
 
     function toggleOption(optionValue: DataGridFilterOptionValue) {
       if (props.multiple) {
-        const currentValues = Array.isArray(props.modelValue) ? props.modelValue : []
+        const currentValues = Array.isArray(draftValue.value) ? draftValue.value : []
         const optionKey = toOptionKey(optionValue)
         const nextValues = currentValues.filter((value) => toOptionKey(value) !== optionKey)
 
@@ -191,12 +158,11 @@ export default defineComponent({
           nextValues.push(optionValue)
         }
 
-        props.onUpdateModelValue(nextValues)
+        draftValue.value = nextValues
         return
       }
 
-      props.onUpdateModelValue(optionValue)
-      props.onClose?.()
+      draftValue.value = optionValue
     }
 
     function selectAllOptions() {
@@ -204,15 +170,21 @@ export default defineComponent({
         return
       }
 
-      props.onUpdateModelValue(props.options.map((option) => option.value))
+      draftValue.value = props.options.map((option) => option.value)
     }
 
     function clearAllOptions() {
-      props.onUpdateModelValue(props.multiple ? [] : '')
+      draftValue.value = props.multiple ? [] : null
+    }
 
-      if (!props.multiple) {
-        props.onClose?.()
-      }
+    function cancelAndClose() {
+      draftValue.value = Array.isArray(props.modelValue) ? [...props.modelValue] : (props.modelValue ?? null)
+      props.onClose?.()
+    }
+
+    function saveAndClose() {
+      props.onUpdateModelValue(draftValue.value)
+      props.onClose?.()
     }
 
     function isOptionSelected(optionValue: DataGridFilterOptionValue) {
@@ -234,7 +206,7 @@ export default defineComponent({
           ]}
           onClick={(event) => {
             event.stopPropagation()
-            updateMenuPosition()
+            cancelAndClose()
           }}
         >
           <span class="data-grid__filter-select-label">{getTriggerLabel()}</span>
@@ -242,13 +214,24 @@ export default defineComponent({
             {getSelectedCount() > 0 ? String(getSelectedCount()) : ''}
           </span>
         </button>
-        <Teleport to="body">
-          <DataGridDropdownMenu
-            menuClass="data-grid__filter-select-menu"
-            scopeAttr="data-grid-filter-root"
-            style={menuStyle.value}
-          >
-            <div class="data-grid__filter-select-options" data-grid-inline-select-root="true">
+        <DataGridDropdownMenu
+          triggerRef={triggerRef}
+          teleport
+          menuClass="data-grid__filter-select-menu"
+          scopeAttr="data-grid-filter-root"
+          minWidth={props.minMenuWidth}
+          desiredHeight={props.minMenuHeight + 132 + (props.multiple ? 40 : 0)}
+          minAvailableHeight={180}
+          chromeHeight={132 + (props.multiple ? 40 : 0)}
+          minOptionsHeight={props.minMenuHeight}
+          maxOptionsHeightMin={96}
+          zIndex={props.zIndex}
+          optionsMaxHeightVar="--data-grid-filter-select-options-max-height"
+          optionsMinHeightVar="--data-grid-filter-select-options-min-height"
+          outsideClickRootAttr="data-grid-inline-select-root"
+          onOutsidePointerDown={cancelAndClose}
+        >
+            <div class="data-grid__filter-select-content" data-grid-inline-select-root="true">
               <input
                 class="data-grid__filter-select-search"
                 value={searchValue.value}
@@ -285,46 +268,74 @@ export default defineComponent({
                   </button>
                 </div>
               ) : null}
-              {visibleOptions.value.length > 0 ? (
-                visibleOptions.value.map((option) => (
-                  <label
-                    key={toOptionKey(option.value)}
-                    class="data-grid__filter-select-option"
-                    data-grid-inline-select-root="true"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <input
-                      class="data-grid__filter-select-native-control"
-                      type={props.multiple ? 'checkbox' : 'radio'}
-                      name={props.multiple ? undefined : 'data-grid-inline-select-single'}
-                      checked={isOptionSelected(option.value)}
+              <div
+                class="data-grid__filter-select-options"
+                data-grid-inline-select-root="true"
+              >
+                {visibleOptions.value.length > 0 ? (
+                  visibleOptions.value.map((option) => (
+                    <label
+                      key={toOptionKey(option.value)}
+                      class="data-grid__filter-select-option"
                       data-grid-inline-select-root="true"
-                      onChange={() => toggleOption(option.value)}
-                    />
-                    <span
-                      class={[
-                        'data-grid__filter-select-control',
-                        props.multiple
-                          ? 'data-grid__filter-select-control--checkbox'
-                          : 'data-grid__filter-select-control--radio',
-                        isOptionSelected(option.value)
-                          ? 'data-grid__filter-select-control--checked'
-                          : '',
-                      ]}
-                      data-grid-inline-select-root="true"
-                      aria-hidden="true"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))
-              ) : (
-                <div class="data-grid__filter-select-empty" data-grid-inline-select-root="true">
-                  Brak opcji
-                </div>
-              )}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        class="data-grid__filter-select-native-control"
+                        type={props.multiple ? 'checkbox' : 'radio'}
+                        name={props.multiple ? undefined : 'data-grid-inline-select-single'}
+                        checked={isOptionSelected(option.value)}
+                        data-grid-inline-select-root="true"
+                        onChange={() => toggleOption(option.value)}
+                      />
+                      <span
+                        class={[
+                          'data-grid__filter-select-control',
+                          props.multiple
+                            ? 'data-grid__filter-select-control--checkbox'
+                            : 'data-grid__filter-select-control--radio',
+                          isOptionSelected(option.value)
+                            ? 'data-grid__filter-select-control--checked'
+                            : '',
+                        ]}
+                        data-grid-inline-select-root="true"
+                        aria-hidden="true"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))
+                ) : (
+                  <div class="data-grid__filter-select-empty" data-grid-inline-select-root="true">
+                    Brak opcji
+                  </div>
+                )}
+              </div>
+              <div class="data-grid__filter-select-footer" data-grid-inline-select-root="true">
+                <button
+                  type="button"
+                  class="data-grid__filter-select-action"
+                  data-grid-inline-select-root="true"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    cancelAndClose()
+                  }}
+                >
+                  {props.cancelLabel}
+                </button>
+                <button
+                  type="button"
+                  class="data-grid__filter-select-action data-grid__filter-select-action--primary"
+                  data-grid-inline-select-root="true"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    saveAndClose()
+                  }}
+                >
+                  {props.saveLabel}
+                </button>
+              </div>
             </div>
-          </DataGridDropdownMenu>
-        </Teleport>
+        </DataGridDropdownMenu>
       </div>
     )
   },

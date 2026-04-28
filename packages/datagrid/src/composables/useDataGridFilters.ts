@@ -107,12 +107,14 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     menuOptions?: { keepDialogsOpen?: boolean; target?: 'toolbar' | 'header' | 'dialog' },
   ) {
     const target = menuOptions?.target ?? 'header'
+    const keepDialogsOpen = target === 'dialog' ? true : menuOptions?.keepDialogsOpen
+
+    options.onOpenFilterMenu({ keepDialogsOpen })
 
     if (target === 'dialog') {
       openDialogFilterColumnId.value = openDialogFilterColumnId.value === columnId ? null : columnId
       openHeaderFilterColumnId.value = null
       openToolbarFilterColumnId.value = null
-      options.onOpenFilterMenu({ keepDialogsOpen: true })
       return
     }
 
@@ -127,7 +129,6 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     }
 
     openDialogFilterColumnId.value = null
-    options.onOpenFilterMenu({ keepDialogsOpen: menuOptions?.keepDialogsOpen })
   }
 
   function getFilterSearchStateKey(columnId: string, target: FilterControlTarget) {
