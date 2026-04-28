@@ -910,6 +910,60 @@
     background: var(--app-row-selected-hover, var(--app-accent-soft-strong));
   }
 
+  .data-grid__cell--selection-hover {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 28%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+    outline: 1px solid color-mix(in srgb, var(--app-accent) 60%, transparent);
+    outline-offset: -1px;
+  }
+
+  .data-grid__row:not(.data-grid__row--header):hover .data-grid__cell--selection-hover,
+  .data-grid__row[aria-selected='true'] .data-grid__cell--selection-hover,
+  .data-grid__row[aria-selected='true']:hover .data-grid__cell--selection-hover {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 34%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+  }
+
+  .data-grid__cell--selection-range-preview {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 22%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 45%, transparent);
+  }
+
+  .data-grid__row:not(.data-grid__row--header):hover .data-grid__cell--selection-range-preview,
+  .data-grid__row[aria-selected='true'] .data-grid__cell--selection-range-preview,
+  .data-grid__row[aria-selected='true']:hover .data-grid__cell--selection-range-preview {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 28%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+  }
+
+  .data-grid__cell--selection-range-preview.data-grid__cell--selection-hover {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 32%, var(--app-surface));
+  }
+
+  .data-grid__row:not(.data-grid__row--header):hover
+    .data-grid__cell--selection-range-preview.data-grid__cell--selection-hover,
+  .data-grid__row[aria-selected='true']
+    .data-grid__cell--selection-range-preview.data-grid__cell--selection-hover,
+  .data-grid__row[aria-selected='true']:hover
+    .data-grid__cell--selection-range-preview.data-grid__cell--selection-hover {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 38%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+  }
+
+  .data-grid__cell--selected-cell {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 34%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 70%, transparent);
+  }
+
+  .data-grid__row:not(.data-grid__row--header):hover .data-grid__cell--selected-cell,
+  .data-grid__row[aria-selected='true'] .data-grid__cell--selected-cell,
+  .data-grid__row[aria-selected='true']:hover .data-grid__cell--selected-cell {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 42%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+  }
+
   .data-grid__header-content {
     display: grid;
     grid-template-rows: auto auto;
@@ -1092,12 +1146,51 @@
     max-height: inherit;
   }
 
+  .data-grid__filter-select-content--compact {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0.35rem;
+  }
+
+  .data-grid__filter-select-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 2rem);
+    gap: 0.25rem;
+    align-items: stretch;
+  }
+
   .data-grid__filter-select-search {
     width: 100%;
     padding: 0.3rem 0.45rem;
   }
 
+  .data-grid__filter-select-icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 0.45rem;
+    background: var(--app-surface);
+    color: var(--app-text);
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  .data-grid__filter-select-icon-action:hover {
+    background: var(--app-accent-soft);
+    border-color: var(--app-accent);
+  }
+
   .data-grid__filter-select-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .data-grid__filter-select-mode {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.35rem;
@@ -1122,6 +1215,15 @@
     line-height: 1.2;
     font-size: 0.78rem;
     text-align: center;
+  }
+
+  .data-grid__filter-select-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1rem;
+    font-size: 0.95rem;
+    line-height: 1;
   }
 
   .data-grid__filter-select-options {
@@ -1344,9 +1446,9 @@
     text-align: center;
     color: var(--app-text);
     transition:
-      background-color 120ms ease,
-      border-color 120ms ease,
-      color 120ms ease;
+      background-color 50ms ease,
+      border-color 50ms ease,
+      color 50ms ease;
   }
 
   .data-grid__menu-item--active {

@@ -34,6 +34,8 @@ export type DataGridFilterConfig = {
   label: string
   group?: string
   variant?: DataGridFilterVariant
+  textFallback?: boolean
+  valueSeparator?: string
   options?: DataGridFilterOption[]
   includeEmptyOption?: boolean
   emptyOptionLabel?: string
@@ -115,6 +117,8 @@ export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & 
   pickerLabel?: string
   headerControl?: (context: HeaderContext<TData, unknown>) => unknown
   filterVariant?: DataGridFilterVariant
+  filterTextFallback?: boolean
+  filterValueSeparator?: string
   filterGroup?: string
   filterOptions?: DataGridFilterOption[]
   filterIncludeEmptyOption?: boolean

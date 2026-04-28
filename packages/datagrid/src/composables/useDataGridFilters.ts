@@ -25,6 +25,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   const openToolbarFilterColumnId = ref<string | null>(null)
   const openDialogFilterColumnId = ref<string | null>(null)
   const filterSearchByColumnId = ref<Record<string, string>>({})
+  const textFallbackFilterIds = ref<Set<string>>(new Set())
 
   function closeFilterMenus() {
     openHeaderFilterColumnId.value = null
@@ -82,6 +83,20 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     return String(getFilterRawValue(columnId, target) ?? '')
   }
 
+  function isTextFallbackFilter(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    return Boolean(config.textFallback && textFallbackFilterIds.value.has(config.id))
+  }
+
+  function getFilterTextValue(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    const rawValue = getFilterRawValue(config.id, target)
+
+    if (Array.isArray(rawValue)) {
+      return rawValue.map((value) => String(value ?? '')).filter(Boolean).join(config.valueSeparator ?? '|')
+    }
+
+    return String(rawValue ?? '')
+  }
+
   function getSingleSelectFilterValue(columnId: string, target: FilterControlTarget = 'live') {
     const rawValue = getFilterRawValue(columnId, target)
 
@@ -92,14 +107,27 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     return rawValue as DataGridFilterOption['value'] | undefined
   }
 
-  function getSelectFilterValues(columnId: string, target: FilterControlTarget = 'live') {
-    const rawValue = getFilterRawValue(columnId, target)
+  function getSelectFilterValues(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    const rawValue = getFilterRawValue(config.id, target)
 
-    if (!Array.isArray(rawValue)) {
+    if (Array.isArray(rawValue)) {
+      return rawValue as DataGridFilterOption['value'][]
+    }
+
+    if (typeof rawValue !== 'string' || !rawValue.trim()) {
       return []
     }
 
-    return rawValue as DataGridFilterOption['value'][]
+    return rawValue
+      .split(config.valueSeparator ?? '|')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => {
+        const matchingOption = getFilterOptions(config).find(
+          (option) => String(option.value ?? '') === value,
+        )
+        return matchingOption?.value ?? value
+      })
   }
 
   function toggleFilterMenu(
@@ -172,6 +200,8 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       label: options.renderColumnPickerLabel(column),
       group: columnDef.filterGroup ?? 'Kolumny',
       variant: columnDef.filterVariant,
+      textFallback: columnDef.filterTextFallback,
+      valueSeparator: columnDef.filterValueSeparator,
       options: columnDef.filterOptions,
       includeEmptyOption: columnDef.filterIncludeEmptyOption,
       emptyOptionLabel: columnDef.filterEmptyOptionLabel,
@@ -196,7 +226,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     checked: boolean,
     target: FilterControlTarget = 'live',
   ) {
-    const currentValues = getSelectFilterValues(columnId, target)
+    const currentValues = getSelectFilterValues({ id: columnId, label: columnId }, target)
     const normalizedValue = toFilterOptionKey(optionValue)
     const nextValues = currentValues.filter((value) => toFilterOptionKey(value) !== normalizedValue)
 
@@ -239,14 +269,21 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return 'Filtr'
     }
 
+    if (isTextFallbackFilter(config, target)) {
+      const value = getFilterTextValue(config, target)
+      return value ? value : 'Filtr'
+    }
+
     const filterOptions = getFilterOptions(config)
     const selectedValues =
-      config.variant === 'radio'
+      isTextFallbackFilter(config, target)
+        ? []
+        : config.variant === 'radio'
         ? (() => {
             const singleValue = getSingleSelectFilterValue(config.id, target)
             return singleValue === undefined ? [] : [singleValue]
           })()
-        : getSelectFilterValues(config.id, target)
+        : getSelectFilterValues(config, target)
 
     if (selectedValues.length === 0) {
       return 'Wybierz'
@@ -284,7 +321,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
             const singleValue = getSingleSelectFilterValue(config.id, target)
             return singleValue === undefined ? [] : [singleValue]
           })()
-        : getSelectFilterValues(config.id, target)
+        : getSelectFilterValues(config, target)
     const selectedValueKeys = new Set(selectedValues.map((value) => toFilterOptionKey(value)))
     const isOpen =
       target === 'dialog'
@@ -297,12 +334,17 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       config,
       isToolbar,
       isOpen,
-      inputValue: getFilterValue(config.id, target),
+      inputValue:
+        config.variant === 'select' || config.variant === 'radio'
+          ? getFilterTextValue(config, target)
+          : getFilterValue(config.id, target),
       buttonLabel: getFilterButtonLabel(config, target),
       selectedCount: selectedValues.length,
       selectedValueKeys,
+      allOptions: getFilterOptions(config),
       visibleOptions: getVisibleFilterOptions(config, target),
       searchValue: getSelectFilterSearch(config.id, target),
+      textMode: isTextFallbackFilter(config, target),
       onToggleMenu: (event: MouseEvent) => {
         event.stopPropagation()
         toggleFilterMenu(config.id, {
@@ -311,13 +353,26 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
         })
       },
       onInput: (value: string) => updateColumnFilter(config.id, value, target),
+      onApplySelectFilter: (value: string | DataGridFilterOption['value'][], textMode: boolean) => {
+        const nextIds = new Set(textFallbackFilterIds.value)
+
+        if (textMode) {
+          nextIds.add(config.id)
+        } else {
+          nextIds.delete(config.id)
+        }
+
+        textFallbackFilterIds.value = nextIds
+        const nextValue =
+          !textMode && Array.isArray(value) && config.valueSeparator
+            ? value.map((entry) => String(entry ?? '')).filter(Boolean).join(config.valueSeparator)
+            : value
+
+        setColumnFilterValue(config.id, nextValue, target)
+        closeFilterMenus()
+      },
+      onCancelSelectFilter: closeFilterMenus,
       onSearchChange: (value: string) => updateSelectFilterSearch(config.id, value, target),
-      onSelectAll: () => selectAllFilterOptions(config, target),
-      onClearAll: () => clearSelectFilterOptions(config.id, target),
-      onToggleValue: (optionValue: DataGridFilterOption['value'], checked: boolean) =>
-        config.variant === 'radio'
-          ? setSingleSelectFilterValue(config.id, optionValue, checked, target)
-          : toggleSelectFilterValue(config.id, optionValue, checked, target),
     })
   }
 

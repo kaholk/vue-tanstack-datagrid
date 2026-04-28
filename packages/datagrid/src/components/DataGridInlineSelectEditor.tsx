@@ -7,11 +7,10 @@ import {
 } from 'vue'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridSelectMenuContent, {
+  toDataGridSelectOptionKey,
+} from './DataGridSelectMenuContent'
 import type { DataGridFilterOption, DataGridFilterOptionValue } from '../types'
-
-function toOptionKey(value: DataGridFilterOptionValue) {
-  return value === null ? '__data_grid_null__' : String(value)
-}
 
 export default defineComponent({
   name: 'DataGridInlineSelectEditor',
@@ -100,7 +99,7 @@ export default defineComponent({
         : [draftValue.value as DataGridFilterOptionValue],
     )
     const selectedValueKeys = computed(
-      () => new Set(normalizedSelectedValues.value.map((value) => toOptionKey(value))),
+      () => new Set(normalizedSelectedValues.value.map((value) => toDataGridSelectOptionKey(value))),
     )
 
     function getSelectedCount() {
@@ -122,7 +121,9 @@ export default defineComponent({
 
         if (selectedValues.length === 1) {
           const selectedOption = props.options.find(
-            (option) => toOptionKey(option.value) === toOptionKey(selectedValues[0] ?? null),
+            (option) =>
+              toDataGridSelectOptionKey(option.value) ===
+              toDataGridSelectOptionKey(selectedValues[0] ?? null),
           )
           return selectedOption?.label ?? String(selectedValues[0])
         }
@@ -134,7 +135,8 @@ export default defineComponent({
         ? null
         : (draftValue.value ?? null)
       const selectedOption = props.options.find(
-        (option) => toOptionKey(option.value) === toOptionKey(singleValue),
+        (option) =>
+          toDataGridSelectOptionKey(option.value) === toDataGridSelectOptionKey(singleValue),
       )
       return selectedOption?.label ?? String(singleValue ?? props.emptyLabel)
     }
@@ -151,8 +153,10 @@ export default defineComponent({
     function toggleOption(optionValue: DataGridFilterOptionValue) {
       if (props.multiple) {
         const currentValues = Array.isArray(draftValue.value) ? draftValue.value : []
-        const optionKey = toOptionKey(optionValue)
-        const nextValues = currentValues.filter((value) => toOptionKey(value) !== optionKey)
+        const optionKey = toDataGridSelectOptionKey(optionValue)
+        const nextValues = currentValues.filter(
+          (value) => toDataGridSelectOptionKey(value) !== optionKey,
+        )
 
         if (!selectedValueKeys.value.has(optionKey)) {
           nextValues.push(optionValue)
@@ -185,10 +189,6 @@ export default defineComponent({
     function saveAndClose() {
       props.onUpdateModelValue(draftValue.value)
       props.onClose?.()
-    }
-
-    function isOptionSelected(optionValue: DataGridFilterOptionValue) {
-      return selectedValueKeys.value.has(toOptionKey(optionValue))
     }
 
     return () => (
@@ -231,110 +231,30 @@ export default defineComponent({
           outsideClickRootAttr="data-grid-inline-select-root"
           onOutsidePointerDown={cancelAndClose}
         >
-            <div class="data-grid__filter-select-content" data-grid-inline-select-root="true">
-              <input
-                class="data-grid__filter-select-search"
-                value={searchValue.value}
-                placeholder={props.searchPlaceholder}
-                data-grid-inline-select-root="true"
-                onClick={(event) => event.stopPropagation()}
-                onInput={(event) => {
-                  searchValue.value = (event.target as HTMLInputElement).value
-                }}
-              />
-              {props.multiple ? (
-                <div class="data-grid__filter-select-actions" data-grid-inline-select-root="true">
-                  <button
-                    type="button"
-                    class="data-grid__filter-select-action"
-                    data-grid-inline-select-root="true"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      selectAllOptions()
-                    }}
-                  >
-                    {props.selectAllLabel}
-                  </button>
-                  <button
-                    type="button"
-                    class="data-grid__filter-select-action"
-                    data-grid-inline-select-root="true"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      clearAllOptions()
-                    }}
-                  >
-                    {props.clearLabel}
-                  </button>
-                </div>
-              ) : null}
-              <div
-                class="data-grid__filter-select-options"
-                data-grid-inline-select-root="true"
-              >
-                {visibleOptions.value.length > 0 ? (
-                  visibleOptions.value.map((option) => (
-                    <label
-                      key={toOptionKey(option.value)}
-                      class="data-grid__filter-select-option"
-                      data-grid-inline-select-root="true"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <input
-                        class="data-grid__filter-select-native-control"
-                        type={props.multiple ? 'checkbox' : 'radio'}
-                        name={props.multiple ? undefined : 'data-grid-inline-select-single'}
-                        checked={isOptionSelected(option.value)}
-                        data-grid-inline-select-root="true"
-                        onChange={() => toggleOption(option.value)}
-                      />
-                      <span
-                        class={[
-                          'data-grid__filter-select-control',
-                          props.multiple
-                            ? 'data-grid__filter-select-control--checkbox'
-                            : 'data-grid__filter-select-control--radio',
-                          isOptionSelected(option.value)
-                            ? 'data-grid__filter-select-control--checked'
-                            : '',
-                        ]}
-                        data-grid-inline-select-root="true"
-                        aria-hidden="true"
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))
-                ) : (
-                  <div class="data-grid__filter-select-empty" data-grid-inline-select-root="true">
-                    Brak opcji
-                  </div>
-                )}
-              </div>
-              <div class="data-grid__filter-select-footer" data-grid-inline-select-root="true">
-                <button
-                  type="button"
-                  class="data-grid__filter-select-action"
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    cancelAndClose()
-                  }}
-                >
-                  {props.cancelLabel}
-                </button>
-                <button
-                  type="button"
-                  class="data-grid__filter-select-action data-grid__filter-select-action--primary"
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    saveAndClose()
-                  }}
-                >
-                  {props.saveLabel}
-                </button>
-              </div>
-            </div>
+          <DataGridSelectMenuContent
+            searchValue={searchValue.value}
+            searchPlaceholder={props.searchPlaceholder}
+            options={visibleOptions.value}
+            selectedValueKeys={selectedValueKeys.value}
+            multiple={props.multiple}
+            optionName="data-grid-inline-select-single"
+            inlineRootAttr="data-grid-inline-select-root"
+            showActions={props.multiple}
+            actionsIconOnly
+            selectAllLabel={props.selectAllLabel}
+            clearLabel={props.clearLabel}
+            showFooter
+            cancelLabel={props.cancelLabel}
+            saveLabel={props.saveLabel}
+            onSearchChange={(value) => {
+              searchValue.value = value
+            }}
+            onSelectAll={selectAllOptions}
+            onClearAll={clearAllOptions}
+            onToggleValue={(optionValue) => toggleOption(optionValue)}
+            onCancel={cancelAndClose}
+            onSave={saveAndClose}
+          />
         </DataGridDropdownMenu>
       </div>
     )

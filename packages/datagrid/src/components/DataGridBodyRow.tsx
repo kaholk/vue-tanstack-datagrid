@@ -47,6 +47,30 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    isCellSelected: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
+      default: undefined,
+    },
+    isCellSelectionHovered: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
+      default: undefined,
+    },
+    isCellSelectionRangePreviewed: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
+      default: undefined,
+    },
+    onCellSelectionPointerEnter: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>, event: PointerEvent) => void>,
+      default: undefined,
+    },
+    onCellSelectionPointerLeave: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>, event: PointerEvent) => void>,
+      default: undefined,
+    },
+    onCellSelectionClick: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>, event: MouseEvent) => boolean | void>,
+      default: undefined,
+    },
   },
   setup(props) {
     return () => {
@@ -90,6 +114,10 @@ export default defineComponent({
               typeof columnDef.cellClass === 'function'
                 ? columnDef.cellClass({ cell, row })
                 : columnDef.cellClass
+            const isCellSelected = props.isCellSelected?.(cell) ?? false
+            const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
+            const isCellSelectionRangePreviewed =
+              props.isCellSelectionRangePreviewed?.(cell) ?? false
 
             return (
               <div
@@ -98,11 +126,28 @@ export default defineComponent({
                   'data-grid__cell',
                   pinnedSide ? 'data-grid__cell--pinned' : '',
                   pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
+                  isCellSelected ? 'data-grid__cell--selected-cell' : '',
+                  !isCellSelected && isCellSelectionRangePreviewed
+                    ? 'data-grid__cell--selection-range-preview'
+                    : '',
+                  !isCellSelected && isCellSelectionHovered
+                    ? 'data-grid__cell--selection-hover'
+                    : '',
                   customCellClass ?? '',
                 ]}
                 data-grid-column-id={entry.column.id}
                 style={props.cellStylesByColumnId.get(entry.column.id)}
+                onPointerenter={(event) => {
+                  props.onCellSelectionPointerEnter?.(cell, event)
+                }}
+                onPointerleave={(event) => {
+                  props.onCellSelectionPointerLeave?.(cell, event)
+                }}
                 onClick={(event) => {
+                  if (props.onCellSelectionClick?.(cell, event)) {
+                    return
+                  }
+
                   columnDef.onCellClick?.({ cell, row, event })
                 }}
               >

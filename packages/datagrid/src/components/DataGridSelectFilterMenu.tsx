@@ -1,14 +1,37 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, ref, type PropType } from 'vue'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridSelectMenuContent, {
+  toDataGridSelectOptionKey,
+} from './DataGridSelectMenuContent'
 import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
 
 type ElementRef = {
   value: HTMLElement | null
 }
 
-function toOptionKey(value: DataGridFilterOption['value']) {
-  return value === null ? '__data_grid_empty__' : String(value)
+function getOptionValuesText(
+  values: DataGridFilterOption['value'][],
+  separator: string,
+) {
+  return values.map((value) => String(value ?? '')).filter(Boolean).join(separator)
+}
+
+function getValuesFromText(
+  text: string,
+  options: DataGridFilterOption[],
+  separator: string,
+) {
+  const values = text
+    .split(separator)
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  return values
+    .map((value) => {
+      const matchingOption = options.find((option) => String(option.value ?? '') === value)
+      return matchingOption?.value ?? value
+    })
 }
 
 export default defineComponent({
@@ -20,6 +43,10 @@ export default defineComponent({
     },
     searchValue: {
       type: String,
+      required: true,
+    },
+    allOptions: {
+      type: Array as PropType<DataGridFilterOption[]>,
       required: true,
     },
     visibleOptions: {
@@ -34,27 +61,106 @@ export default defineComponent({
       type: Object as PropType<ElementRef>,
       default: undefined,
     },
+    textMode: {
+      type: Boolean,
+      default: false,
+    },
+    textValue: {
+      type: String,
+      default: '',
+    },
     onSearchChange: {
       type: Function as PropType<(value: string) => void>,
       required: true,
     },
-    onSelectAll: {
-      type: Function as PropType<() => void>,
+    onApply: {
+      type: Function as PropType<(value: string | DataGridFilterOption['value'][], textMode: boolean) => void>,
       required: true,
     },
-    onClearAll: {
+    onCancel: {
       type: Function as PropType<() => void>,
-      required: true,
-    },
-    onToggleValue: {
-      type: Function as PropType<
-        (optionValue: DataGridFilterOption['value'], checked: boolean) => void
-      >,
       required: true,
     },
   },
   setup(props) {
     const isRadioVariant = () => props.config.variant === 'radio'
+    const valueSeparator = () => props.config.valueSeparator ?? '|'
+    const draftTextMode = ref(props.textMode)
+    const draftTextValue = ref(props.textValue)
+    const draftSelectedValueKeys = ref(new Set(props.selectedValueKeys))
+
+    function resetDraft() {
+      draftTextMode.value = props.textMode
+      draftTextValue.value = props.textValue
+      draftSelectedValueKeys.value = new Set(props.selectedValueKeys)
+    }
+
+    function getDraftSelectedValues() {
+      return props.allOptions
+        .filter((option) => draftSelectedValueKeys.value.has(toDataGridSelectOptionKey(option.value)))
+        .map((option) => option.value)
+    }
+
+    function switchTextMode(enabled: boolean) {
+      if (enabled === draftTextMode.value) {
+        return
+      }
+
+      if (enabled) {
+        draftTextValue.value = getOptionValuesText(getDraftSelectedValues(), valueSeparator())
+      } else {
+        draftSelectedValueKeys.value = new Set(
+          getValuesFromText(draftTextValue.value, props.allOptions, valueSeparator()).map((value) =>
+            toDataGridSelectOptionKey(value),
+          ),
+        )
+      }
+
+      draftTextMode.value = enabled
+    }
+
+    function selectAllOptions() {
+      draftSelectedValueKeys.value = new Set(
+        props.allOptions.map((option) => toDataGridSelectOptionKey(option.value)),
+      )
+    }
+
+    function clearOptions() {
+      draftSelectedValueKeys.value = new Set()
+      draftTextValue.value = ''
+    }
+
+    function toggleOption(optionValue: DataGridFilterOption['value'], checked: boolean) {
+      const optionKey = toDataGridSelectOptionKey(optionValue)
+
+      if (isRadioVariant()) {
+        draftSelectedValueKeys.value = checked ? new Set([optionKey]) : new Set()
+        return
+      }
+
+      const nextKeys = new Set(draftSelectedValueKeys.value)
+
+      if (checked) {
+        nextKeys.add(optionKey)
+      } else {
+        nextKeys.delete(optionKey)
+      }
+
+      draftSelectedValueKeys.value = nextKeys
+    }
+
+    function applyFilter() {
+      if (draftTextMode.value) {
+        props.onApply(draftTextValue.value.trim(), true)
+        return
+      }
+
+      props.onApply(getDraftSelectedValues(), false)
+    }
+
+    function toggleMode() {
+      switchTextMode(!draftTextMode.value)
+    }
 
     return () => (
       <DataGridDropdownMenu
@@ -65,71 +171,120 @@ export default defineComponent({
         minWidth={280}
         desiredHeight={360}
         minAvailableHeight={180}
-        chromeHeight={props.config.variant === 'radio' ? 92 : 132}
+        chromeHeight={props.config.variant === 'radio' ? 132 : 172}
         maxOptionsHeightMin={96}
         zIndex={500}
         menuMaxHeightVar="--data-grid-filter-select-menu-max-height"
         optionsMaxHeightVar="--data-grid-filter-select-options-max-height"
       >
-          <div class="data-grid__filter-select-content">
-            <input
-              class="data-grid__filter-select-search"
-              value={props.searchValue}
-              placeholder="Szukaj opcji"
-              onClick={(event) => event.stopPropagation()}
-              onInput={(event) => props.onSearchChange((event.target as HTMLInputElement).value)}
-            />
-            {!isRadioVariant() ? (
-              <div class="data-grid__filter-select-actions">
-                <button type="button" class="data-grid__filter-select-action" onClick={props.onSelectAll}>
-                  Zaznacz wszystko
-                </button>
-                <button type="button" class="data-grid__filter-select-action" onClick={props.onClearAll}>
-                  Odznacz wszystko
-                </button>
-              </div>
+        <div class="data-grid__filter-select-content data-grid__filter-select-content--compact">
+          <div class="data-grid__filter-select-toolbar">
+            {draftTextMode.value ? (
+              <input
+                class="data-grid__filter-select-search"
+                value={draftTextValue.value}
+                placeholder={props.config.placeholder ?? 'Filtr'}
+                onClick={(event) => event.stopPropagation()}
+                onInput={(event) => {
+                  draftTextValue.value = (event.target as HTMLInputElement).value
+                }}
+              />
             ) : (
-              <div class="data-grid__filter-select-actions data-grid__filter-select-actions--single">
-                <button type="button" class="data-grid__filter-select-action" onClick={props.onClearAll}>
-                  Wyczyść
-                </button>
-              </div>
+              <input
+                class="data-grid__filter-select-search"
+                value={props.searchValue}
+                placeholder="Szukaj opcji"
+                onClick={(event) => event.stopPropagation()}
+                onInput={(event) => props.onSearchChange((event.target as HTMLInputElement).value)}
+              />
             )}
-            <div class="data-grid__filter-select-options data-grid__filter-select-options--menu">
-              {props.visibleOptions.length > 0 ? (
-                props.visibleOptions.map((option) => {
-                  const selected = props.selectedValueKeys.has(toOptionKey(option.value))
-
-                  return (
-                    <label key={String(option.value)} class="data-grid__filter-select-option">
-                      <input
-                        class="data-grid__filter-select-native-control"
-                        type={isRadioVariant() ? 'radio' : 'checkbox'}
-                        name={isRadioVariant() ? `data-grid-filter-${props.config.id}` : undefined}
-                        checked={selected}
-                        onChange={(event) =>
-                          props.onToggleValue(option.value, (event.target as HTMLInputElement).checked)
-                        }
-                      />
-                      <span
-                        class={[
-                          'data-grid__filter-select-control',
-                          isRadioVariant()
-                            ? 'data-grid__filter-select-control--radio'
-                            : 'data-grid__filter-select-control--checkbox',
-                          selected ? 'data-grid__filter-select-control--checked' : '',
-                        ]}
-                        aria-hidden="true"
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  )
-                })
-              ) : (
-                <div class="data-grid__filter-select-empty">Brak opcji</div>
-              )}
-            </div>
+            {props.config.textFallback ? (
+              <button
+                type="button"
+                class="data-grid__filter-select-icon-action"
+                title={draftTextMode.value ? 'Lista' : 'Tekst'}
+                aria-label={draftTextMode.value ? 'Lista' : 'Tekst'}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggleMode()
+                }}
+              >
+                {draftTextMode.value ? '☷' : 'T'}
+              </button>
+            ) : null}
+            {!draftTextMode.value ? (
+              <button
+                type="button"
+                class="data-grid__filter-select-icon-action"
+                title="Zaznacz wszystko"
+                aria-label="Zaznacz wszystko"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  selectAllOptions()
+                }}
+              >
+                ✓
+              </button>
+            ) : null}
+            <button
+              type="button"
+              class="data-grid__filter-select-icon-action"
+              title={draftTextMode.value || isRadioVariant() ? 'Wyczyść' : 'Odznacz wszystko'}
+              aria-label={draftTextMode.value || isRadioVariant() ? 'Wyczyść' : 'Odznacz wszystko'}
+              onClick={(event) => {
+                event.stopPropagation()
+                clearOptions()
+              }}
+            >
+              ×
+            </button>
           </div>
+          {draftTextMode.value ? (
+            <div class="data-grid__filter-select-empty">Tryb tekstowy</div>
+          ) : (
+            <DataGridSelectMenuContent
+              searchValue=""
+              searchPlaceholder="Szukaj opcji"
+              options={props.visibleOptions}
+              selectedValueKeys={draftSelectedValueKeys.value}
+              multiple={!isRadioVariant()}
+              optionName={isRadioVariant() ? `data-grid-filter-${props.config.id}` : undefined}
+              optionsMenuClass="data-grid__filter-select-options--menu"
+              showSearch={false}
+              showActions={false}
+              selectAllLabel="Zaznacz wszystko"
+              clearLabel={isRadioVariant() ? 'Wyczyść' : 'Odznacz wszystko'}
+              renderShell={false}
+              onSearchChange={props.onSearchChange}
+              onSelectAll={selectAllOptions}
+              onClearAll={clearOptions}
+              onToggleValue={toggleOption}
+            />
+          )}
+          <div class="data-grid__filter-select-footer">
+            <button
+              type="button"
+              class="data-grid__filter-select-action"
+              onClick={(event) => {
+                event.stopPropagation()
+                resetDraft()
+                props.onCancel()
+              }}
+            >
+              Anuluj
+            </button>
+            <button
+              type="button"
+              class="data-grid__filter-select-action data-grid__filter-select-action--primary"
+              onClick={(event) => {
+                event.stopPropagation()
+                applyFilter()
+              }}
+            >
+              Filtruj
+            </button>
+          </div>
+        </div>
       </DataGridDropdownMenu>
     )
   },

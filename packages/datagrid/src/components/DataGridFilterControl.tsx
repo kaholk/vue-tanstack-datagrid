@@ -43,9 +43,17 @@ export default defineComponent({
       type: Array as PropType<DataGridFilterOption[]>,
       default: () => [],
     },
+    allOptions: {
+      type: Array as PropType<DataGridFilterOption[]>,
+      default: () => [],
+    },
     searchValue: {
       type: String,
       default: '',
+    },
+    textMode: {
+      type: Boolean,
+      default: false,
     },
     onToggleMenu: {
       type: Function as PropType<(event: MouseEvent) => void>,
@@ -59,18 +67,14 @@ export default defineComponent({
       type: Function as PropType<(value: string) => void>,
       default: undefined,
     },
-    onSelectAll: {
-      type: Function as PropType<() => void>,
-      default: undefined,
-    },
-    onClearAll: {
-      type: Function as PropType<() => void>,
-      default: undefined,
-    },
-    onToggleValue: {
+    onApplySelectFilter: {
       type: Function as PropType<
-        (optionValue: DataGridFilterOption['value'], checked: boolean) => void
+        (value: string | DataGridFilterOption['value'][], textMode: boolean) => void
       >,
+      default: undefined,
+    },
+    onCancelSelectFilter: {
+      type: Function as PropType<() => void>,
       default: undefined,
     },
   },
@@ -108,7 +112,9 @@ export default defineComponent({
               type="button"
               class={[
                 'data-grid__filter-select-trigger',
-                props.selectedCount > 0 ? 'data-grid__filter-select-trigger--active' : '',
+                props.selectedCount > 0 || (props.textMode && draftValue.value)
+                  ? 'data-grid__filter-select-trigger--active'
+                  : '',
               ]}
               onClick={(event) => {
                 props.onToggleMenu?.(event)
@@ -123,13 +129,15 @@ export default defineComponent({
               <DataGridSelectFilterMenu
                 config={props.config}
                 searchValue={props.searchValue}
+                allOptions={props.allOptions}
                 visibleOptions={props.visibleOptions}
                 selectedValueKeys={props.selectedValueKeys ?? new Set<string>()}
                 triggerRef={triggerRef}
+                textMode={props.textMode}
+                textValue={draftValue.value}
                 onSearchChange={(value) => props.onSearchChange?.(value)}
-                onSelectAll={() => props.onSelectAll?.()}
-                onClearAll={() => props.onClearAll?.()}
-                onToggleValue={(optionValue, checked) => props.onToggleValue?.(optionValue, checked)}
+                onApply={(value, textMode) => props.onApplySelectFilter?.(value, textMode)}
+                onCancel={() => props.onCancelSelectFilter?.()}
               />
             ) : null}
           </div>
