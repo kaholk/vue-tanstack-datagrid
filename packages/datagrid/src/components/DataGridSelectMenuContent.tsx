@@ -114,6 +114,7 @@ export default defineComponent({
     return () => {
       const content = (
         <>
+        <div class="data-grid__filter-select-search-actions" {...rootAttrs()}>
         {props.showSearch ? (
           <input
             class="data-grid__filter-select-search"
@@ -174,6 +175,7 @@ export default defineComponent({
             </button>
           </div>
         ) : null}
+        </div>
         <div
           class={['data-grid__filter-select-options', props.optionsMenuClass]}
           {...rootAttrs()}

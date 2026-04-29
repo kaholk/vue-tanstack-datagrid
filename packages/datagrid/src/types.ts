@@ -90,6 +90,7 @@ export type DataGridSelectionPanelConfig = {
   position?: DataGridSelectionPanelPosition
   sumColumns?: DataGridSelectionPanelSumConfig[]
   copyColumnIds?: string[]
+  copyIncludeHeaders?: boolean
   selectedRowsLabel?: string
   copyWithHeadersLabel?: string
   copyWithoutHeadersLabel?: string

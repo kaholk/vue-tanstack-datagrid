@@ -1,5 +1,6 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, ref, type PropType } from 'vue'
 
+import howToSearchImage from '../assets/how_to_search.png'
 import DataGridDialog from './DataGridDialog'
 
 export default defineComponent({
@@ -15,6 +16,8 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const isImageExpanded = ref(false)
+
     return () => {
       if (!props.isOpen) {
         return null
@@ -36,6 +39,21 @@ export default defineComponent({
           }}
         >
           <div class="data-grid__filter-help-content">
+            <button
+              type="button"
+              class="data-grid__filter-help-image-link"
+              aria-label="Powieksz infografike"
+              onClick={() => {
+                isImageExpanded.value = true
+              }}
+            >
+              <img
+                src={howToSearchImage}
+                alt="Infografika pokazujaca jak uzywac wyszukiwania"
+                class="data-grid__filter-help-image"
+              />
+            </button>
+
             <section class="data-grid__filter-help-section">
               <h5 class="data-grid__filter-help-title">1. Zwykle wpisywanie</h5>
               <p class="data-grid__filter-help-text">
@@ -115,6 +133,35 @@ export default defineComponent({
               </p>
             </section>
           </div>
+
+          {isImageExpanded.value ? (
+            <div
+              class="data-grid__filter-help-preview"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Powiekszona infografika"
+              onClick={() => {
+                isImageExpanded.value = false
+              }}
+            >
+              <div class="data-grid__filter-help-preview-panel" onClick={(event) => event.stopPropagation()}>
+                <button
+                  type="button"
+                  class="data-grid__dialog-close data-grid__filter-help-preview-close"
+                  onClick={() => {
+                    isImageExpanded.value = false
+                  }}
+                >
+                  Zamknij
+                </button>
+                <img
+                  src={howToSearchImage}
+                  alt="Infografika pokazujaca jak uzywac wyszukiwania"
+                  class="data-grid__filter-help-preview-image"
+                />
+              </div>
+            </div>
+          ) : null}
         </DataGridDialog>
       )
     }

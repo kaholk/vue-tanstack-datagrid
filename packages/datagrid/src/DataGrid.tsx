@@ -116,6 +116,7 @@ const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
   position: 'bottom-right',
   sumColumns: [],
   copyColumnIds: undefined,
+  copyIncludeHeaders: false,
   selectedRowsLabel: 'Zaznaczone wiersze',
   copyWithHeadersLabel: 'Kopiuj z naglowkami',
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
@@ -851,7 +852,7 @@ export default defineComponent({
         currentPointerCell.value.columnId,
       )
       previewCellRangeKeys.value = event.shiftKey
-        ? getCellRangeKeys(currentPointerCell.value)
+        ? getCellRangePreviewKeys(currentPointerCell.value)
         : new Set()
     }
 
@@ -1062,6 +1063,9 @@ export default defineComponent({
         sumColumns: props.selectionPanelConfig.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
         copyColumnIds:
           props.selectionPanelConfig.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
+        copyIncludeHeaders:
+          props.selectionPanelConfig.copyIncludeHeaders ??
+          defaultSelectionPanelConfig.copyIncludeHeaders,
         selectedRowsLabel:
           props.selectionPanelConfig.selectedRowsLabel ??
           defaultSelectionPanelConfig.selectedRowsLabel,
@@ -1162,6 +1166,14 @@ export default defineComponent({
         return false
       }
 
+      if (
+        isCellSelectionShiftDown.value &&
+        lastSelectedCell.value?.rowId === cell.row.id &&
+        lastSelectedCell.value.columnId === cell.column.id
+      ) {
+        return false
+      }
+
       return hoveredCellKey.value === getCellSelectionKey(cell.row.id, cell.column.id)
     }
 
@@ -1222,6 +1234,17 @@ export default defineComponent({
       return keys
     }
 
+    function getCellRangePreviewKeys(target: CellSelectionAnchor) {
+      const keys = getCellRangeKeys(target)
+      const anchor = lastSelectedCell.value
+
+      if (anchor) {
+        keys.delete(getCellSelectionKey(anchor.rowId, anchor.columnId))
+      }
+
+      return keys
+    }
+
     function selectCellRange(targetCell: Cell<AnyRow, unknown>) {
       const anchor = lastSelectedCell.value
       if (!anchor) {
@@ -1237,8 +1260,15 @@ export default defineComponent({
       }
 
       const nextKeys = new Set(selectedCellKeys.value)
-      for (const key of getCellRangeKeys(getCellSelectionAnchor(targetCell))) {
-        nextKeys.add(key)
+      const rangeKeys = getCellRangeKeys(getCellSelectionAnchor(targetCell))
+      rangeKeys.delete(getCellSelectionKey(anchor.rowId, anchor.columnId))
+
+      for (const key of rangeKeys) {
+        if (nextKeys.has(key)) {
+          nextKeys.delete(key)
+        } else {
+          nextKeys.add(key)
+        }
       }
 
       replaceSelectedCellKeys(nextKeys)
@@ -1265,7 +1295,7 @@ export default defineComponent({
       }
 
       hoveredCellKey.value = getCellSelectionKey(cell.row.id, cell.column.id)
-      previewCellRangeKeys.value = event.shiftKey ? getCellRangeKeys(target) : new Set()
+      previewCellRangeKeys.value = event.shiftKey ? getCellRangePreviewKeys(target) : new Set()
     }
 
     function handleCellSelectionPointerLeave(cell: Cell<AnyRow, unknown>) {
@@ -1310,6 +1340,8 @@ export default defineComponent({
       }
 
       lastSelectedCell.value = anchor
+      hoveredCellKey.value = null
+      previewCellRangeKeys.value = new Set()
       replaceSelectedCellKeys(nextKeys)
       return true
     }
@@ -2045,6 +2077,20 @@ export default defineComponent({
       return JSON.stringify(rawValue)
     }
 
+    function clearSelectedCells() {
+      selectedCellKeys.value = new Set()
+      previewCellRangeKeys.value = new Set()
+      hoveredCellKey.value = null
+      currentPointerCell.value = null
+      lastSelectedCell.value = null
+    }
+
+    function clearSelectedRows() {
+      rowSelection.value = {}
+      previewSelectionRowIds.value = new Set()
+      lastSelectedRowId.value = null
+    }
+
     async function copySelectedRows(includeHeaders: boolean) {
       const columns = selectionPanelColumns.value
       const rows = selectedRows.value
@@ -2417,15 +2463,13 @@ export default defineComponent({
                 selectedRowsCount={selectedCellCount.value}
                 selectedRowsLabel="Zaznaczone komorki"
                 sums={[]}
-                copyWithHeadersLabel="Kopiuj komorki z naglowkami"
-                copyWithoutHeadersLabel="Kopiuj komorki"
+                copyLabel="Kopiuj komorki"
+                copyIncludeHeaders={mergedSelectionPanelConfig.value?.copyIncludeHeaders ?? false}
                 allowPositionChange={mergedSelectionPanelConfig.value?.allowPositionChange ?? true}
-                onCopyWithHeaders={() => {
-                  void copySelectedCells(true)
+                onCopy={(options) => {
+                  void copySelectedCells(options.includeHeaders)
                 }}
-                onCopyWithoutHeaders={() => {
-                  void copySelectedCells(false)
-                }}
+                onClearSelection={clearSelectedCells}
                 onUpdatePosition={updateSelectionPanelPosition}
                 onUpdateFloatingPosition={updateSelectionPanelFloatingPosition}
               />
@@ -2438,6 +2482,8 @@ export default defineComponent({
                   mergedSelectionPanelConfig.value.selectedRowsLabel ?? 'Zaznaczone wiersze'
                 }
                 sums={selectionPanelSums.value}
+                copyLabel="Kopiuj wiersze"
+                copyIncludeHeaders={mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}
                 copyWithHeadersLabel={
                   mergedSelectionPanelConfig.value.copyWithHeadersLabel ??
                   'Kopiuj z naglowkami'
@@ -2447,12 +2493,16 @@ export default defineComponent({
                   'Kopiuj bez naglowkow'
                 }
                 allowPositionChange={mergedSelectionPanelConfig.value.allowPositionChange ?? true}
+                onCopy={(options) => {
+                  void copySelectedRows(options.includeHeaders)
+                }}
                 onCopyWithHeaders={() => {
                   void copySelectedRows(true)
                 }}
                 onCopyWithoutHeaders={() => {
                   void copySelectedRows(false)
                 }}
+                onClearSelection={clearSelectedRows}
                 onUpdatePosition={updateSelectionPanelPosition}
                 onUpdateFloatingPosition={updateSelectionPanelFloatingPosition}
               />

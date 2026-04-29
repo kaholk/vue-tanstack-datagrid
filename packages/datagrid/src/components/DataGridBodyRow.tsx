@@ -118,6 +118,15 @@ export default defineComponent({
             const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
             const isCellSelectionRangePreviewed =
               props.isCellSelectionRangePreviewed?.(cell) ?? false
+            const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
+              if (!event.ctrlKey) {
+                return
+              }
+
+              event.preventDefault()
+              event.stopPropagation()
+              window.getSelection()?.removeAllRanges()
+            }
 
             return (
               <div
@@ -127,6 +136,12 @@ export default defineComponent({
                   pinnedSide ? 'data-grid__cell--pinned' : '',
                   pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
                   isCellSelected ? 'data-grid__cell--selected-cell' : '',
+                  isCellSelected && isCellSelectionHovered
+                    ? 'data-grid__cell--selection-revert-hover'
+                    : '',
+                  isCellSelected && isCellSelectionRangePreviewed
+                    ? 'data-grid__cell--selection-revert-preview'
+                    : '',
                   !isCellSelected && isCellSelectionRangePreviewed
                     ? 'data-grid__cell--selection-range-preview'
                     : '',
@@ -143,6 +158,16 @@ export default defineComponent({
                 onPointerleave={(event) => {
                   props.onCellSelectionPointerLeave?.(cell, event)
                 }}
+                {...({
+                  onPointerdownCapture: preventNativeCellSelection,
+                  onMousedownCapture: preventNativeCellSelection,
+                  onClickCapture: (event: MouseEvent) => {
+                    if (props.onCellSelectionClick?.(cell, event)) {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  },
+                } as Record<string, unknown>)}
                 onClick={(event) => {
                   if (props.onCellSelectionClick?.(cell, event)) {
                     return

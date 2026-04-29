@@ -1,6 +1,6 @@
-import { defineComponent, onBeforeUnmount, ref, type CSSProperties, type PropType } from 'vue'
+import { defineComponent, onBeforeUnmount, ref, watch, type CSSProperties, type PropType } from 'vue'
 import IconContentCopyRounded from '~icons/material-symbols/content-copy-rounded'
-import IconTableRowsRounded from '~icons/material-symbols/table-rows-rounded'
+import IconCloseRounded from '~icons/material-symbols/close-rounded'
 import IconSettingsRounded from '~icons/material-symbols/settings-rounded'
 
 import type { DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../types'
@@ -9,6 +9,10 @@ type SumItem = {
   columnId: string
   label: string
   value: string
+}
+
+type CopyOptions = {
+  includeHeaders: boolean
 }
 
 const positions: DataGridSelectionPanelPosition[] = [
@@ -40,11 +44,19 @@ export default defineComponent({
     },
     copyWithHeadersLabel: {
       type: String,
-      required: true,
+      default: 'Kopiuj z naglowkami',
     },
     copyWithoutHeadersLabel: {
       type: String,
-      required: true,
+      default: 'Kopiuj bez naglowkow',
+    },
+    copyLabel: {
+      type: String,
+      default: 'Kopiuj',
+    },
+    copyIncludeHeaders: {
+      type: Boolean,
+      default: false,
     },
     allowPositionChange: {
       type: Boolean,
@@ -56,11 +68,19 @@ export default defineComponent({
     },
     onCopyWithHeaders: {
       type: Function as PropType<() => void | Promise<void>>,
-      required: true,
+      default: undefined,
     },
     onCopyWithoutHeaders: {
       type: Function as PropType<() => void | Promise<void>>,
-      required: true,
+      default: undefined,
+    },
+    onCopy: {
+      type: Function as PropType<(options: CopyOptions) => void | Promise<void>>,
+      default: undefined,
+    },
+    onClearSelection: {
+      type: Function as PropType<() => void>,
+      default: undefined,
     },
     onUpdatePosition: {
       type: Function as PropType<(position: DataGridSelectionPanelPosition) => void>,
@@ -72,7 +92,8 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const copiedButton = ref<'withHeaders' | 'withoutHeaders' | null>(null)
+    const copiedButton = ref<'copy' | null>(null)
+    const includeHeaders = ref(props.copyIncludeHeaders)
     const isSettingsOpen = ref(false)
     const panelRef = ref<HTMLDivElement | null>(null)
     let activePointerId: number | null = null
@@ -80,8 +101,15 @@ export default defineComponent({
     let dragOffsetY = 0
     let resetTimer: ReturnType<typeof setTimeout> | undefined
 
-    function showCopiedState(target: 'withHeaders' | 'withoutHeaders') {
-      copiedButton.value = target
+    watch(
+      () => props.copyIncludeHeaders,
+      (value) => {
+        includeHeaders.value = value
+      },
+    )
+
+    function showCopiedState() {
+      copiedButton.value = 'copy'
 
       if (resetTimer) {
         clearTimeout(resetTimer)
@@ -92,14 +120,18 @@ export default defineComponent({
       }, 1400)
     }
 
-    async function handleCopy(target: 'withHeaders' | 'withoutHeaders') {
-      if (target === 'withHeaders') {
-        await props.onCopyWithHeaders()
+    async function handleCopy() {
+      if (props.onCopy) {
+        await props.onCopy({
+          includeHeaders: includeHeaders.value,
+        })
+      } else if (includeHeaders.value) {
+        await props.onCopyWithHeaders?.()
       } else {
-        await props.onCopyWithoutHeaders()
+        await props.onCopyWithoutHeaders?.()
       }
 
-      showCopiedState(target)
+      showCopiedState()
     }
 
     onBeforeUnmount(() => {
@@ -209,7 +241,7 @@ export default defineComponent({
             props.position === 'floating' ? 'data-grid__selection-panel-toolbar--draggable' : '',
           ]}
           onPointerdown={(event) => {
-            if ((event.target as HTMLElement)?.closest('button')) {
+            if ((event.target as HTMLElement)?.closest('button, input, label')) {
               return
             }
 
@@ -228,75 +260,83 @@ export default defineComponent({
               class={[
                 'data-grid__selection-panel-button',
                 'data-grid__selection-panel-button--icon',
-                copiedButton.value === 'withHeaders'
-                  ? 'data-grid__selection-panel-button--success'
-                  : '',
+                copiedButton.value === 'copy' ? 'data-grid__selection-panel-button--success' : '',
               ]}
-              title={props.copyWithHeadersLabel}
-              aria-label={props.copyWithHeadersLabel}
+              title={props.copyLabel}
+              aria-label={props.copyLabel}
               onClick={() => {
-                void handleCopy('withHeaders')
+                void handleCopy()
               }}
             >
-              <IconTableRowsRounded class="data-grid__icon" />
+              <IconContentCopyRounded class="data-grid__icon" />
             </button>
             <button
               type="button"
               class={[
                 'data-grid__selection-panel-button',
                 'data-grid__selection-panel-button--icon',
-                copiedButton.value === 'withoutHeaders'
-                  ? 'data-grid__selection-panel-button--success'
-                  : '',
               ]}
-              title={props.copyWithoutHeadersLabel}
-              aria-label={props.copyWithoutHeadersLabel}
+              title="Wyczysc zaznaczenie"
+              aria-label="Wyczysc zaznaczenie"
               onClick={() => {
-                void handleCopy('withoutHeaders')
+                props.onClearSelection?.()
               }}
             >
-              <IconContentCopyRounded class="data-grid__icon" />
+              <IconCloseRounded class="data-grid__icon" />
             </button>
-            {props.allowPositionChange ? (
-              <div class="data-grid__selection-panel-settings">
-                <button
-                  type="button"
-                  class={[
-                    'data-grid__selection-panel-button',
-                    'data-grid__selection-panel-button--icon',
-                  ]}
-                  title="Pozycja panelu"
-                  aria-label="Pozycja panelu"
-                  onClick={() => {
-                    isSettingsOpen.value = !isSettingsOpen.value
-                  }}
-                >
-                  <IconSettingsRounded class="data-grid__icon" />
-                </button>
-                {isSettingsOpen.value ? (
-                  <div class="data-grid__selection-panel-settings-menu">
-                    {positions.map((position) => (
-                      <button
-                        key={position}
-                        type="button"
-                        class={[
-                          'data-grid__selection-panel-settings-option',
-                          position === props.position
-                            ? 'data-grid__selection-panel-settings-option--active'
-                            : '',
-                        ]}
-                        onClick={() => {
-                          props.onUpdatePosition?.(position)
-                          isSettingsOpen.value = false
+            <div class="data-grid__selection-panel-settings">
+              <button
+                type="button"
+                class={[
+                  'data-grid__selection-panel-button',
+                  'data-grid__selection-panel-button--icon',
+                ]}
+                title="Ustawienia kopiowania"
+                aria-label="Ustawienia kopiowania"
+                onClick={() => {
+                  isSettingsOpen.value = !isSettingsOpen.value
+                }}
+              >
+                <IconSettingsRounded class="data-grid__icon" />
+              </button>
+              {isSettingsOpen.value ? (
+                <div class="data-grid__selection-panel-settings-menu">
+                    <label class="data-grid__selection-panel-settings-choice">
+                      <input
+                        type="checkbox"
+                        checked={includeHeaders.value}
+                        onChange={(event) => {
+                          includeHeaders.value = (event.target as HTMLInputElement).checked
                         }}
-                      >
-                        {position}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+                      />
+                      <span>Kopiuj naglowki</span>
+                    </label>
+                    {props.allowPositionChange ? (
+                      <div class="data-grid__selection-panel-settings-divider" />
+                    ) : null}
+                  {props.allowPositionChange ? (
+                    positions.map((position) => (
+                        <button
+                          key={position}
+                          type="button"
+                          class={[
+                            'data-grid__selection-panel-settings-option',
+                            position === props.position
+                              ? 'data-grid__selection-panel-settings-option--active'
+                              : '',
+                          ]}
+                          onClick={() => {
+                            props.onUpdatePosition?.(position)
+                            isSettingsOpen.value = false
+                          }}
+                        >
+                          {position}
+                        </button>
+                      ))
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
