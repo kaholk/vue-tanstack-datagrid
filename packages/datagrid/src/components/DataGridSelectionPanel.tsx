@@ -39,6 +39,14 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    secondarySelectedRowsCount: {
+      type: Number,
+      default: 0,
+    },
+    secondarySelectedRowsLabel: {
+      type: String,
+      default: '',
+    },
     sums: {
       type: Array as PropType<SumItem[]>,
       required: true,
@@ -254,6 +262,11 @@ export default defineComponent({
             <span class="data-grid__selection-panel-count">
               {props.selectedRowsLabel}: {props.selectedRowsCount}
             </span>
+            {props.secondarySelectedRowsLabel && props.secondarySelectedRowsCount > 0 ? (
+              <span class="data-grid__selection-panel-count">
+                {props.secondarySelectedRowsLabel}: {props.secondarySelectedRowsCount}
+              </span>
+            ) : null}
           </div>
 
           <div class="data-grid__selection-panel-actions">

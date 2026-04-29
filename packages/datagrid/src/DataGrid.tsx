@@ -73,6 +73,10 @@ type RequestState<TData extends AnyRow> = {
   meta?: Record<string, unknown>
 }
 
+type LoadDataOptions = {
+  force?: boolean
+}
+
 type FilterDialogSection = {
   id: string
   label: string
@@ -698,6 +702,8 @@ export default defineComponent({
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined
     let activeController: AbortController | null = null
+    let activeRequestKey = ''
+    let loadedRequestKey = ''
     let activeRequestId = 0
     let measureFrame: number | null = null
     let isUnmounted = false
@@ -1606,26 +1612,35 @@ export default defineComponent({
       return Array.from(requested)
     })
 
-    async function loadData() {
+    async function loadData(options: LoadDataOptions = {}) {
+      const params: DataGridFetchParams = {
+        pageIndex: pagination.value.pageIndex,
+        pageSize: pagination.value.pageSize,
+        sorting: sorting.value,
+        filters: columnFilters.value,
+        search: globalFilter.value.trim() || undefined,
+        include_columns: requestedServerColumns.value,
+      }
+      const requestKey = JSON.stringify(params)
+
+      if (!options.force && (requestKey === activeRequestKey || requestKey === loadedRequestKey)) {
+        return
+      }
+
+      if (activeController) {
+        activeController.abort()
+      }
+
       const requestId = activeRequestId + 1
       activeRequestId = requestId
       const controller = new AbortController()
       activeController = controller
+      activeRequestKey = requestKey
       isLoading.value = true
       errorMessage.value = ''
 
       try {
-        const response = await props.fetchPage(
-          {
-            pageIndex: pagination.value.pageIndex,
-            pageSize: pagination.value.pageSize,
-            sorting: sorting.value,
-            filters: columnFilters.value,
-            search: globalFilter.value.trim() || undefined,
-            include_columns: requestedServerColumns.value,
-          },
-          controller.signal,
-        )
+        const response = await props.fetchPage(params, controller.signal)
 
         if (isUnmounted || requestId !== activeRequestId) {
           return
@@ -1639,6 +1654,7 @@ export default defineComponent({
         }
 
         rowVirtualizer.value.scrollToOffset(0)
+        loadedRequestKey = requestKey
       } catch (error) {
         if (
           isUnmounted ||
@@ -1660,6 +1676,10 @@ export default defineComponent({
       } finally {
         if (activeController === controller) {
           activeController = null
+        }
+
+        if (activeRequestKey === requestKey) {
+          activeRequestKey = ''
         }
 
         if (!isUnmounted && requestId === activeRequestId) {
@@ -1841,7 +1861,7 @@ export default defineComponent({
         clearTimeout(debounceTimer)
       }
 
-      void loadData()
+      void loadData({ force: true })
     }
 
     function clearAllFilters() {
@@ -1849,10 +1869,10 @@ export default defineComponent({
         ...pagination.value,
         pageIndex: 0,
       }
-      columnFilters.value = []
-      globalFilter.value = ''
-      draftColumnFilters.value = []
-      draftGlobalFilter.value = ''
+      columnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
+      globalFilter.value = mergedInitialState.value.globalFilter ?? ''
+      draftColumnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
+      draftGlobalFilter.value = mergedInitialState.value.globalFilter ?? ''
       closeFilterMenus()
     }
 
@@ -2462,6 +2482,10 @@ export default defineComponent({
                 }
                 selectedRowsCount={selectedCellCount.value}
                 selectedRowsLabel="Zaznaczone komorki"
+                secondarySelectedRowsCount={selectedRows.value.length}
+                secondarySelectedRowsLabel={
+                  mergedSelectionPanelConfig.value?.selectedRowsLabel ?? 'Zaznaczone wiersze'
+                }
                 sums={[]}
                 copyLabel="Kopiuj komorki"
                 copyIncludeHeaders={mergedSelectionPanelConfig.value?.copyIncludeHeaders ?? false}
