@@ -3,6 +3,7 @@ import IconContentCopyRounded from '~icons/material-symbols/content-copy-rounded
 import IconCloseRounded from '~icons/material-symbols/close-rounded'
 import IconSettingsRounded from '~icons/material-symbols/settings-rounded'
 
+import DataGridDropdownMenu from './DataGridDropdownMenu'
 import type { DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../types'
 
 type SumItem = {
@@ -96,6 +97,7 @@ export default defineComponent({
     const includeHeaders = ref(props.copyIncludeHeaders)
     const isSettingsOpen = ref(false)
     const panelRef = ref<HTMLDivElement | null>(null)
+    const settingsTriggerRef = ref<HTMLElement | null>(null)
     let activePointerId: number | null = null
     let dragOffsetX = 0
     let dragOffsetY = 0
@@ -286,7 +288,9 @@ export default defineComponent({
             </button>
             <div class="data-grid__selection-panel-settings">
               <button
+                ref={settingsTriggerRef}
                 type="button"
+                data-grid-selection-panel-settings-root="true"
                 class={[
                   'data-grid__selection-panel-button',
                   'data-grid__selection-panel-button--icon',
@@ -300,41 +304,61 @@ export default defineComponent({
                 <IconSettingsRounded class="data-grid__icon" />
               </button>
               {isSettingsOpen.value ? (
-                <div class="data-grid__selection-panel-settings-menu">
-                    <label class="data-grid__selection-panel-settings-choice">
-                      <input
-                        type="checkbox"
-                        checked={includeHeaders.value}
-                        onChange={(event) => {
-                          includeHeaders.value = (event.target as HTMLInputElement).checked
-                        }}
-                      />
-                      <span>Kopiuj naglowki</span>
-                    </label>
-                    {props.allowPositionChange ? (
-                      <div class="data-grid__selection-panel-settings-divider" />
-                    ) : null}
+                <DataGridDropdownMenu
+                  triggerRef={settingsTriggerRef}
+                  teleport
+                  menuClass="data-grid__selection-panel-settings-menu"
+                  scopeAttr="data-grid-selection-panel-settings-root"
+                  minWidth={160}
+                  desiredHeight={250}
+                  minAvailableHeight={120}
+                  viewportMargin={8}
+                  offset={6}
+                  zIndex={230}
+                  outsideClickRootAttr="data-grid-selection-panel-settings-root"
+                  onOutsidePointerDown={() => {
+                    isSettingsOpen.value = false
+                  }}
+                >
+                  <label
+                    class="data-grid__selection-panel-settings-choice"
+                    data-grid-selection-panel-settings-root="true"
+                  >
+                    <input
+                      data-grid-selection-panel-settings-root="true"
+                      type="checkbox"
+                      checked={includeHeaders.value}
+                      onChange={(event) => {
+                        includeHeaders.value = (event.target as HTMLInputElement).checked
+                      }}
+                    />
+                    <span>Kopiuj naglowki</span>
+                  </label>
+                  {props.allowPositionChange ? (
+                    <div class="data-grid__selection-panel-settings-divider" />
+                  ) : null}
                   {props.allowPositionChange ? (
                     positions.map((position) => (
-                        <button
-                          key={position}
-                          type="button"
-                          class={[
-                            'data-grid__selection-panel-settings-option',
-                            position === props.position
-                              ? 'data-grid__selection-panel-settings-option--active'
-                              : '',
-                          ]}
-                          onClick={() => {
-                            props.onUpdatePosition?.(position)
-                            isSettingsOpen.value = false
-                          }}
-                        >
-                          {position}
-                        </button>
-                      ))
+                      <button
+                        key={position}
+                        type="button"
+                        data-grid-selection-panel-settings-root="true"
+                        class={[
+                          'data-grid__selection-panel-settings-option',
+                          position === props.position
+                            ? 'data-grid__selection-panel-settings-option--active'
+                            : '',
+                        ]}
+                        onClick={() => {
+                          props.onUpdatePosition?.(position)
+                          isSettingsOpen.value = false
+                        }}
+                      >
+                        {position}
+                      </button>
+                    ))
                   ) : null}
-                </div>
+                </DataGridDropdownMenu>
               ) : null}
             </div>
           </div>
