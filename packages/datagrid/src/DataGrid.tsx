@@ -5,12 +5,13 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  shallowRef,
   watch,
   type CSSProperties,
   type PropType,
+  type VNodeChild,
 } from 'vue'
 import {
-  FlexRender,
   getCoreRowModel,
   useVueTable,
   type Cell,
@@ -453,6 +454,14 @@ function escapeClipboardCell(value: string) {
   return value
 }
 
+function renderFlexibleContent(render: unknown, props: Record<string, unknown>): VNodeChild {
+  if (typeof render === 'function' || (typeof render === 'object' && render !== null)) {
+    return h(render as never, props)
+  }
+
+  return render as VNodeChild
+}
+
 export default defineComponent({
   name: 'DataGrid',
   props: {
@@ -532,7 +541,7 @@ export default defineComponent({
       label: props.loadingConfig?.label ?? defaultLoadingConfig.label,
     }))
     const lastSelectedRowId = ref<string | null>(null)
-    const previewSelectionRowIds = ref<Set<string>>(new Set())
+    const previewSelectionRowIds = shallowRef<Set<string>>(new Set())
     const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(
       props.selectionPanelConfig?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right',
     )
@@ -684,10 +693,10 @@ export default defineComponent({
     const columnFilters = ref<ColumnFiltersState>(mergedInitialState.value.columnFilters ?? [])
     const globalFilter = ref(mergedInitialState.value.globalFilter ?? '')
     const rowSelection = ref<RowSelectionState>({})
-    const selectedCellKeys = ref<Set<string>>(new Set())
+    const selectedCellKeys = shallowRef<Set<string>>(new Set())
     const currentPointerCell = ref<CellSelectionAnchor | null>(null)
     const hoveredCellKey = ref<string | null>(null)
-    const previewCellRangeKeys = ref<Set<string>>(new Set())
+    const previewCellRangeKeys = shallowRef<Set<string>>(new Set())
     const lastSelectedCell = ref<CellSelectionAnchor | null>(null)
     const isCellSelectionCtrlDown = ref(false)
     const isCellSelectionShiftDown = ref(false)
@@ -701,7 +710,7 @@ export default defineComponent({
     const columnMoveTargetById = ref<Record<string, string>>({})
     const draftColumnFilters = ref<ColumnFiltersState>([])
     const draftGlobalFilter = ref('')
-    const requestState = ref<RequestState<AnyRow>>({
+    const requestState = shallowRef<RequestState<AnyRow>>({
       rows: [],
       totalRows: 0,
       pageCount: 0,
@@ -2114,10 +2123,7 @@ export default defineComponent({
         align: columnDef.align ?? 'start',
       }
 
-      return h(FlexRender, {
-        render: cell.column.columnDef.cell,
-        props: renderProps,
-      })
+      return renderFlexibleContent(cell.column.columnDef.cell, renderProps as Record<string, unknown>)
     }
 
     function closeColumnMenu() {
