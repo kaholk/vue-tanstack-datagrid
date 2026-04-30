@@ -106,6 +106,16 @@ type CellSelectionAnchor = {
   columnId: string
 }
 
+type SelectionPanelSection = {
+  id: string
+  label: string
+  count: number
+  copyLabel: string
+  clearLabel: string
+  onCopy: (options: { includeHeaders: boolean }) => void | Promise<void>
+  onClear: () => void
+}
+
 const headerHeight = 92
 const defaultMetaItems: DataGridMetaConfig[] = [
   { key: 'rows', label: 'Rows' },
@@ -1110,6 +1120,22 @@ export default defineComponent({
       })
     })
     const selectedCellCount = computed(() => selectedCellKeys.value.size)
+    const selectedColumnIds = computed(() => {
+      const columns: string[] = []
+
+      for (const column of cellSelectionColumns.value) {
+        if (
+          visibleRows.value.length > 0 &&
+          visibleRows.value.every((row) =>
+            selectedCellKeys.value.has(getCellSelectionKey(row.id, column.id)),
+          )
+        ) {
+          columns.push(column.id)
+        }
+      }
+
+      return columns
+    })
     const selectedCellRows = computed(() => {
       if (selectedCellKeys.value.size === 0) {
         return []
@@ -1350,6 +1376,38 @@ export default defineComponent({
       previewCellRangeKeys.value = new Set()
       replaceSelectedCellKeys(nextKeys)
       return true
+    }
+
+    function toggleColumnSelection(column: Column<AnyRow, unknown>) {
+      if (!isCellSelectionColumn(column)) {
+        return
+      }
+
+      const columnKeys = visibleRows.value.map((row) => getCellSelectionKey(row.id, column.id))
+      if (columnKeys.length === 0) {
+        return
+      }
+
+      const nextKeys = new Set(selectedCellKeys.value)
+      const isFullySelected = columnKeys.every((key) => nextKeys.has(key))
+
+      for (const key of columnKeys) {
+        if (isFullySelected) {
+          nextKeys.delete(key)
+        } else {
+          nextKeys.add(key)
+        }
+      }
+
+      const firstRow = visibleRows.value[0]
+      if (firstRow) {
+        lastSelectedCell.value = {
+          rowId: firstRow.id,
+          columnId: column.id,
+        }
+      }
+
+      replaceSelectedCellKeys(nextKeys)
     }
 
     const { closeFilterMenus, getColumnFilterConfig, renderFilterControl } = useDataGridFilters({
@@ -2111,6 +2169,28 @@ export default defineComponent({
       lastSelectedRowId.value = null
     }
 
+    function clearAllSelection() {
+      clearSelectedRows()
+      clearSelectedCells()
+    }
+
+    function clearSelectedColumns() {
+      if (selectedColumnIds.value.length === 0) {
+        return
+      }
+
+      const columnIds = new Set(selectedColumnIds.value)
+      selectedCellKeys.value = new Set(
+        [...selectedCellKeys.value].filter((key) => {
+          const [, columnId] = key.split('::')
+          return !columnId || !columnIds.has(columnId)
+        }),
+      )
+      previewCellRangeKeys.value = new Set()
+      hoveredCellKey.value = null
+      currentPointerCell.value = null
+    }
+
     async function copySelectedRows(includeHeaders: boolean) {
       const columns = selectionPanelColumns.value
       const rows = selectedRows.value
@@ -2165,6 +2245,58 @@ export default defineComponent({
       }
 
       await navigator.clipboard.writeText(lines.join('\n'))
+    }
+
+    async function copyAllSelection(includeHeaders: boolean) {
+      const parts: string[] = []
+
+      if (selectedRows.value.length > 0) {
+        const columns = selectionPanelColumns.value
+        const lines: string[] = []
+
+        if (includeHeaders) {
+          lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
+        }
+
+        for (const row of selectedRows.value) {
+          lines.push(
+            columns
+              .map((column) => escapeClipboardCell(getClipboardCellValue(row, column)))
+              .join('\t'),
+          )
+        }
+
+        parts.push(lines.join('\n'))
+      }
+
+      if (selectedCellCount.value > 0) {
+        const columns = cellSelectionColumns.value.filter((column) =>
+          selectedCellRows.value.some((row) => row.selectedColumnIds.includes(column.id)),
+        )
+        const lines: string[] = []
+
+        if (includeHeaders) {
+          lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
+        }
+
+        for (const rowEntry of selectedCellRows.value) {
+          lines.push(
+            columns
+              .map((column) =>
+                rowEntry.selectedColumnIds.includes(column.id)
+                  ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column))
+                  : '',
+              )
+              .join('\t'),
+          )
+        }
+
+        parts.push(lines.join('\n'))
+      }
+
+      if (parts.length > 0 && typeof navigator !== 'undefined') {
+        await navigator.clipboard.writeText(parts.join('\n\n'))
+      }
     }
 
     const selectionPanelSums = computed(() => {
@@ -2284,6 +2416,43 @@ export default defineComponent({
       const pageCount = requestState.value.pageCount
       const pageIndex = pagination.value.pageIndex
       const paginationItems = buildPaginationItems(pageCount, pageIndex)
+      const selectionPanelSections: SelectionPanelSection[] = []
+
+      if (selectedRows.value.length > 0) {
+        selectionPanelSections.push({
+          id: 'rows',
+          label: mergedSelectionPanelConfig.value?.selectedRowsLabel ?? 'Zaznaczone wiersze',
+          count: selectedRows.value.length,
+          copyLabel: 'Kopiuj wiersze',
+          clearLabel: 'Wyczysc wiersze',
+          onCopy: (options: { includeHeaders: boolean }) => copySelectedRows(options.includeHeaders),
+          onClear: clearSelectedRows,
+        })
+      }
+
+      if (selectedColumnIds.value.length > 0) {
+        selectionPanelSections.push({
+          id: 'columns',
+          label: 'Zaznaczone kolumny',
+          count: selectedColumnIds.value.length,
+          copyLabel: 'Kopiuj kolumny',
+          clearLabel: 'Wyczysc kolumny',
+          onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
+          onClear: clearSelectedColumns,
+        })
+      }
+
+      if (selectedCellCount.value > 0) {
+        selectionPanelSections.push({
+          id: 'cells',
+          label: 'Zaznaczone komorki',
+          count: selectedCellCount.value,
+          copyLabel: 'Kopiuj komorki',
+          clearLabel: 'Wyczysc komorki',
+          onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
+          onClear: clearSelectedCells,
+        })
+      }
 
       return (
         <section
@@ -2405,6 +2574,15 @@ export default defineComponent({
                             style={{
                               ...cellStylesByColumnId.value.get(entry.column.id),
                             }}
+                            onClick={(event) => {
+                              if (!event.shiftKey) {
+                                return
+                              }
+
+                              event.preventDefault()
+                              event.stopPropagation()
+                              toggleColumnSelection(entry.column)
+                            }}
                           >
                             <DataGridHeaderCell
                               header={entry.item.getContext()}
@@ -2472,41 +2650,22 @@ export default defineComponent({
                 </div>
               ) : null}
             </div>
-            {selectedCellCount.value > 0 ? (
+            {mergedSelectionPanelConfig.value && selectionPanelSections.length > 0 ? (
               <DataGridSelectionPanel
-                position={mergedSelectionPanelConfig.value?.position ?? selectionPanelPosition.value ?? 'bottom-right'}
+                position={mergedSelectionPanelConfig.value.position ?? selectionPanelPosition.value ?? 'bottom-right'}
                 floatingPosition={
-                  mergedSelectionPanelConfig.value?.floatingPosition ??
+                  mergedSelectionPanelConfig.value.floatingPosition ??
                   selectionPanelFloatingPosition.value ??
                   null
                 }
-                selectedRowsCount={selectedCellCount.value}
-                selectedRowsLabel="Zaznaczone komorki"
-                secondarySelectedRowsCount={selectedRows.value.length}
-                secondarySelectedRowsLabel={
-                  mergedSelectionPanelConfig.value?.selectedRowsLabel ?? 'Zaznaczone wiersze'
-                }
-                sums={[]}
-                copyLabel="Kopiuj komorki"
-                copyIncludeHeaders={mergedSelectionPanelConfig.value?.copyIncludeHeaders ?? false}
-                allowPositionChange={mergedSelectionPanelConfig.value?.allowPositionChange ?? true}
-                onCopy={(options) => {
-                  void copySelectedCells(options.includeHeaders)
-                }}
-                onClearSelection={clearSelectedCells}
-                onUpdatePosition={updateSelectionPanelPosition}
-                onUpdateFloatingPosition={updateSelectionPanelFloatingPosition}
-              />
-            ) : mergedSelectionPanelConfig.value && selectedRows.value.length > 0 ? (
-              <DataGridSelectionPanel
-                position={mergedSelectionPanelConfig.value.position ?? 'bottom-right'}
-                floatingPosition={mergedSelectionPanelConfig.value.floatingPosition ?? null}
-                selectedRowsCount={selectedRows.value.length}
-                selectedRowsLabel={
-                  mergedSelectionPanelConfig.value.selectedRowsLabel ?? 'Zaznaczone wiersze'
-                }
+                selectedRowsCount={selectionPanelSections.reduce(
+                  (total, section) => total + section.count,
+                  0,
+                )}
+                selectedRowsLabel="Zaznaczone razem"
+                sections={selectionPanelSections}
                 sums={selectionPanelSums.value}
-                copyLabel="Kopiuj wiersze"
+                copyLabel="Kopiuj wszystko"
                 copyIncludeHeaders={mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}
                 copyWithHeadersLabel={
                   mergedSelectionPanelConfig.value.copyWithHeadersLabel ??
@@ -2518,15 +2677,9 @@ export default defineComponent({
                 }
                 allowPositionChange={mergedSelectionPanelConfig.value.allowPositionChange ?? true}
                 onCopy={(options) => {
-                  void copySelectedRows(options.includeHeaders)
+                  void copyAllSelection(options.includeHeaders)
                 }}
-                onCopyWithHeaders={() => {
-                  void copySelectedRows(true)
-                }}
-                onCopyWithoutHeaders={() => {
-                  void copySelectedRows(false)
-                }}
-                onClearSelection={clearSelectedRows}
+                onClearSelection={clearAllSelection}
                 onUpdatePosition={updateSelectionPanelPosition}
                 onUpdateFloatingPosition={updateSelectionPanelFloatingPosition}
               />

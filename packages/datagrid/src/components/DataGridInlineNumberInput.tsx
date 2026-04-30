@@ -32,6 +32,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    decimalSeparator: {
+      type: String as PropType<'.' | ',' | 'both'>,
+      default: 'both',
+    },
     onUpdateModelValue: {
       type: Function as PropType<(value: string) => void>,
       required: true,
@@ -61,8 +65,16 @@ export default defineComponent({
       nextTick(() => inputRef.value?.focus())
     })
 
+    function normalizeValue(value: string) {
+      return props.decimalSeparator === ',' || props.decimalSeparator === 'both'
+        ? value.replace(',', '.')
+        : value
+    }
+
     function saveAndClose() {
-      props.onUpdateModelValue(localValue.value)
+      const normalizedValue = normalizeValue(localValue.value)
+      localValue.value = normalizedValue
+      props.onUpdateModelValue(normalizedValue)
       if (props.onEnter) {
         props.onEnter(localValue.value)
         return
@@ -103,13 +115,14 @@ export default defineComponent({
                   'data-grid__inline-number-input',
                   props.loading ? 'data-grid__inline-number-input--loading' : '',
                 ]}
-                type={props.type}
+                type={props.decimalSeparator === ',' || props.decimalSeparator === 'both' ? 'text' : props.type}
+                inputmode="decimal"
                 step={props.step}
                 min={props.min}
                 value={localValue.value}
                 data-grid-inline-select-root="true"
                 onInput={(event) => {
-                  localValue.value = (event.target as HTMLInputElement).value
+                  localValue.value = (event.target as HTMLInputElement).value.replace(',', '.')
                 }}
                 onKeydown={(event) => {
                   if (event.key === 'Enter') {

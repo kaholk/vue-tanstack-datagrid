@@ -16,6 +16,16 @@ type CopyOptions = {
   includeHeaders: boolean
 }
 
+type SelectionPanelSection = {
+  id: string
+  label: string
+  count: number
+  copyLabel: string
+  clearLabel: string
+  onCopy: (options: CopyOptions) => void | Promise<void>
+  onClear: () => void
+}
+
 const positions: DataGridSelectionPanelPosition[] = [
   'bottom-right',
   'bottom-left',
@@ -50,6 +60,10 @@ export default defineComponent({
     sums: {
       type: Array as PropType<SumItem[]>,
       required: true,
+    },
+    sections: {
+      type: Array as PropType<SelectionPanelSection[]>,
+      default: () => [],
     },
     copyWithHeadersLabel: {
       type: String,
@@ -141,6 +155,13 @@ export default defineComponent({
         await props.onCopyWithoutHeaders?.()
       }
 
+      showCopiedState()
+    }
+
+    async function handleSectionCopy(section: SelectionPanelSection) {
+      await section.onCopy({
+        includeHeaders: includeHeaders.value,
+      })
       showCopiedState()
     }
 
@@ -376,6 +397,40 @@ export default defineComponent({
             </div>
           </div>
         </div>
+
+        {props.sections.length > 0 ? (
+          <div class="data-grid__selection-panel-sections">
+            {props.sections.map((section) => (
+              <div key={section.id} class="data-grid__selection-panel-section">
+                <span class="data-grid__selection-panel-section-label">
+                  {section.label}: {section.count}
+                </span>
+                <div class="data-grid__selection-panel-section-actions">
+                  <button
+                    type="button"
+                    class="data-grid__selection-panel-button data-grid__selection-panel-button--icon"
+                    title={section.copyLabel}
+                    aria-label={section.copyLabel}
+                    onClick={() => {
+                      void handleSectionCopy(section)
+                    }}
+                  >
+                    <IconContentCopyRounded class="data-grid__icon" />
+                  </button>
+                  <button
+                    type="button"
+                    class="data-grid__selection-panel-button data-grid__selection-panel-button--icon"
+                    title={section.clearLabel}
+                    aria-label={section.clearLabel}
+                    onClick={() => section.onClear()}
+                  >
+                    <IconCloseRounded class="data-grid__icon" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {props.sums.length > 0 ? (
           <div class="data-grid__selection-panel-sums">

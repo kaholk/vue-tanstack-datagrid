@@ -180,7 +180,14 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function getFilterOptions(config: DataGridFilterConfig) {
-    const filterOptions = [...(config.options ?? [])]
+    const filterOptions = [
+      ...(config.optionsResolver?.({
+        columnFilters: options.columnFilters.value,
+        draftColumnFilters: options.draftColumnFilters.value,
+      }) ??
+        config.options ??
+        []),
+    ]
 
     if (config.includeEmptyOption) {
       filterOptions.unshift({
@@ -202,7 +209,9 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       variant: columnDef.filterVariant,
       textFallback: columnDef.filterTextFallback,
       valueSeparator: columnDef.filterValueSeparator,
-      options: columnDef.filterOptions,
+      options: Array.isArray(columnDef.filterOptions) ? columnDef.filterOptions : undefined,
+      optionsResolver:
+        typeof columnDef.filterOptions === 'function' ? columnDef.filterOptions : undefined,
       includeEmptyOption: columnDef.filterIncludeEmptyOption,
       emptyOptionLabel: columnDef.filterEmptyOptionLabel,
       placeholder: columnDef.filterPlaceholder ?? 'Filtr',

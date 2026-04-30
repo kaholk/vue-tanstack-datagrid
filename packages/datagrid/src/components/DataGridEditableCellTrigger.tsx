@@ -12,7 +12,7 @@ export default defineComponent({
       default: '',
     },
     align: {
-      type: String as PropType<'start' | 'center'>,
+      type: String as PropType<'start' | 'center' | 'end'>,
       default: 'start',
     },
     multiline: {
@@ -35,6 +35,7 @@ export default defineComponent({
           'data-grid__editable-trigger',
           props.editable ? 'data-grid__editable-trigger--editable' : '',
           props.align === 'center' ? 'data-grid__editable-trigger--center' : '',
+          props.align === 'end' ? 'data-grid__editable-trigger--end' : '',
           props.multiline ? 'data-grid__editable-trigger--multiline' : '',
           props.truncate ? 'data-grid__editable-trigger--truncate' : '',
         ]}

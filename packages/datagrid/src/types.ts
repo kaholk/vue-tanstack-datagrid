@@ -23,6 +23,11 @@ export type DataGridFilterOption = {
   value: DataGridFilterOptionValue
 }
 
+export type DataGridFilterOptionsResolver = (context: {
+  columnFilters: ColumnFiltersState
+  draftColumnFilters: ColumnFiltersState
+}) => DataGridFilterOption[]
+
 export type DataGridCellContext<TData extends RowData> = {
   cell: Cell<TData, unknown>
   row: Row<TData>
@@ -37,6 +42,7 @@ export type DataGridFilterConfig = {
   textFallback?: boolean
   valueSeparator?: string
   options?: DataGridFilterOption[]
+  optionsResolver?: DataGridFilterOptionsResolver
   includeEmptyOption?: boolean
   emptyOptionLabel?: string
   placeholder?: string
@@ -121,7 +127,7 @@ export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & 
   filterTextFallback?: boolean
   filterValueSeparator?: string
   filterGroup?: string
-  filterOptions?: DataGridFilterOption[]
+  filterOptions?: DataGridFilterOption[] | DataGridFilterOptionsResolver
   filterIncludeEmptyOption?: boolean
   filterEmptyOptionLabel?: string
   filterPlaceholder?: string
