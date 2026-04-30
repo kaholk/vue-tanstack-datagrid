@@ -151,6 +151,14 @@ export type DataGridFetchResult<TData> = {
   meta?: Record<string, unknown>
 }
 
+export type DataGridRowId = string | number
+
+export type DataGridInstance<TData extends RowData = RowData> = {
+  refreshData: () => void
+  patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => void
+  replaceRow: (rowId: DataGridRowId, row: TData) => void
+}
+
 export type DataGridInitialState = {
   pagination?: PaginationState
   sorting?: ColumnSort[]

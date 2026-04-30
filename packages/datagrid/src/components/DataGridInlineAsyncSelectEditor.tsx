@@ -213,7 +213,11 @@ export default defineComponent({
                   type="button"
                   class="data-grid__filter-select-action"
                   data-grid-inline-select-root="true"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    selectedOption.value = null
+                    searchValue.value = ''
                     props.onUpdateModelValue(null)
                     props.onClose?.()
                   }}

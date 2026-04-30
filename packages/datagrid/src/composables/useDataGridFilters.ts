@@ -17,7 +17,21 @@ type UseDataGridFiltersOptions = {
 }
 
 function toFilterOptionKey(value: DataGridFilterOption['value']) {
-  return value === null ? '__data_grid_empty__' : String(value)
+  return value === null ? '__data_grid_null__' : String(value)
+}
+
+function toFilterTextToken(value: DataGridFilterOption['value']) {
+  return value === null || value === '' ? '""' : String(value)
+}
+
+function getFilterOptionValueFromText(value: string, options: DataGridFilterOption[]) {
+  if (value === '""' || value === "''") {
+    const emptyOption = options.find((option) => option.value === null || option.value === '')
+    return emptyOption?.value ?? null
+  }
+
+  const matchingOption = options.find((option) => String(option.value ?? '') === value)
+  return matchingOption?.value ?? value
 }
 
 export function useDataGridFilters(options: UseDataGridFiltersOptions) {
@@ -91,7 +105,10 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     const rawValue = getFilterRawValue(config.id, target)
 
     if (Array.isArray(rawValue)) {
-      return rawValue.map((value) => String(value ?? '')).filter(Boolean).join(config.valueSeparator ?? '|')
+      return rawValue
+        .map((value) => toFilterTextToken(value as DataGridFilterOption['value']))
+        .filter((value) => value !== '')
+        .join(config.valueSeparator ?? '|')
     }
 
     return String(rawValue ?? '')
@@ -118,16 +135,13 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return []
     }
 
+    const filterOptions = getFilterOptions(config)
+
     return rawValue
       .split(config.valueSeparator ?? '|')
       .map((value) => value.trim())
-      .filter(Boolean)
-      .map((value) => {
-        const matchingOption = getFilterOptions(config).find(
-          (option) => String(option.value ?? '') === value,
-        )
-        return matchingOption?.value ?? value
-      })
+      .filter((value) => value !== '')
+      .map((value) => getFilterOptionValueFromText(value, filterOptions))
   }
 
   function toggleFilterMenu(
@@ -374,7 +388,10 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
         textFallbackFilterIds.value = nextIds
         const nextValue =
           !textMode && Array.isArray(value) && config.valueSeparator
-            ? value.map((entry) => String(entry ?? '')).filter(Boolean).join(config.valueSeparator)
+            ? value
+                .map((entry) => toFilterTextToken(entry))
+                .filter((entry) => entry !== '')
+                .join(config.valueSeparator)
             : value
 
         setColumnFilterValue(config.id, nextValue, target)

@@ -10,11 +10,28 @@ type ElementRef = {
   value: HTMLElement | null
 }
 
+function toFilterTextToken(value: DataGridFilterOption['value']) {
+  return value === null || value === '' ? '""' : String(value)
+}
+
+function getFilterOptionValueFromText(value: string, options: DataGridFilterOption[]) {
+  if (value === '""' || value === "''") {
+    const emptyOption = options.find((option) => option.value === null || option.value === '')
+    return emptyOption?.value ?? null
+  }
+
+  const matchingOption = options.find((option) => String(option.value ?? '') === value)
+  return matchingOption?.value ?? value
+}
+
 function getOptionValuesText(
   values: DataGridFilterOption['value'][],
   separator: string,
 ) {
-  return values.map((value) => String(value ?? '')).filter(Boolean).join(separator)
+  return values
+    .map((value) => toFilterTextToken(value))
+    .filter((value) => value !== '')
+    .join(separator)
 }
 
 function getValuesFromText(
@@ -25,13 +42,9 @@ function getValuesFromText(
   const values = text
     .split(separator)
     .map((value) => value.trim())
-    .filter(Boolean)
+    .filter((value) => value !== '')
 
-  return values
-    .map((value) => {
-      const matchingOption = options.find((option) => String(option.value ?? '') === value)
-      return matchingOption?.value ?? value
-    })
+  return values.map((value) => getFilterOptionValueFromText(value, options))
 }
 
 export default defineComponent({

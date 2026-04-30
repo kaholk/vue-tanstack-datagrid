@@ -535,7 +535,7 @@ export default defineComponent({
       default: undefined,
     },
   },
-  setup(props) {
+  setup(props, { expose }) {
     const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
       variant: props.loadingConfig?.variant ?? defaultLoadingConfig.variant,
       label: props.loadingConfig?.label ?? defaultLoadingConfig.label,
@@ -1939,6 +1939,50 @@ export default defineComponent({
 
       void loadData({ force: true })
     }
+
+    function getRowKey(row: AnyRow, index: number): string {
+      return String((row as { id?: string | number }).id ?? index)
+    }
+
+    function updateVisibleRow(
+      rowId: string | number,
+      resolveRow: (currentRow: AnyRow) => AnyRow,
+    ) {
+      const targetRowId = String(rowId)
+      const rowIndex = requestState.value.rows.findIndex(
+        (row, index) => getRowKey(row, index) === targetRowId,
+      )
+
+      if (rowIndex === -1) {
+        return
+      }
+
+      const currentRow = requestState.value.rows[rowIndex]
+      if (!currentRow) {
+        return
+      }
+
+      const nextRows = [...requestState.value.rows]
+      nextRows[rowIndex] = resolveRow(currentRow)
+      requestState.value = {
+        ...requestState.value,
+        rows: nextRows,
+      }
+    }
+
+    function patchRow(rowId: string | number, patch: Partial<AnyRow>) {
+      updateVisibleRow(rowId, (currentRow) => ({ ...currentRow, ...patch }))
+    }
+
+    function replaceRow(rowId: string | number, row: AnyRow) {
+      updateVisibleRow(rowId, () => row)
+    }
+
+    expose({
+      refreshData,
+      patchRow,
+      replaceRow,
+    })
 
     function clearAllFilters() {
       pagination.value = {
