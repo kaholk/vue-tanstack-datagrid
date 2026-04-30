@@ -119,7 +119,7 @@ export default defineComponent({
             const isCellSelectionRangePreviewed =
               props.isCellSelectionRangePreviewed?.(cell) ?? false
             const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
-              if (!event.ctrlKey) {
+              if (!event.ctrlKey && !event.shiftKey) {
                 return
               }
 

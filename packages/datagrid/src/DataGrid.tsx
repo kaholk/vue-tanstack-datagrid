@@ -1348,6 +1348,14 @@ export default defineComponent({
       isCellSelectionCtrlDown.value = event.ctrlKey
       isCellSelectionShiftDown.value = event.shiftKey
 
+      if (event.shiftKey && !event.ctrlKey && isCellSelectionColumn(cell.column)) {
+        event.preventDefault()
+        event.stopPropagation()
+        previewCellRangeKeys.value = new Set()
+        toggleColumnSelection(cell.column)
+        return true
+      }
+
       if (!event.ctrlKey || !isCellSelectionColumn(cell.column)) {
         return false
       }
@@ -1384,6 +1392,7 @@ export default defineComponent({
       }
 
       const columnKeys = visibleRows.value.map((row) => getCellSelectionKey(row.id, column.id))
+
       if (columnKeys.length === 0) {
         return
       }
@@ -2573,15 +2582,6 @@ export default defineComponent({
                             ]}
                             style={{
                               ...cellStylesByColumnId.value.get(entry.column.id),
-                            }}
-                            onClick={(event) => {
-                              if (!event.shiftKey) {
-                                return
-                              }
-
-                              event.preventDefault()
-                              event.stopPropagation()
-                              toggleColumnSelection(entry.column)
                             }}
                           >
                             <DataGridHeaderCell
