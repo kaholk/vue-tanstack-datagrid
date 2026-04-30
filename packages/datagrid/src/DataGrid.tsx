@@ -1357,6 +1357,33 @@ export default defineComponent({
       isCellSelectionCtrlDown.value = event.ctrlKey
       isCellSelectionShiftDown.value = event.shiftKey
 
+      if (event.altKey && mergedRowSelectionConfig.value) {
+        event.preventDefault()
+        event.stopPropagation()
+
+        const checked = !cell.row.getIsSelected()
+        const rows = table.getRowModel().rows
+        const currentIndex = rows.findIndex((row) => row.id === cell.row.id)
+        const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
+
+        if (event.shiftKey && currentIndex >= 0 && anchorIndex >= 0) {
+          const [start, end] =
+            currentIndex < anchorIndex
+              ? [currentIndex, anchorIndex]
+              : [anchorIndex, currentIndex]
+
+          for (let index = start; index <= end; index += 1) {
+            rows[index]?.toggleSelected(checked)
+          }
+        } else {
+          cell.row.toggleSelected(checked)
+        }
+
+        lastSelectedRowId.value = cell.row.id
+        previewSelectionRowIds.value = new Set()
+        return true
+      }
+
       if (event.shiftKey && !event.ctrlKey && isCellSelectionColumn(cell.column)) {
         event.preventDefault()
         event.stopPropagation()
