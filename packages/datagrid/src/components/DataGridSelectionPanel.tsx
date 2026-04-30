@@ -26,6 +26,14 @@ type SelectionPanelSection = {
   onClear: () => void
 }
 
+type SelectionPanelAction = {
+  id: string
+  label: string
+  title?: string
+  disabled?: boolean
+  onClick: () => void | Promise<void>
+}
+
 const positions: DataGridSelectionPanelPosition[] = [
   'bottom-right',
   'bottom-left',
@@ -63,6 +71,10 @@ export default defineComponent({
     },
     sections: {
       type: Array as PropType<SelectionPanelSection[]>,
+      default: () => [],
+    },
+    actions: {
+      type: Array as PropType<SelectionPanelAction[]>,
       default: () => [],
     },
     copyWithHeadersLabel: {
@@ -291,6 +303,20 @@ export default defineComponent({
           </div>
 
           <div class="data-grid__selection-panel-actions">
+            {props.actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                class="data-grid__selection-panel-button"
+                title={action.title ?? action.label}
+                disabled={action.disabled}
+                onClick={() => {
+                  void action.onClick()
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
             <button
               type="button"
               class={[

@@ -72,12 +72,13 @@ export default defineComponent({
         </div>
         <button
           type="button"
-          class="data-grid__toolbar-button"
+          class="data-grid__toolbar-button data-grid__toolbar-button--icon-only"
           onClick={props.onToggleFilterHelpDialog}
+          aria-label="Pomoc gridu"
+          title="Pomoc gridu"
           data-grid-dialog-root="true"
         >
           <IconHelpOutlineRounded class="data-grid__button-icon" />
-          <span>Jak używać filtrów</span>
         </button>
         <button
           type="button"

@@ -35,7 +35,7 @@ import DataGridDialog from './components/DataGridDialog'
 import DataGridColumnPickerDialog from './components/DataGridColumnPickerDialog'
 import DataGridFooter from './components/DataGridFooter'
 import DataGridFilterDialog from './components/DataGridFilterDialog'
-import DataGridFilterHelpDialog from './components/DataGridFilterHelpDialog'
+import DataGridHelpDialog from './components/DataGridHelpDialog'
 import DataGridHeaderCell from './components/DataGridHeaderCell'
 import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
 import DataGridSelectionPanel from './components/DataGridSelectionPanel'
@@ -60,6 +60,7 @@ import type {
   DataGridRowSelectionConfig,
   DataGridSavedViewsPersistence,
   DataGridSelectionPanelConfig,
+  DataGridSelectionPanelActionContext,
   DataGridSelectionPanelSumConfig,
   DataGridSelectionPanelPosition,
   DataGridSavedViewState,
@@ -527,7 +528,7 @@ export default defineComponent({
       }),
     },
     selectionPanelConfig: {
-      type: Object as PropType<DataGridSelectionPanelConfig | undefined>,
+      type: Object as PropType<DataGridSelectionPanelConfig<AnyRow> | undefined>,
       default: undefined,
     },
     rowSelectionConfig: {
@@ -1075,7 +1076,7 @@ export default defineComponent({
     const visibleColumnIndexById = computed(
       () => new Map(visibleColumns.value.map((column, index) => [column.id, index])),
     )
-    const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig | null>(() => {
+    const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig<AnyRow> | null>(() => {
       if (!props.selectionPanelConfig) {
         return null
       }
@@ -1086,6 +1087,7 @@ export default defineComponent({
           props.selectionPanelConfig.position ??
           defaultSelectionPanelConfig.position,
         sumColumns: props.selectionPanelConfig.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
+        actions: props.selectionPanelConfig.actions ?? defaultSelectionPanelConfig.actions,
         copyColumnIds:
           props.selectionPanelConfig.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
         copyIncludeHeaders:
@@ -2124,7 +2126,7 @@ export default defineComponent({
 
     function renderFilterHelpDialog() {
       return (
-        <DataGridFilterHelpDialog
+        <DataGridHelpDialog
           isOpen={isFilterHelpDialogOpen.value}
           onClose={() => {
             isFilterHelpDialogOpen.value = false
@@ -2516,6 +2518,24 @@ export default defineComponent({
         })
       }
 
+      const selectedRowActionContext: DataGridSelectionPanelActionContext<AnyRow> = {
+        selectedRows: selectedRows.value.map((row) => row.original),
+        selectedRowIds: selectedRows.value.map((row) => row.original.id as string | number),
+        clearSelection: clearSelectedRows,
+      }
+
+      const selectionPanelActions =
+        mergedSelectionPanelConfig.value?.actions?.map((action) => ({
+          id: action.id,
+          label: action.label,
+          title: action.title,
+          disabled:
+            typeof action.disabled === 'function'
+              ? action.disabled(selectedRowActionContext)
+              : (action.disabled ?? false),
+          onClick: () => action.onClick(selectedRowActionContext),
+        })) ?? []
+
       if (selectedColumnIds.value.length > 0) {
         selectionPanelSections.push({
           id: 'columns',
@@ -2741,6 +2761,7 @@ export default defineComponent({
                 )}
                 selectedRowsLabel="Zaznaczone razem"
                 sections={selectionPanelSections}
+                actions={selectionPanelActions}
                 sums={selectionPanelSums.value}
                 copyLabel="Kopiuj wszystko"
                 copyIncludeHeaders={mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}

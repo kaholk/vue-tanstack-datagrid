@@ -33,6 +33,14 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
   const savedViews = ref<DataGridSavedView[]>([])
   const activeViewId = ref('')
 
+  async function persistLastSelectedViewId(viewId: string) {
+    try {
+      await options.savedViewsPersistence?.saveLastSelectedViewId?.(viewId)
+    } catch (error) {
+      options.onPersistenceError(error)
+    }
+  }
+
   function getCurrentViewState(): DataGridSavedViewState {
     return {
       columnOrder: [...options.columnOrder.value],
@@ -90,6 +98,17 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
           options.savedViewsPersistence.deserialize ?? deserializeDataGridSavedViews
         const payload = await options.savedViewsPersistence.load()
         savedViews.value = deserialize(payload)
+        const lastSelectedViewId = await options.savedViewsPersistence.loadLastSelectedViewId?.()
+        if (
+          typeof lastSelectedViewId === 'string' &&
+          savedViews.value.some((view) => view.id === lastSelectedViewId)
+        ) {
+          activeViewId.value = lastSelectedViewId
+          const selectedView = savedViews.value.find((view) => view.id === lastSelectedViewId)
+          if (selectedView) {
+            applyViewState(selectedView.state)
+          }
+        }
         return
       }
 
@@ -135,6 +154,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
     if (!viewId) {
       applyViewState(getDefaultViewState())
+      void persistLastSelectedViewId('')
       return
     }
 
@@ -145,6 +165,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     }
 
     applyViewState(selectedView.state)
+    void persistLastSelectedViewId(viewId)
   }
 
   async function createNewView(name: string) {
@@ -160,6 +181,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     savedViews.value = [...savedViews.value, nextView]
     activeViewId.value = nextView.id
     await persistSavedViews(savedViews.value)
+    await persistLastSelectedViewId(nextView.id)
   }
 
   async function overwriteActiveView() {

@@ -92,9 +92,24 @@ export type DataGridSelectionPanelSumConfig = {
   formatValue?: (value: number) => string
 }
 
-export type DataGridSelectionPanelConfig = {
+export type DataGridSelectionPanelActionContext<TData extends RowData = RowData> = {
+  selectedRows: TData[]
+  selectedRowIds: DataGridRowId[]
+  clearSelection: () => void
+}
+
+export type DataGridSelectionPanelAction<TData extends RowData = RowData> = {
+  id: string
+  label: string
+  title?: string
+  disabled?: boolean | ((context: DataGridSelectionPanelActionContext<TData>) => boolean)
+  onClick: (context: DataGridSelectionPanelActionContext<TData>) => void | Promise<void>
+}
+
+export type DataGridSelectionPanelConfig<TData extends RowData = RowData> = {
   position?: DataGridSelectionPanelPosition
   sumColumns?: DataGridSelectionPanelSumConfig[]
+  actions?: DataGridSelectionPanelAction<TData>[]
   copyColumnIds?: string[]
   copyIncludeHeaders?: boolean
   selectedRowsLabel?: string
@@ -193,6 +208,8 @@ export type DataGridSavedViewsDeserialize = (payload: unknown) => DataGridSavedV
 export type DataGridSavedViewsPersistence = {
   load: () => Promise<unknown>
   save: (payload: unknown, views: DataGridSavedView[]) => Promise<void>
+  loadLastSelectedViewId?: () => Promise<string | null | undefined>
+  saveLastSelectedViewId?: (viewId: string) => Promise<void>
   serialize?: DataGridSavedViewsSerialize
   deserialize?: DataGridSavedViewsDeserialize
 }

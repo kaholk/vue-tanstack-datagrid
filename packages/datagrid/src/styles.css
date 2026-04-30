@@ -773,6 +773,7 @@
   .data-grid__toolbar-button,
   .data-grid__dialog-close,
   .data-grid__dialog-action {
+    height: var(--data-grid-control-height);
     min-height: var(--data-grid-control-height);
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--app-border-strong);
