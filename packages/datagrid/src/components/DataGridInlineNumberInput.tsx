@@ -77,7 +77,6 @@ export default defineComponent({
       props.onUpdateModelValue(normalizedValue)
       if (props.onEnter) {
         props.onEnter(localValue.value)
-        return
       }
 
       props.onClose?.()

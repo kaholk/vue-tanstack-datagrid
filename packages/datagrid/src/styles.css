@@ -126,9 +126,13 @@
 
 .data-grid__editable-trigger {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   width: 100%;
+  align-self: stretch;
   min-height: 2rem;
+  margin: -0.4rem -0.5rem;
+  padding: 0.4rem 0.5rem;
   gap: 0.5rem;
 }
 

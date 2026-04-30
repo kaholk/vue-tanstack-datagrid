@@ -63,7 +63,9 @@ export default defineComponent({
       default: undefined,
     },
     onUpdateModelValue: {
-      type: Function as PropType<(value: string | number | null) => void>,
+      type: Function as PropType<
+        (value: string | number | null, option?: DataGridAsyncSelectOption | null) => void
+      >,
       required: true,
     },
     onClose: {
@@ -218,7 +220,7 @@ export default defineComponent({
                     event.stopPropagation()
                     selectedOption.value = null
                     searchValue.value = ''
-                    props.onUpdateModelValue(null)
+                    props.onUpdateModelValue(null, null)
                     props.onClose?.()
                   }}
                 >
@@ -249,7 +251,7 @@ export default defineComponent({
                         ]}
                         data-grid-inline-select-root="true"
                         onClick={() => {
-                          props.onUpdateModelValue(option.value)
+                          props.onUpdateModelValue(option.value, option)
                           props.onClose?.()
                         }}
                       >
