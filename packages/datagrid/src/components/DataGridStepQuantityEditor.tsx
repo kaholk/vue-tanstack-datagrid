@@ -1,7 +1,6 @@
 import {
   defineComponent,
   onBeforeUnmount,
-  onMounted,
   ref,
   watch,
   type PropType,
@@ -10,6 +9,8 @@ import {
 import DataGridDropdownMenu from './DataGridDropdownMenu'
 
 import IconSaveRounded from '~icons/material-symbols/save-rounded';
+
+let closeActiveStepEditor: (() => void) | null = null
 
 export default defineComponent({
   name: 'DataGridStepQuantityEditor',
@@ -32,7 +33,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const instanceId = `step-editor-${Math.random().toString(36).slice(2, 10)}`
     const triggerRef = ref<HTMLButtonElement | null>(null)
     const quantityValue = ref(props.modelValue >= 1 ? String(props.modelValue) : '1')
     const menuOpen = ref(false)
@@ -48,6 +48,9 @@ export default defineComponent({
 
     function closeMenu() {
       menuOpen.value = false
+      if (closeActiveStepEditor === closeMenu) {
+        closeActiveStepEditor = null
+      }
     }
 
     function quickToggle() {
@@ -73,25 +76,13 @@ export default defineComponent({
         return
       }
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('data-grid-step-editor-open', {
-            detail: { instanceId },
-          }),
-        )
+      if (closeActiveStepEditor && closeActiveStepEditor !== closeMenu) {
+        closeActiveStepEditor()
       }
 
       quantityValue.value = props.modelValue >= 1 ? String(props.modelValue) : '1'
       menuOpen.value = true
-    }
-
-    function handleStepEditorOpen(event: Event) {
-      const customEvent = event as CustomEvent<{ instanceId?: string }>
-      if (customEvent.detail?.instanceId === instanceId) {
-        return
-      }
-
-      closeMenu()
+      closeActiveStepEditor = closeMenu
     }
 
     function submitQuantity() {
@@ -101,12 +92,10 @@ export default defineComponent({
       closeMenu()
     }
 
-    onMounted(() => {
-      window.addEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
-    })
-
     onBeforeUnmount(() => {
-      window.removeEventListener('data-grid-step-editor-open', handleStepEditorOpen as EventListener)
+      if (closeActiveStepEditor === closeMenu) {
+        closeActiveStepEditor = null
+      }
     })
 
     return () => (

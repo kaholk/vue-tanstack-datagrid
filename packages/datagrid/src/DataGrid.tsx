@@ -1130,6 +1130,15 @@ export default defineComponent({
         return column.id !== rowSelectionColumnId && columnDef.localKind !== 'action'
       })
     })
+    const visibleRowIndexById = computed(
+      () => new Map(visibleRows.value.map((row, index) => [row.id, index])),
+    )
+    const cellSelectionColumnIdSet = computed(
+      () => new Set(cellSelectionColumns.value.map((column) => column.id)),
+    )
+    const cellSelectionColumnIndexById = computed(
+      () => new Map(cellSelectionColumns.value.map((column, index) => [column.id, index])),
+    )
     const selectedCellCount = computed(() => selectedCellKeys.value.size)
     const selectedColumnIds = computed(() => {
       const columns: string[] = []
@@ -1190,7 +1199,7 @@ export default defineComponent({
     }
 
     function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
-      return cellSelectionColumns.value.some((selectionColumn) => selectionColumn.id === column.id)
+      return cellSelectionColumnIdSet.value.has(column.id)
     }
 
     function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
@@ -1236,10 +1245,10 @@ export default defineComponent({
 
       const rows = visibleRows.value
       const columns = cellSelectionColumns.value
-      const anchorRowIndex = rows.findIndex((row) => row.id === anchor.rowId)
-      const targetRowIndex = rows.findIndex((row) => row.id === target.rowId)
-      const anchorColumnIndex = columns.findIndex((column) => column.id === anchor.columnId)
-      const targetColumnIndex = columns.findIndex((column) => column.id === target.columnId)
+      const anchorRowIndex = visibleRowIndexById.value.get(anchor.rowId) ?? -1
+      const targetRowIndex = visibleRowIndexById.value.get(target.rowId) ?? -1
+      const anchorColumnIndex = cellSelectionColumnIndexById.value.get(anchor.columnId) ?? -1
+      const targetColumnIndex = cellSelectionColumnIndexById.value.get(target.columnId) ?? -1
 
       if (
         anchorRowIndex < 0 ||

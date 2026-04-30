@@ -77,6 +77,15 @@ export default defineComponent({
       const row = props.row
       const isSelected = row.getIsSelected()
       const visibleCells = row.getVisibleCells()
+      const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
+        if (!event.ctrlKey && !event.shiftKey) {
+          return
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+        window.getSelection()?.removeAllRanges()
+      }
 
       return (
         <div
@@ -118,15 +127,6 @@ export default defineComponent({
             const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
             const isCellSelectionRangePreviewed =
               props.isCellSelectionRangePreviewed?.(cell) ?? false
-            const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
-              if (!event.ctrlKey && !event.shiftKey) {
-                return
-              }
-
-              event.preventDefault()
-              event.stopPropagation()
-              window.getSelection()?.removeAllRanges()
-            }
 
             return (
               <div

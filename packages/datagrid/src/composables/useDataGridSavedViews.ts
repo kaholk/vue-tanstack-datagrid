@@ -99,15 +99,14 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
         const payload = await options.savedViewsPersistence.load()
         savedViews.value = deserialize(payload)
         const lastSelectedViewId = await options.savedViewsPersistence.loadLastSelectedViewId?.()
-        if (
-          typeof lastSelectedViewId === 'string' &&
-          savedViews.value.some((view) => view.id === lastSelectedViewId)
-        ) {
-          activeViewId.value = lastSelectedViewId
-          const selectedView = savedViews.value.find((view) => view.id === lastSelectedViewId)
-          if (selectedView) {
-            applyViewState(selectedView.state)
-          }
+        const selectedView =
+          typeof lastSelectedViewId === 'string'
+            ? savedViews.value.find((view) => view.id === lastSelectedViewId)
+            : null
+
+        if (selectedView) {
+          activeViewId.value = selectedView.id
+          applyViewState(selectedView.state)
         }
         return
       }

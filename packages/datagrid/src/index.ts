@@ -9,6 +9,7 @@ export { default as DataGridHeaderCell } from './components/DataGridHeaderCell'
 export { default as DataGridEditableCellTrigger } from './components/DataGridEditableCellTrigger'
 export { default as DataGridInlineAsyncSelectEditor } from './components/DataGridInlineAsyncSelectEditor'
 export { default as DataGridInlineDateInput } from './components/DataGridInlineDateInput'
+export { default as DataGridInlineEditStatus } from './components/DataGridInlineEditStatus'
 export { default as DataGridInlineNumberInput } from './components/DataGridInlineNumberInput'
 export { default as DataGridInlineSelectEditor } from './components/DataGridInlineSelectEditor'
 export { default as DataGridSaveViewDialog } from './components/DataGridSaveViewDialog'
@@ -17,6 +18,7 @@ export { default as DataGridSelectionPanel } from './components/DataGridSelectio
 export { default as DataGridToolbar } from './components/DataGridToolbar'
 export { default as DataGridValidatedNumberInput } from './components/DataGridValidatedNumberInput'
 export {
+  createDataGridSavedViewsPersistence,
   deserializeDataGridSavedViews,
   serializeDataGridSavedViews,
 } from './savedViews'

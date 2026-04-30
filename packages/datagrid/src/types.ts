@@ -74,6 +74,8 @@ export type DataGridLoadingConfig = {
   label?: string
 }
 
+export type DataGridInlineEditStatusState = 'pending' | 'error'
+
 export type DataGridSelectionPanelPosition =
   | 'bottom-left'
   | 'bottom-right'
