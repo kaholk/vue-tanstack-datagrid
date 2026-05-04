@@ -43,6 +43,10 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
   function getCurrentViewState(): DataGridSavedViewState {
     return {
+      pagination: {
+        pageIndex: 0,
+        pageSize: options.pagination.value.pageSize,
+      },
       columnOrder: [...options.columnOrder.value],
       columnSizing: { ...options.columnSizing.value },
       columnVisibility: { ...options.columnVisibility.value },
@@ -69,6 +73,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     options.pagination.value = {
       ...options.pagination.value,
       pageIndex: 0,
+      pageSize: nextState.pagination?.pageSize ?? options.pagination.value.pageSize,
     }
     options.rowSelection.value = {}
     options.onAfterApplyViewState()
@@ -76,6 +81,9 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
   function getDefaultViewState(): DataGridSavedViewState {
     return {
+      pagination: options.initialState.pagination
+        ? { ...options.initialState.pagination, pageIndex: 0 }
+        : undefined,
       columnOrder: [...(options.initialState.columnOrder ?? [])],
       columnSizing: { ...(options.initialState.columnSizing ?? {}) },
       columnVisibility: { ...(options.initialState.columnVisibility ?? {}) },

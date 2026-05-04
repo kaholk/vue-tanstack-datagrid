@@ -133,7 +133,7 @@ const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
   position: 'bottom-right',
   sumColumns: [],
   copyColumnIds: undefined,
-  copyIncludeHeaders: false,
+  copyIncludeHeaders: true,
   selectedRowsLabel: 'Zaznaczone wiersze',
   copyWithHeadersLabel: 'Kopiuj z naglowkami',
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
@@ -437,6 +437,7 @@ function buildPaginationItems(pageCount: number, pageIndex: number): PaginationI
 
 function cloneViewState(state: DataGridSavedViewState): DataGridSavedViewState {
   return {
+    pagination: state.pagination ? { ...state.pagination } : undefined,
     columnOrder: [...state.columnOrder],
     columnSizing: { ...state.columnSizing },
     columnVisibility: { ...state.columnVisibility },
@@ -563,7 +564,7 @@ export default defineComponent({
       default: undefined,
     },
   },
-  setup(props, { expose }) {
+  setup(props, { expose, slots }) {
     const localeText = computed<Required<DataGridLocaleText>>(() => ({
       ...defaultLocaleText,
       ...(props.localeText ?? {}),
@@ -2602,16 +2603,24 @@ export default defineComponent({
       }
 
       const selectionPanelActions =
-        mergedSelectionPanelConfig.value?.actions?.map((action) => ({
-          id: action.id,
-          label: action.label,
-          title: action.title,
-          disabled:
-            typeof action.disabled === 'function'
-              ? action.disabled(selectedRowActionContext)
-              : (action.disabled ?? false),
-          onClick: () => action.onClick(selectedRowActionContext),
-        })) ?? []
+        mergedSelectionPanelConfig.value?.actions
+          ?.filter((action) => {
+            const hidden =
+              typeof action.hidden === 'function'
+                ? action.hidden(selectedRowActionContext)
+                : (action.hidden ?? false)
+            return !hidden
+          })
+          .map((action) => ({
+            id: action.id,
+            label: action.label,
+            title: action.title,
+            disabled:
+              typeof action.disabled === 'function'
+                ? action.disabled(selectedRowActionContext)
+                : (action.disabled ?? false),
+            onClick: () => action.onClick(selectedRowActionContext),
+          })) ?? []
 
       if (selectedColumnIds.value.length > 0) {
         selectionPanelSections.push({
@@ -2702,6 +2711,7 @@ export default defineComponent({
                 onRefresh={refreshData}
                 onClearFilters={clearAllFilters}
                 onToggleColumnPicker={toggleColumnPicker}
+                customActions={slots['toolbar-actions']?.()}
               />
             </div>
 

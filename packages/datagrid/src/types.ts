@@ -106,6 +106,7 @@ export type DataGridSelectionPanelAction<TData extends RowData = RowData> = {
   id: string
   label: string
   title?: string
+  hidden?: boolean | ((context: DataGridSelectionPanelActionContext<TData>) => boolean)
   disabled?: boolean | ((context: DataGridSelectionPanelActionContext<TData>) => boolean)
   onClick: (context: DataGridSelectionPanelActionContext<TData>) => void | Promise<void>
 }
@@ -240,6 +241,7 @@ export type DataGridInitialState = {
 }
 
 export type DataGridSavedViewState = {
+  pagination?: PaginationState
   columnOrder: ColumnOrderState
   columnSizing: ColumnSizingState
   columnVisibility: DataGridColumnVisibilityState

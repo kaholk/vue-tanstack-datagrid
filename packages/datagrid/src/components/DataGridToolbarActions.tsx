@@ -1,4 +1,4 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, type PropType, type VNodeChild } from 'vue'
 import IconDeleteRounded from '~icons/material-symbols/delete-rounded'
 import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
 import IconHelpOutlineRounded from '~icons/material-symbols/help-outline-rounded'
@@ -32,10 +32,15 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    customActions: {
+      type: Array as PropType<VNodeChild[] | undefined>,
+      default: undefined,
+    },
   },
   setup(props) {
     return () => (
       <div class="data-grid__toolbar-actions" data-grid-dialog-root="true">
+        {props.customActions}
         <div class="data-grid__toolbar-button-group" data-grid-dialog-root="true">
           <button
             type="button"

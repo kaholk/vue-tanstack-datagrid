@@ -84,6 +84,10 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    customActions: {
+      type: Array as PropType<VNodeChild[] | undefined>,
+      default: undefined,
+    },
   },
   setup(props) {
     return () => (
@@ -107,6 +111,7 @@ export default defineComponent({
         />
 
         <DataGridToolbarActions
+          customActions={props.customActions}
           activeFilterCount={props.activeFilterCount}
           onToggleFilterDialog={props.onToggleFilterDialog}
           onToggleFilterHelpDialog={props.onToggleFilterHelpDialog}
