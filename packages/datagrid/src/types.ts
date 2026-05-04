@@ -34,6 +34,8 @@ export type DataGridCellContext<TData extends RowData> = {
   event: MouseEvent
 }
 
+export type DataGridValueContext<TData extends RowData> = Omit<DataGridCellContext<TData>, 'event'>
+
 export type DataGridFilterConfig = {
   id: string
   label: string
@@ -122,6 +124,29 @@ export type DataGridSelectionPanelConfig<TData extends RowData = RowData> = {
   floatingPosition?: DataGridFloatingPosition
 }
 
+export type DataGridLocaleText = {
+  rowsLabel?: string
+  fetchedLabel?: string
+  datasetLabel?: string
+  pageSizeLabel?: string
+  selectedRowsLabel?: string
+  selectedRowsTotalLabel?: string
+  selectedColumnsLabel?: string
+  selectedCellsLabel?: string
+  copyRowsLabel?: string
+  copyColumnsLabel?: string
+  copyCellsLabel?: string
+  copyAllLabel?: string
+  copyWithHeadersLabel?: string
+  copyWithoutHeadersLabel?: string
+  loadingLabel?: string
+  fetchErrorMessage?: string
+  columnFiltersGroupLabel?: string
+  extraFiltersGroupLabel?: string
+  filterPlaceholder?: string
+  noFilterableColumnsMessage?: string
+}
+
 export type DataGridRowSelectionConfig<TData extends RowData> = {
   enabled?: boolean
   preset?: 'default' | 'compact-left' | 'compact-right'
@@ -135,6 +160,9 @@ export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & 
   serverField?: string
   localKind?: DataGridLocalKind
   requiredServerFields?: string[]
+  clipboardValue?: (context: DataGridValueContext<TData>) => unknown
+  clipboardFormat?: (value: unknown, context: DataGridValueContext<TData>) => string
+  sumValue?: (context: DataGridValueContext<TData>) => unknown
   align?: DataGridColumnAlign
   headerMode?: DataGridHeaderMode
   showFilter?: boolean

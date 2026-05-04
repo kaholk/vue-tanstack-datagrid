@@ -52,6 +52,14 @@ export default defineComponent({
       type: Number,
       default: 500,
     },
+    searchDebounceMs: {
+      type: Number,
+      default: 250,
+    },
+    cacheOptions: {
+      type: Boolean,
+      default: true,
+    },
     loadOptions: {
       type: Function as PropType<(query: string) => Promise<DataGridAsyncSelectOption[]>>,
       required: true,
@@ -82,6 +90,8 @@ export default defineComponent({
     const selectedOption = ref<DataGridAsyncSelectOption | null>(null)
     const requestId = ref(0)
     let searchTimer: ReturnType<typeof window.setTimeout> | null = null
+    const optionsCache = new Map<string, DataGridAsyncSelectOption[]>()
+    const selectedOptionCache = new Map<string, DataGridAsyncSelectOption | null>()
 
     const mergedOptions = computed(() => {
       if (!selectedOption.value) {
@@ -103,14 +113,25 @@ export default defineComponent({
 
     async function runSearch(query: string) {
       const currentRequestId = ++requestId.value
+      const cacheKey = query.trim()
+
+      if (props.cacheOptions && optionsCache.has(cacheKey)) {
+        options.value = optionsCache.get(cacheKey) ?? []
+        loading.value = false
+        return
+      }
+
       loading.value = true
 
       try {
-        const result = await props.loadOptions(query)
+        const result = await props.loadOptions(cacheKey)
         if (currentRequestId !== requestId.value) {
           return
         }
 
+        if (props.cacheOptions) {
+          optionsCache.set(cacheKey, result)
+        }
         options.value = result
       } finally {
         if (currentRequestId === requestId.value) {
@@ -126,7 +147,7 @@ export default defineComponent({
 
       searchTimer = window.setTimeout(() => {
         void runSearch(query)
-      }, 250)
+      }, Math.max(0, props.searchDebounceMs))
     }
 
     async function ensureSelectedOption() {
@@ -140,7 +161,17 @@ export default defineComponent({
         return
       }
 
-      selectedOption.value = await props.loadSelectedOption(props.modelValue)
+      const cacheKey = String(props.modelValue)
+      if (props.cacheOptions && selectedOptionCache.has(cacheKey)) {
+        selectedOption.value = selectedOptionCache.get(cacheKey) ?? null
+        return
+      }
+
+      const loadedOption = await props.loadSelectedOption(props.modelValue)
+      if (props.cacheOptions) {
+        selectedOptionCache.set(cacheKey, loadedOption)
+      }
+      selectedOption.value = loadedOption
     }
 
     onMounted(() => {

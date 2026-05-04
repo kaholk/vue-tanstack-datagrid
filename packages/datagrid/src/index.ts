@@ -22,4 +22,13 @@ export {
   deserializeDataGridSavedViews,
   serializeDataGridSavedViews,
 } from './savedViews'
+export {
+  createDataGridSelectFilterConfig,
+  createDataGridTextColumn,
+} from './columnFactories'
+export { useDataGridInlineMutation } from './composables/useDataGridInlineMutation'
+export type {
+  DataGridInlineMutationState,
+  DataGridInlineMutationStatus,
+} from './composables/useDataGridInlineMutation'
 export * from './types'

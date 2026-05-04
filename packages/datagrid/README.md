@@ -220,11 +220,55 @@ type DataGridFetchResult<TData> = {
 | `overscanRows` | `number` | `10` | Row virtualization buffer |
 | `overscanColumns` | `number` | `3` | Column virtualization buffer |
 | `height` | `number \| 'auto'` | `560` | Fixed viewport height in px or fill the available parent height |
+| `localeText` | `DataGridLocaleText \| undefined` | built-in labels | Text labels used by the grid |
 | `viewStorageKey` | `string` | `''` | `localStorage` key for saved views |
 | `savedViewsPersistence` | `DataGridSavedViewsPersistence \| undefined` | `undefined` | Custom saved views persistence |
 | `metaItems` | `DataGridMetaConfig[]` | `rows`, `fetched`, `datasetSize` | Footer metadata to display |
 | `pageSizeConfig` | `DataGridPageSizeConfig` | `{ label: 'Rows', options: [50,100,250,500] }` | Page size select config |
 | `selectionPanelConfig` | `DataGridSelectionPanelConfig \| undefined` | `undefined` | Enables the selection panel |
+
+## Column Values For Copy And Sums
+
+By default, the selection panel copies and sums `row.getValue(column.id)`.
+
+For computed or formatted columns, define custom value resolvers:
+
+```ts
+const columns: DataGridColumn<OrderRow>[] = [
+  {
+    id: 'remainingWeight',
+    accessorKey: 'remainingWeight',
+    header: 'Remaining weight',
+    sumValue: ({ row }) => row.original.weightKg * row.original.qtyLeft,
+    clipboardValue: ({ row }) => row.original.weightKg * row.original.qtyLeft,
+    clipboardFormat: (value) => `${value} kg`,
+  },
+]
+```
+
+## Column Helpers
+
+The package exports small helpers for app-level column factories:
+
+```ts
+import { createDataGridSelectFilterConfig } from 'vue-tanstack-datagrid'
+
+const selectFilter = createDataGridSelectFilterConfig<OrderRow>(statusOptions, {
+  includeEmpty: true,
+})
+```
+
+## Inline Mutation Helper
+
+For editable grids, `useDataGridInlineMutation` stores per-row/per-field pending and error states:
+
+```ts
+import { useDataGridInlineMutation } from 'vue-tanstack-datagrid'
+
+const inlineMutation = useDataGridInlineMutation<OrderRow>()
+inlineMutation.setStatus(row, 'status', 'pending')
+inlineMutation.setStatus(row, 'status', null)
+```
 
 ## Saved Views
 

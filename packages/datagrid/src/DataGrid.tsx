@@ -64,6 +64,7 @@ import type {
   DataGridSelectionPanelSumConfig,
   DataGridSelectionPanelPosition,
   DataGridSavedViewState,
+  DataGridLocaleText,
 } from './types'
 
 type AnyRow = Record<string, unknown>
@@ -145,6 +146,28 @@ const defaultRowSelectionPreset = 'default'
 const defaultLoadingConfig: DataGridLoadingConfig = {
   variant: 'overlay',
   label: 'Ladowanie danych',
+}
+const defaultLocaleText: Required<DataGridLocaleText> = {
+  rowsLabel: 'Rows',
+  fetchedLabel: 'Fetched',
+  datasetLabel: 'Dataset',
+  pageSizeLabel: 'Rows',
+  selectedRowsLabel: 'Zaznaczone wiersze',
+  selectedRowsTotalLabel: 'Zaznaczone razem',
+  selectedColumnsLabel: 'Zaznaczone kolumny',
+  selectedCellsLabel: 'Zaznaczone komorki',
+  copyRowsLabel: 'Kopiuj wiersze',
+  copyColumnsLabel: 'Kopiuj kolumny',
+  copyCellsLabel: 'Kopiuj komorki',
+  copyAllLabel: 'Kopiuj wszystko',
+  copyWithHeadersLabel: 'Kopiuj z naglowkami',
+  copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
+  loadingLabel: 'Ladowanie danych',
+  fetchErrorMessage: 'Nie udalo sie pobrac danych.',
+  columnFiltersGroupLabel: 'Kolumny',
+  extraFiltersGroupLabel: 'Dodatkowe filtry',
+  filterPlaceholder: 'Filtr',
+  noFilterableColumnsMessage: 'Brak backendowych kolumn filtrowalnych.',
 }
 
 function renderSelectionCheckbox(
@@ -508,6 +531,10 @@ export default defineComponent({
       type: Object as PropType<DataGridLoadingConfig | undefined>,
       default: undefined,
     },
+    localeText: {
+      type: Object as PropType<DataGridLocaleText | undefined>,
+      default: undefined,
+    },
     viewStorageKey: {
       type: String,
       default: '',
@@ -537,9 +564,13 @@ export default defineComponent({
     },
   },
   setup(props, { expose }) {
+    const localeText = computed<Required<DataGridLocaleText>>(() => ({
+      ...defaultLocaleText,
+      ...(props.localeText ?? {}),
+    }))
     const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
       variant: props.loadingConfig?.variant ?? defaultLoadingConfig.variant,
-      label: props.loadingConfig?.label ?? defaultLoadingConfig.label,
+      label: props.loadingConfig?.label ?? localeText.value.loadingLabel,
     }))
     const lastSelectedRowId = ref<string | null>(null)
     const previewSelectionRowIds = shallowRef<Set<string>>(new Set())
@@ -1094,14 +1125,12 @@ export default defineComponent({
           props.selectionPanelConfig.copyIncludeHeaders ??
           defaultSelectionPanelConfig.copyIncludeHeaders,
         selectedRowsLabel:
-          props.selectionPanelConfig.selectedRowsLabel ??
-          defaultSelectionPanelConfig.selectedRowsLabel,
+          props.selectionPanelConfig.selectedRowsLabel ?? localeText.value.selectedRowsLabel,
         copyWithHeadersLabel:
-          props.selectionPanelConfig.copyWithHeadersLabel ??
-          defaultSelectionPanelConfig.copyWithHeadersLabel,
+          props.selectionPanelConfig.copyWithHeadersLabel ?? localeText.value.copyWithHeadersLabel,
         copyWithoutHeadersLabel:
           props.selectionPanelConfig.copyWithoutHeadersLabel ??
-          defaultSelectionPanelConfig.copyWithoutHeadersLabel,
+          localeText.value.copyWithoutHeadersLabel,
         allowPositionChange:
           props.selectionPanelConfig.allowPositionChange ??
           defaultSelectionPanelConfig.allowPositionChange,
@@ -1650,7 +1679,7 @@ export default defineComponent({
         ...columnConfigs,
         ...props.toolbarFilters.map((config) => ({
           ...config,
-          group: config.group ?? 'Dodatkowe filtry',
+          group: config.group ?? localeText.value.extraFiltersGroupLabel,
         })),
       ]
     })
@@ -1658,7 +1687,7 @@ export default defineComponent({
       const sectionMap = new Map<string, FilterDialogSection>()
 
       for (const config of toolbarFilterConfigs.value) {
-        const groupLabel = config.group?.trim() || 'Kolumny'
+        const groupLabel = config.group?.trim() || localeText.value.columnFiltersGroupLabel
         const groupId = toFilterGroupId(groupLabel)
         const section = sectionMap.get(groupId)
 
@@ -1723,7 +1752,7 @@ export default defineComponent({
         }
       }
 
-      return Array.from(requested)
+      return Array.from(requested).sort()
     })
 
     async function loadData(options: LoadDataOptions = {}) {
@@ -1780,7 +1809,8 @@ export default defineComponent({
           return
         }
 
-        errorMessage.value = error instanceof Error ? error.message : 'Nie udalo sie pobrac danych.'
+        errorMessage.value =
+          error instanceof Error ? error.message : localeText.value.fetchErrorMessage
         requestState.value = {
           rows: [],
           totalRows: 0,
@@ -2234,8 +2264,45 @@ export default defineComponent({
       return renderColumnPickerLabel(column)
     }
 
+    const cellsByRow = new WeakMap<Row<AnyRow>, Map<string, Cell<AnyRow, unknown>>>()
+
+    function getCellByColumnId(row: Row<AnyRow>, columnId: string) {
+      let cellsByColumnId = cellsByRow.get(row)
+      if (!cellsByColumnId) {
+        cellsByColumnId = new Map(row.getAllCells().map((cell) => [cell.column.id, cell]))
+        cellsByRow.set(row, cellsByColumnId)
+      }
+
+      return cellsByColumnId.get(columnId)
+    }
+
+    function getCustomColumnValue(
+      row: Row<AnyRow>,
+      column: Column<AnyRow, unknown>,
+      kind: 'clipboard' | 'sum',
+    ) {
+      const columnDef = column.columnDef as DataGridColumn<AnyRow>
+      const resolver = kind === 'clipboard' ? columnDef.clipboardValue : columnDef.sumValue
+
+      if (!resolver) {
+        return row.getValue(column.id)
+      }
+
+      const cell = getCellByColumnId(row, column.id)
+      if (!cell) {
+        return row.getValue(column.id)
+      }
+
+      return resolver({ cell, row })
+    }
+
     function getClipboardCellValue(row: Row<AnyRow>, column: Column<AnyRow, unknown>) {
-      const rawValue = row.getValue(column.id)
+      const rawValue = getCustomColumnValue(row, column, 'clipboard')
+      const columnDef = column.columnDef as DataGridColumn<AnyRow>
+      const cell = columnDef.clipboardFormat ? getCellByColumnId(row, column.id) : undefined
+      if (columnDef.clipboardFormat && cell) {
+        return columnDef.clipboardFormat(rawValue, { cell, row })
+      }
 
       if (rawValue === null || rawValue === undefined) {
         return ''
@@ -2417,11 +2484,12 @@ export default defineComponent({
 
       for (const row of selectedRows.value) {
         for (const config of sumConfigs) {
-          if (!totalsById.has(config.columnId)) {
+          const column = columnsById.get(config.columnId)
+          if (!column || !totalsById.has(config.columnId)) {
             continue
           }
 
-          const rawValue = row.getValue(config.columnId)
+          const rawValue = getCustomColumnValue(row, column, 'sum')
           const numericValue =
             typeof rawValue === 'number'
               ? rawValue
@@ -2520,7 +2588,7 @@ export default defineComponent({
           id: 'rows',
           label: mergedSelectionPanelConfig.value?.selectedRowsLabel ?? 'Zaznaczone wiersze',
           count: selectedRows.value.length,
-          copyLabel: 'Kopiuj wiersze',
+          copyLabel: localeText.value.copyRowsLabel,
           clearLabel: 'Wyczysc wiersze',
           onCopy: (options: { includeHeaders: boolean }) => copySelectedRows(options.includeHeaders),
           onClear: clearSelectedRows,
@@ -2548,9 +2616,9 @@ export default defineComponent({
       if (selectedColumnIds.value.length > 0) {
         selectionPanelSections.push({
           id: 'columns',
-          label: 'Zaznaczone kolumny',
+          label: localeText.value.selectedColumnsLabel,
           count: selectedColumnIds.value.length,
-          copyLabel: 'Kopiuj kolumny',
+          copyLabel: localeText.value.copyColumnsLabel,
           clearLabel: 'Wyczysc kolumny',
           onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
           onClear: clearSelectedColumns,
@@ -2560,9 +2628,9 @@ export default defineComponent({
       if (selectedCellCount.value > 0) {
         selectionPanelSections.push({
           id: 'cells',
-          label: 'Zaznaczone komorki',
+          label: localeText.value.selectedCellsLabel,
           count: selectedCellCount.value,
-          copyLabel: 'Kopiuj komorki',
+          copyLabel: localeText.value.copyCellsLabel,
           clearLabel: 'Wyczysc komorki',
           onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
           onClear: clearSelectedCells,
@@ -2768,19 +2836,19 @@ export default defineComponent({
                   (total, section) => total + section.count,
                   0,
                 )}
-                selectedRowsLabel="Zaznaczone razem"
+                selectedRowsLabel={localeText.value.selectedRowsTotalLabel}
                 sections={selectionPanelSections}
                 actions={selectionPanelActions}
                 sums={selectionPanelSums.value}
-                copyLabel="Kopiuj wszystko"
+                copyLabel={localeText.value.copyAllLabel}
                 copyIncludeHeaders={mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}
                 copyWithHeadersLabel={
                   mergedSelectionPanelConfig.value.copyWithHeadersLabel ??
-                  'Kopiuj z naglowkami'
+                  localeText.value.copyWithHeadersLabel
                 }
                 copyWithoutHeadersLabel={
                   mergedSelectionPanelConfig.value.copyWithoutHeadersLabel ??
-                  'Kopiuj bez naglowkow'
+                  localeText.value.copyWithoutHeadersLabel
                 }
                 allowPositionChange={mergedSelectionPanelConfig.value.allowPositionChange ?? true}
                 onCopy={(options) => {
@@ -2824,7 +2892,7 @@ export default defineComponent({
           </div>
 
           {serverFilterColumns.value.length === 0 ? (
-            <p class="data-grid__note">Brak backendowych kolumn filtrowalnych.</p>
+            <p class="data-grid__note">{localeText.value.noFilterableColumnsMessage}</p>
           ) : null}
           {errorMessage.value ? <p class="data-grid__error">{errorMessage.value}</p> : null}
           {renderFilterDialog()}
