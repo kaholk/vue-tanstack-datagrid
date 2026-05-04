@@ -7,6 +7,7 @@ import {
 } from 'vue'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
+import type { DataGridStepQuantityEditorLocaleText } from '../types'
 
 import IconSaveRounded from '~icons/material-symbols/save-rounded';
 
@@ -29,7 +30,11 @@ export default defineComponent({
     },
     onUpdateModelValue: {
       type: Function as PropType<(value: number) => void>,
-      required: true,
+      default: undefined,
+    },
+    localeText: {
+      type: Object as PropType<DataGridStepQuantityEditorLocaleText>,
+      default: () => ({}),
     },
   },
   setup(props) {
@@ -54,25 +59,25 @@ export default defineComponent({
     }
 
     function quickToggle() {
-      if (props.readonly) {
+      if (props.readonly || !props.onUpdateModelValue) {
         return
       }
 
       if (props.modelValue === 0) {
-        props.onUpdateModelValue(-1)
+        props.onUpdateModelValue?.(-1)
         return
       }
 
       if (props.modelValue === -1 || props.modelValue === -2) {
-        props.onUpdateModelValue(0)
+        props.onUpdateModelValue?.(0)
         return
       }
 
-      props.onUpdateModelValue(-1)
+      props.onUpdateModelValue?.(-1)
     }
 
     function openMenu() {
-      if (props.readonly) {
+      if (props.readonly || !props.onUpdateModelValue) {
         return
       }
 
@@ -88,7 +93,7 @@ export default defineComponent({
     function submitQuantity() {
       const parsed = Number.parseInt(quantityValue.value, 10)
       const nextValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
-      props.onUpdateModelValue(nextValue)
+      props.onUpdateModelValue?.(nextValue)
       closeMenu()
     }
 
@@ -153,38 +158,40 @@ export default defineComponent({
                     type="button"
                     class="data-grid__step-editor-action data-grid__step-editor-action--done"
                     onClick={() => {
-                      props.onUpdateModelValue(-1)
+                      props.onUpdateModelValue?.(-1)
                       closeMenu()
                     }}
                   >
                     <span class="data-grid__step-editor-action-icon">{'\u2713'}</span>
-                    <span>Ukonczone</span>
+                    <span>{props.localeText.doneLabel ?? 'Ukonczone'}</span>
                   </button>
                   <button
                     type="button"
                     class="data-grid__step-editor-action data-grid__step-editor-action--neutral"
                     onClick={() => {
-                      props.onUpdateModelValue(0)
+                      props.onUpdateModelValue?.(0)
                       closeMenu()
                     }}
                   >
                     <span class="data-grid__step-editor-action-icon">{'\u2715'}</span>
-                    <span>Nie</span>
+                    <span>{props.localeText.noneLabel ?? 'Nie'}</span>
                   </button>
                   <button
                     type="button"
                     class="data-grid__step-editor-action data-grid__step-editor-action--blocked"
                     onClick={() => {
-                      props.onUpdateModelValue(-2)
+                      props.onUpdateModelValue?.(-2)
                       closeMenu()
                     }}
                   >
                     <span class="data-grid__step-editor-action-icon">{'\u2298'}</span>
-                    <span>Blokada</span>
+                    <span>{props.localeText.blockedLabel ?? 'Blokada'}</span>
                   </button>
                 </div>
                 <div class="data-grid__step-editor-quantity">
-                  <label class="data-grid__step-editor-field-label">Ilosc (pomaranczowe)</label>
+                  <label class="data-grid__step-editor-field-label">
+                    {props.localeText.quantityLabel ?? 'Ilosc (pomaranczowe)'}
+                  </label>
                   <input
                     class="data-grid__step-editor-input"
                     type="number"
@@ -213,7 +220,7 @@ export default defineComponent({
                     class="data-grid__step-editor-cancel"
                     onClick={closeMenu}
                   >
-                    Anuluj
+                    {props.localeText.cancelLabel ?? 'Anuluj'}
                   </button>
                   <button
                     type="button"
@@ -223,7 +230,7 @@ export default defineComponent({
                     <span class="data-grid__step-editor-save-icon">
                       <IconSaveRounded />
                     </span>
-                    <span>Zapisz ilosc</span>
+                    <span>{props.localeText.saveQuantityLabel ?? 'Zapisz ilosc'}</span>
                   </button>
                 </div>
               </div>

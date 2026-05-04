@@ -12,6 +12,7 @@ export { default as DataGridInlineDateInput } from './components/DataGridInlineD
 export { default as DataGridInlineEditStatus } from './components/DataGridInlineEditStatus'
 export { default as DataGridInlineNumberInput } from './components/DataGridInlineNumberInput'
 export { default as DataGridInlineSelectEditor } from './components/DataGridInlineSelectEditor'
+export { default as DataGridRowActions } from './components/DataGridRowActions'
 export { default as DataGridSaveViewDialog } from './components/DataGridSaveViewDialog'
 export { default as DataGridStepQuantityEditor } from './components/DataGridStepQuantityEditor'
 export { default as DataGridSelectionPanel } from './components/DataGridSelectionPanel'
@@ -27,8 +28,10 @@ export {
   createDataGridTextColumn,
 } from './columnFactories'
 export { useDataGridInlineMutation } from './composables/useDataGridInlineMutation'
+export { useDataGridInlineEdit } from './composables/useDataGridInlineEdit'
 export type {
   DataGridInlineMutationState,
   DataGridInlineMutationStatus,
 } from './composables/useDataGridInlineMutation'
+export type { DataGridInlineEditCell } from './composables/useDataGridInlineEdit'
 export * from './types'

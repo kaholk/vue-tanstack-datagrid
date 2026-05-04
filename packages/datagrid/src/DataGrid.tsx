@@ -524,7 +524,7 @@ export default defineComponent({
       default: 3,
     },
     height: {
-      type: Number as PropType<DataGridHeight>,
+      type: [Number, String] as PropType<DataGridHeight | -1>,
       default: 560,
     },
     loadingConfig: {
@@ -1540,7 +1540,7 @@ export default defineComponent({
     const showViewsMenu = computed(
       () => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence),
     )
-    const isAutoHeight = computed(() => props.height === -1)
+    const isAutoHeight = computed(() => props.height === 'fill' || props.height === -1)
 
     function getPinnedSide(columnId: string): 'left' | 'right' | false {
       if (leftPinnedColumnIds.value.has(columnId)) {

@@ -67,7 +67,7 @@ export type DataGridPageSizeConfig = {
   options?: number[]
 }
 
-export type DataGridHeight = number
+export type DataGridHeight = number | 'fill'
 
 export type DataGridLoadingVariant = 'none' | 'overlay'
 
@@ -153,6 +153,30 @@ export type DataGridRowSelectionConfig<TData extends RowData> = {
   columnId?: string
   defaultPin?: 'left' | 'right' | false
   column?: Partial<DataGridColumn<TData>>
+}
+
+export type DataGridRowActionContext<TData extends RowData = RowData> = {
+  row: TData
+  event: MouseEvent
+}
+
+export type DataGridRowAction<TData extends RowData = RowData> = {
+  id: string
+  title: string
+  ariaLabel?: string
+  icon: (context: Omit<DataGridRowActionContext<TData>, 'event'>) => unknown
+  class?: string | Array<string | Record<string, boolean>> | Record<string, boolean>
+  disabled?: boolean | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) => boolean)
+  onClick: (context: DataGridRowActionContext<TData>) => void | Promise<void>
+}
+
+export type DataGridStepQuantityEditorLocaleText = {
+  doneLabel?: string
+  noneLabel?: string
+  blockedLabel?: string
+  quantityLabel?: string
+  cancelLabel?: string
+  saveQuantityLabel?: string
 }
 
 export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & {
