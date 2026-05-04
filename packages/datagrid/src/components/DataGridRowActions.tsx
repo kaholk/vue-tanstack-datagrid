@@ -23,6 +23,7 @@ export default defineComponent({
             typeof action.disabled === 'function'
               ? action.disabled(context)
               : Boolean(action.disabled)
+          const actionClass = typeof action.class === 'function' ? action.class(context) : action.class
 
           return (
             <button
@@ -32,7 +33,7 @@ export default defineComponent({
                 'data-grid__toolbar-button',
                 'data-grid__toolbar-button--icon-only',
                 'data-grid__row-actions-button',
-                action.class,
+                actionClass,
               ]}
               title={action.title}
               aria-label={action.ariaLabel ?? action.title}

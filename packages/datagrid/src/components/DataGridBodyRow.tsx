@@ -47,6 +47,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    enableCellSelection: {
+      type: Boolean,
+      default: true,
+    },
     isCellSelected: {
       type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
       default: undefined,
@@ -123,10 +127,33 @@ export default defineComponent({
               typeof columnDef.cellClass === 'function'
                 ? columnDef.cellClass({ cell, row })
                 : columnDef.cellClass
-            const isCellSelected = props.isCellSelected?.(cell) ?? false
-            const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
-            const isCellSelectionRangePreviewed =
-              props.isCellSelectionRangePreviewed?.(cell) ?? false
+            const isCellSelected = props.enableCellSelection
+              ? (props.isCellSelected?.(cell) ?? false)
+              : false
+            const isCellSelectionHovered = props.enableCellSelection
+              ? (props.isCellSelectionHovered?.(cell) ?? false)
+              : false
+            const isCellSelectionRangePreviewed = props.enableCellSelection
+              ? (props.isCellSelectionRangePreviewed?.(cell) ?? false)
+              : false
+            const cellSelectionHandlers = props.enableCellSelection
+              ? ({
+                  onPointerenter: (event: PointerEvent) => {
+                    props.onCellSelectionPointerEnter?.(cell, event)
+                  },
+                  onPointerleave: (event: PointerEvent) => {
+                    props.onCellSelectionPointerLeave?.(cell, event)
+                  },
+                  onPointerdownCapture: preventNativeCellSelection,
+                  onMousedownCapture: preventNativeCellSelection,
+                  onClickCapture: (event: MouseEvent) => {
+                    if (props.onCellSelectionClick?.(cell, event)) {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  },
+                } as Record<string, unknown>)
+              : {}
 
             return (
               <div
@@ -152,24 +179,9 @@ export default defineComponent({
                 ]}
                 data-grid-column-id={entry.column.id}
                 style={props.cellStylesByColumnId.get(entry.column.id)}
-                onPointerenter={(event) => {
-                  props.onCellSelectionPointerEnter?.(cell, event)
-                }}
-                onPointerleave={(event) => {
-                  props.onCellSelectionPointerLeave?.(cell, event)
-                }}
-                {...({
-                  onPointerdownCapture: preventNativeCellSelection,
-                  onMousedownCapture: preventNativeCellSelection,
-                  onClickCapture: (event: MouseEvent) => {
-                    if (props.onCellSelectionClick?.(cell, event)) {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }
-                  },
-                } as Record<string, unknown>)}
+                {...cellSelectionHandlers}
                 onClick={(event) => {
-                  if (props.onCellSelectionClick?.(cell, event)) {
+                  if (props.enableCellSelection && props.onCellSelectionClick?.(cell, event)) {
                     return
                   }
 

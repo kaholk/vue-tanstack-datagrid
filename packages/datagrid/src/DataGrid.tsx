@@ -45,6 +45,7 @@ import { useDataGridFilters } from './composables/useDataGridFilters'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import type {
   DataGridColumnAlign,
+  DataGridCellSelectionConfig,
   DataGridColumn,
   DataGridFilterConfig,
   DataGridQuickFilterConfig,
@@ -563,6 +564,10 @@ export default defineComponent({
       type: Object as PropType<DataGridRowSelectionConfig<any> | undefined>,
       default: undefined,
     },
+    cellSelectionConfig: {
+      type: Object as PropType<DataGridCellSelectionConfig | undefined>,
+      default: undefined,
+    },
   },
   setup(props, { expose, slots }) {
     const localeText = computed<Required<DataGridLocaleText>>(() => ({
@@ -573,6 +578,7 @@ export default defineComponent({
       variant: props.loadingConfig?.variant ?? defaultLoadingConfig.variant,
       label: props.loadingConfig?.label ?? localeText.value.loadingLabel,
     }))
+    const isCellSelectionEnabled = computed(() => props.cellSelectionConfig?.enabled ?? true)
     const lastSelectedRowId = ref<string | null>(null)
     const previewSelectionRowIds = shallowRef<Set<string>>(new Set())
     const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(
@@ -1171,6 +1177,10 @@ export default defineComponent({
     )
     const selectedCellCount = computed(() => selectedCellKeys.value.size)
     const selectedColumnIds = computed(() => {
+      if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
+        return []
+      }
+
       const columns: string[] = []
 
       for (const column of cellSelectionColumns.value) {
@@ -1187,7 +1197,7 @@ export default defineComponent({
       return columns
     })
     const selectedCellRows = computed(() => {
-      if (selectedCellKeys.value.size === 0) {
+      if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
         return []
       }
 
@@ -1229,6 +1239,10 @@ export default defineComponent({
     }
 
     function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
+      if (!isCellSelectionEnabled.value) {
+        return false
+      }
+
       return cellSelectionColumnIdSet.value.has(column.id)
     }
 
@@ -1755,6 +1769,7 @@ export default defineComponent({
 
       return Array.from(requested).sort()
     })
+    const requestedServerColumnsKey = computed(() => requestedServerColumns.value.join('|'))
 
     async function loadData(options: LoadDataOptions = {}) {
       const params: DataGridFetchParams = {
@@ -1763,7 +1778,9 @@ export default defineComponent({
         sorting: sorting.value,
         filters: columnFilters.value,
         search: globalFilter.value.trim() || undefined,
-        include_columns: requestedServerColumns.value,
+        include_columns: requestedServerColumnsKey.value
+          ? requestedServerColumnsKey.value.split('|')
+          : [],
       }
       const requestKey = JSON.stringify(params)
 
@@ -1881,7 +1898,7 @@ export default defineComponent({
     }
 
     watch(
-      [pagination, sorting, columnFilters, globalFilter, requestedServerColumns],
+      [pagination, sorting, columnFilters, globalFilter, requestedServerColumnsKey],
       () => {
         if (debounceTimer) {
           clearTimeout(debounceTimer)
@@ -1905,7 +1922,7 @@ export default defineComponent({
     watch(
       [visibleRows, cellSelectionColumns],
       ([rows, columns]) => {
-        if (selectedCellKeys.value.size === 0) {
+        if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
           return
         }
 
@@ -2466,6 +2483,14 @@ export default defineComponent({
 
     const selectionPanelSums = computed(() => {
       const sumConfigs = mergedSelectionPanelConfig.value?.sumColumns ?? []
+      if (
+        !mergedSelectionPanelConfig.value ||
+        sumConfigs.length === 0 ||
+        Object.keys(rowSelection.value).length === 0
+      ) {
+        return []
+      }
+
       const columnsById = new Map<string, Column<AnyRow, unknown>>()
       const totalsById = new Map<string, number>()
 
@@ -2813,12 +2838,29 @@ export default defineComponent({
                           getPinnedSide={getPinnedSide}
                           renderCell={renderCell}
                           isSelectionPreviewed={previewSelectionRowIds.value.has(row.id)}
-                          isCellSelected={isCellSelected}
-                          isCellSelectionHovered={isCellSelectionHovered}
-                          isCellSelectionRangePreviewed={isCellSelectionRangePreviewed}
-                          onCellSelectionPointerEnter={handleCellSelectionPointerEnter}
-                          onCellSelectionPointerLeave={handleCellSelectionPointerLeave}
-                          onCellSelectionClick={handleCellSelectionClick}
+                          enableCellSelection={isCellSelectionEnabled.value}
+                          isCellSelected={isCellSelectionEnabled.value ? isCellSelected : undefined}
+                          isCellSelectionHovered={
+                            isCellSelectionEnabled.value ? isCellSelectionHovered : undefined
+                          }
+                          isCellSelectionRangePreviewed={
+                            isCellSelectionEnabled.value
+                              ? isCellSelectionRangePreviewed
+                              : undefined
+                          }
+                          onCellSelectionPointerEnter={
+                            isCellSelectionEnabled.value
+                              ? handleCellSelectionPointerEnter
+                              : undefined
+                          }
+                          onCellSelectionPointerLeave={
+                            isCellSelectionEnabled.value
+                              ? handleCellSelectionPointerLeave
+                              : undefined
+                          }
+                          onCellSelectionClick={
+                            isCellSelectionEnabled.value ? handleCellSelectionClick : undefined
+                          }
                         />
                       )
                     })}

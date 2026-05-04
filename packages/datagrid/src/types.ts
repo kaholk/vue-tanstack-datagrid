@@ -156,6 +156,10 @@ export type DataGridRowSelectionConfig<TData extends RowData> = {
   column?: Partial<DataGridColumn<TData>>
 }
 
+export type DataGridCellSelectionConfig = {
+  enabled?: boolean
+}
+
 export type DataGridRowActionContext<TData extends RowData = RowData> = {
   row: TData
   event: MouseEvent
@@ -166,7 +170,14 @@ export type DataGridRowAction<TData extends RowData = RowData> = {
   title: string
   ariaLabel?: string
   icon: (context: Omit<DataGridRowActionContext<TData>, 'event'>) => unknown
-  class?: string | Array<string | Record<string, boolean>> | Record<string, boolean>
+  class?:
+    | string
+    | Array<string | Record<string, boolean>>
+    | Record<string, boolean>
+    | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) =>
+        | string
+        | Array<string | Record<string, boolean>>
+        | Record<string, boolean>)
   disabled?: boolean | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) => boolean)
   onClick: (context: DataGridRowActionContext<TData>) => void | Promise<void>
 }
