@@ -2064,10 +2064,15 @@ export default defineComponent({
       updateVisibleRow(rowId, () => row)
     }
 
+    function getVisibleRows() {
+      return [...requestState.value.rows]
+    }
+
     expose({
       refreshData,
       patchRow,
       replaceRow,
+      getVisibleRows,
     })
 
     function clearAllFilters() {

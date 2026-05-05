@@ -238,6 +238,7 @@ export type DataGridInstance<TData extends RowData = RowData> = {
   refreshData: () => void
   patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => void
   replaceRow: (rowId: DataGridRowId, row: TData) => void
+  getVisibleRows: () => TData[]
 }
 
 export type DataGridInitialState = {

@@ -24,11 +24,22 @@ export {
   serializeDataGridSavedViews,
 } from './savedViews'
 export {
+  createDataGridCommentsColumn,
   createDataGridSelectFilterConfig,
   createDataGridTextColumn,
 } from './columnFactories'
+export { useDataGridEditableColumn } from './composables/useDataGridEditableColumn'
+export { useDataGridFetchPage } from './composables/useDataGridFetchPage'
 export { useDataGridInlineMutation } from './composables/useDataGridInlineMutation'
 export { useDataGridInlineEdit } from './composables/useDataGridInlineEdit'
+export type {
+  DataGridEditableColumnOptions,
+  DataGridRenderEditableCellOptions,
+} from './composables/useDataGridEditableColumn'
+export type {
+  DataGridFetchPageHandler,
+  DataGridFetchPageOptions,
+} from './composables/useDataGridFetchPage'
 export type {
   DataGridInlineMutationState,
   DataGridInlineMutationStatus,
