@@ -480,6 +480,7 @@ export default defineComponent({
     })
     const isLoading = ref(false)
     const errorMessage = ref('')
+    const isInitialViewLoaded = ref(false)
 
     let measureFrame: number | null = null
 
@@ -1293,6 +1294,7 @@ export default defineComponent({
       requestState,
       isLoading,
       errorMessage,
+      enabled: isInitialViewLoaded,
       pagination,
       sorting,
       columnFilters,
@@ -1396,7 +1398,9 @@ export default defineComponent({
 
     onMounted(() => {
       document.addEventListener('click', handleDocumentClick)
-      void loadSavedViews()
+      void loadSavedViews().finally(() => {
+        isInitialViewLoaded.value = true
+      })
     })
 
     const { columnPickerColumns, syncColumnDialogDraftState, getDraftPinnedSide, getDraftColumnMoveTarget, toggleDraftColumnVisibility, updateDraftColumnSize, setDraftPin, moveDraftColumn, updateDraftColumnMoveTarget, moveDraftColumnRelative, applyColumnDialogChanges, draftColumnVisibility, draftColumnSizing } = useDataGridColumnPicker({

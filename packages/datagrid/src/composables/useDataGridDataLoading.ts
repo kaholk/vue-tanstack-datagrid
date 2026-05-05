@@ -1,4 +1,4 @@
-import { onBeforeUnmount, watch, type Ref, type ShallowRef } from 'vue'
+import { onBeforeUnmount, ref, watch, type Ref, type ShallowRef } from 'vue'
 import type { ColumnFiltersState, ColumnSort, PaginationState } from '@tanstack/vue-table'
 
 import type { DataGridFetchParams, DataGridFetchResult, DataGridLocaleText } from '../types'
@@ -14,6 +14,7 @@ type UseDataGridDataLoadingOptions<TData extends AnyRow> = {
   requestState: ShallowRef<DataGridRequestState<TData>>
   isLoading: Ref<boolean>
   errorMessage: Ref<string>
+  enabled?: Ref<boolean>
   pagination: Ref<PaginationState>
   sorting: Ref<ColumnSort[]>
   columnFilters: Ref<ColumnFiltersState>
@@ -104,6 +105,10 @@ export function useDataGridDataLoading<TData extends AnyRow>(options: UseDataGri
   }
 
   function refreshData() {
+    if (options.enabled && !options.enabled.value) {
+      return
+    }
+
     if (debounceTimer) {
       clearTimeout(debounceTimer)
     }
@@ -112,8 +117,19 @@ export function useDataGridDataLoading<TData extends AnyRow>(options: UseDataGri
   }
 
   watch(
-    [options.pagination, options.sorting, options.columnFilters, options.globalFilter, options.requestedServerColumnsKey],
+    [
+      options.enabled ?? ref(true),
+      options.pagination,
+      options.sorting,
+      options.columnFilters,
+      options.globalFilter,
+      options.requestedServerColumnsKey,
+    ],
     () => {
+      if (options.enabled && !options.enabled.value) {
+        return
+      }
+
       if (debounceTimer) {
         clearTimeout(debounceTimer)
       }
