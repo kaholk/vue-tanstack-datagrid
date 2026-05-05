@@ -3,6 +3,7 @@ import { type Cell, type Column, type Row } from '@tanstack/vue-table'
 import type { DataGridColumn } from '../types'
 
 type AnyRow = Record<string, unknown>
+type SelectionPreviewMode = 'select' | 'deselect' | 'toggle' | null
 
 type RenderedRowSequenceItem =
   | { type: 'spacer'; key: string; width: number }
@@ -47,6 +48,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    isSelectionRevertPreviewed: {
+      type: Boolean,
+      default: false,
+    },
     enableCellSelection: {
       type: Boolean,
       default: true,
@@ -59,8 +64,8 @@ export default defineComponent({
       type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
       default: undefined,
     },
-    isCellSelectionRangePreviewed: {
-      type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
+    getCellSelectionPreviewMode: {
+      type: Function as PropType<(cell: Cell<AnyRow, unknown>) => SelectionPreviewMode>,
       default: undefined,
     },
     onCellSelectionPointerEnter: {
@@ -82,7 +87,7 @@ export default defineComponent({
       const isSelected = row.getIsSelected()
       const visibleCells = row.getVisibleCells()
       const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
-        if (!event.ctrlKey && !event.shiftKey) {
+        if (!event.ctrlKey && !event.shiftKey && !event.altKey) {
           return
         }
 
@@ -97,6 +102,7 @@ export default defineComponent({
             'data-grid__row',
             isSelected ? 'data-grid__row--selected' : '',
             !isSelected && props.isSelectionPreviewed ? 'data-grid__row--selection-preview' : '',
+            isSelected && props.isSelectionRevertPreviewed ? 'data-grid__row--selection-revert-preview' : '',
           ]}
           aria-selected={isSelected ? 'true' : 'false'}
           style={{
@@ -133,9 +139,15 @@ export default defineComponent({
             const isCellSelectionHovered = props.enableCellSelection
               ? (props.isCellSelectionHovered?.(cell) ?? false)
               : false
-            const isCellSelectionRangePreviewed = props.enableCellSelection
-              ? (props.isCellSelectionRangePreviewed?.(cell) ?? false)
-              : false
+            const cellSelectionPreviewMode = props.enableCellSelection
+              ? (props.getCellSelectionPreviewMode?.(cell) ?? null)
+              : null
+            const isCellSelectionAddPreviewed =
+              !isCellSelected &&
+              (cellSelectionPreviewMode === 'select' || cellSelectionPreviewMode === 'toggle')
+            const isCellSelectionRevertPreviewed =
+              isCellSelected &&
+              (cellSelectionPreviewMode === 'deselect' || cellSelectionPreviewMode === 'toggle')
             const cellSelectionHandlers = props.enableCellSelection
               ? ({
                   onPointerenter: (event: PointerEvent) => {
@@ -166,10 +178,10 @@ export default defineComponent({
                   isCellSelected && isCellSelectionHovered
                     ? 'data-grid__cell--selection-revert-hover'
                     : '',
-                  isCellSelected && isCellSelectionRangePreviewed
+                  isCellSelectionRevertPreviewed
                     ? 'data-grid__cell--selection-revert-preview'
                     : '',
-                  !isCellSelected && isCellSelectionRangePreviewed
+                  isCellSelectionAddPreviewed
                     ? 'data-grid__cell--selection-range-preview'
                     : '',
                   !isCellSelected && isCellSelectionHovered

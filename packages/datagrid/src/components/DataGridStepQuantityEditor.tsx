@@ -63,18 +63,13 @@ export default defineComponent({
         return
       }
 
-      if (props.modelValue >= 1 || props.modelValue === -2) {
+      if (props.modelValue >= 1 || props.modelValue === -1 || props.modelValue === -2) {
         openMenu()
         return
       }
 
       if (props.modelValue === 0) {
         props.onUpdateModelValue?.(-1)
-        return
-      }
-
-      if (props.modelValue === -1) {
-        props.onUpdateModelValue?.(0)
         return
       }
 

@@ -105,6 +105,16 @@
     background: var(--app-row-selected-hover, var(--app-accent-soft-strong));
   }
 
+.data-grid__row--selection-revert-preview .data-grid__cell,
+  .data-grid__row[aria-selected='true'].data-grid__row--selection-revert-preview .data-grid__cell,
+  .data-grid__row[aria-selected='true'].data-grid__row--selection-revert-preview:hover .data-grid__cell {
+    --data-grid-row-bg: color-mix(in srgb, var(--app-error) 20%, var(--app-surface));
+    background: var(--data-grid-row-bg);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--app-error) 42%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--app-error) 42%, transparent);
+  }
+
 .data-grid__cell--selection-hover {
     --data-grid-row-bg: color-mix(in srgb, var(--app-accent) 28%, var(--app-surface));
     background: var(--data-grid-row-bg);
