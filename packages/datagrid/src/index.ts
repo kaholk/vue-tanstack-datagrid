@@ -18,31 +18,15 @@ export { default as DataGridStepQuantityEditor } from './components/DataGridStep
 export { default as DataGridSelectionPanel } from './components/DataGridSelectionPanel'
 export { default as DataGridToolbar } from './components/DataGridToolbar'
 export { default as DataGridValidatedNumberInput } from './components/DataGridValidatedNumberInput'
-export {
-  createDataGridSavedViewsPersistence,
-  deserializeDataGridSavedViews,
-  serializeDataGridSavedViews,
-} from './savedViews'
-export {
-  createDataGridCommentsColumn,
-  createDataGridSelectFilterConfig,
-  createDataGridTextColumn,
-} from './columnFactories'
+export { createDataGridSavedViewsPersistence, deserializeDataGridSavedViews, serializeDataGridSavedViews } from './savedViews'
+export { createDataGridBooleanSelectColumn, createDataGridCommentsColumn, createDataGridDateColumn, createDataGridEditableDateColumn, createDataGridEditableSelectColumn, createDataGridNumberColumn, createDataGridSelectFilterConfig, createDataGridTextColumn } from './columnFactories'
 export { useDataGridEditableColumn } from './composables/useDataGridEditableColumn'
 export { useDataGridFetchPage } from './composables/useDataGridFetchPage'
 export { useDataGridInlineMutation } from './composables/useDataGridInlineMutation'
 export { useDataGridInlineEdit } from './composables/useDataGridInlineEdit'
-export type {
-  DataGridEditableColumnOptions,
-  DataGridRenderEditableCellOptions,
-} from './composables/useDataGridEditableColumn'
-export type {
-  DataGridFetchPageHandler,
-  DataGridFetchPageOptions,
-} from './composables/useDataGridFetchPage'
-export type {
-  DataGridInlineMutationState,
-  DataGridInlineMutationStatus,
-} from './composables/useDataGridInlineMutation'
+export { useDataGridStableColumns } from './composables/useDataGridStableColumns'
+export type { DataGridEditableColumnOptions, DataGridRenderEditableCellOptions } from './composables/useDataGridEditableColumn'
+export type { DataGridFetchPageHandler, DataGridFetchPageOptions } from './composables/useDataGridFetchPage'
+export type { DataGridInlineMutationState, DataGridInlineMutationStatus } from './composables/useDataGridInlineMutation'
 export type { DataGridInlineEditCell } from './composables/useDataGridInlineEdit'
 export * from './types'

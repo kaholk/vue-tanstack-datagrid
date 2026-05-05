@@ -1,16 +1,4 @@
-import type {
-  ColumnDef,
-  ColumnFiltersState,
-  ColumnOrderState,
-  ColumnPinningState,
-  ColumnSizingState,
-  ColumnSort,
-  Cell,
-  HeaderContext,
-  PaginationState,
-  Row,
-  RowData,
-} from '@tanstack/vue-table'
+import type { ColumnDef, ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ColumnSort, Cell, HeaderContext, PaginationState, Row, RowData } from '@tanstack/vue-table'
 
 export type DataGridLocalKind = 'computed' | 'action'
 export type DataGridColumnVisibilityState = Record<string, boolean>
@@ -23,10 +11,7 @@ export type DataGridFilterOption = {
   value: DataGridFilterOptionValue
 }
 
-export type DataGridFilterOptionsResolver = (context: {
-  columnFilters: ColumnFiltersState
-  draftColumnFilters: ColumnFiltersState
-}) => DataGridFilterOption[]
+export type DataGridFilterOptionsResolver = (context: { columnFilters: ColumnFiltersState; draftColumnFilters: ColumnFiltersState }) => DataGridFilterOption[]
 
 export type DataGridCellContext<TData extends RowData> = {
   cell: Cell<TData, unknown>
@@ -78,12 +63,7 @@ export type DataGridLoadingConfig = {
 
 export type DataGridInlineEditStatusState = 'pending' | 'error'
 
-export type DataGridSelectionPanelPosition =
-  | 'bottom-left'
-  | 'bottom-right'
-  | 'top-left'
-  | 'top-right'
-  | 'floating'
+export type DataGridSelectionPanelPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'floating'
 
 export type DataGridFloatingPosition = {
   x: number
@@ -170,14 +150,7 @@ export type DataGridRowAction<TData extends RowData = RowData> = {
   title: string
   ariaLabel?: string
   icon: (context: Omit<DataGridRowActionContext<TData>, 'event'>) => unknown
-  class?:
-    | string
-    | Array<string | Record<string, boolean>>
-    | Record<string, boolean>
-    | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) =>
-        | string
-        | Array<string | Record<string, boolean>>
-        | Record<string, boolean>)
+  class?: string | Array<string | Record<string, boolean>> | Record<string, boolean> | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) => string | Array<string | Record<string, boolean>> | Record<string, boolean>)
   disabled?: boolean | ((context: Omit<DataGridRowActionContext<TData>, 'event'>) => boolean)
   onClick: (context: DataGridRowActionContext<TData>) => void | Promise<void>
 }
@@ -237,7 +210,10 @@ export type DataGridRowId = string | number
 export type DataGridInstance<TData extends RowData = RowData> = {
   refreshData: () => void
   patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => void
+  patchRows: (patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) => void
+  updateRow: (rowId: DataGridRowId, updater: (row: TData) => TData) => void
   replaceRow: (rowId: DataGridRowId, row: TData) => void
+  getRow: (rowId: DataGridRowId) => TData | null
   getVisibleRows: () => TData[]
 }
 
