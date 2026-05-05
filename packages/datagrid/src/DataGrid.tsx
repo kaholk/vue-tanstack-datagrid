@@ -1,6 +1,5 @@
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef, watch, type CSSProperties, type PropType } from 'vue'
-import { getCoreRowModel, useVueTable, type Cell, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type HeaderContext, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
-import IconCheckSmallRounded from '~icons/material-symbols/check-small-rounded'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, shallowRef, watch, type CSSProperties, type PropType } from 'vue'
+import { getCoreRowModel, useVueTable, type Cell, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
 
 import DataGridBodyRow from './components/DataGridBodyRow'
 import DataGridDialog from './components/DataGridDialog'
@@ -20,7 +19,9 @@ import { useDataGridFilters } from './composables/useDataGridFilters'
 import { useDataGridRows, type DataGridRequestState } from './composables/useDataGridRows'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
-import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridMetaConfig, DataGridPageSizeConfig, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
+import { buildDataGridRowSelectionColumn, defaultRowSelectionColumnId, defaultRowSelectionPreset } from './composables/useDataGridRowSelectionColumn'
+import { resolveDataGridLocaleText } from './locales'
+import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridLocale, DataGridMetaConfig, DataGridPageSizeConfig, DataGridPreset, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
 import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
 import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
 import { toFilterGroupId } from './utils/filters'
@@ -85,151 +86,9 @@ const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
   positionStorageKey: '',
   floatingPosition: { x: 16, y: 16 },
 }
-const defaultRowSelectionColumnId = '__select'
-const defaultRowSelectionPreset = 'default'
 const defaultLoadingConfig: DataGridLoadingConfig = {
   variant: 'overlay',
-  label: 'Ladowanie danych',
-}
-const defaultLocaleText: Required<DataGridLocaleText> = {
-  rowsLabel: 'Rows',
-  fetchedLabel: 'Fetched',
-  datasetLabel: 'Dataset',
-  pageSizeLabel: 'Rows',
-  selectedRowsLabel: 'Zaznaczone wiersze',
-  selectedRowsTotalLabel: 'Zaznaczone razem',
-  selectedColumnsLabel: 'Zaznaczone kolumny',
-  selectedCellsLabel: 'Zaznaczone komorki',
-  copyRowsLabel: 'Kopiuj wiersze',
-  copyColumnsLabel: 'Kopiuj kolumny',
-  copyCellsLabel: 'Kopiuj komorki',
-  copyAllLabel: 'Kopiuj wszystko',
-  copyWithHeadersLabel: 'Kopiuj z naglowkami',
-  copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
-  loadingLabel: 'Ladowanie danych',
-  fetchErrorMessage: 'Nie udalo sie pobrac danych.',
-  columnFiltersGroupLabel: 'Kolumny',
-  extraFiltersGroupLabel: 'Dodatkowe filtry',
-  filterPlaceholder: 'Filtr',
-  noFilterableColumnsMessage: 'Brak backendowych kolumn filtrowalnych.',
-  exportExcelLabel: 'Excel',
-  exportExcelViewAllRowsLabel: 'Wszystkie rekordy',
-  exportExcelViewCurrentPageLabel: 'Biezaca strona',
-  exportExcelAllColumnsAllRowsLabel: 'Wszystkie rekordy',
-  exportExcelAllColumnsCurrentPageLabel: 'Biezaca strona',
-  exportExcelErrorMessage: 'Nie udalo sie wyeksportowac danych do Excel.',
-}
-
-function renderSelectionCheckbox(
-  checked: boolean,
-  onToggle: (nextChecked: boolean, event: MouseEvent | KeyboardEvent) => void,
-  options?: {
-    ariaLabel?: string
-    indeterminate?: boolean
-    onPointerEnter?: (event: PointerEvent) => void
-    onPointerLeave?: (event: PointerEvent) => void
-  },
-) {
-  return h(
-    'button',
-    {
-      type: 'button',
-      role: 'checkbox',
-      'aria-checked': options?.indeterminate ? 'mixed' : checked ? 'true' : 'false',
-      'aria-label': options?.ariaLabel,
-      class: ['data-grid__select-checkbox', checked ? 'data-grid__select-checkbox--checked' : '', options?.indeterminate ? 'data-grid__select-checkbox--indeterminate' : ''],
-      onClick: (event: MouseEvent) => {
-        event.stopPropagation()
-        onToggle(!checked, event)
-      },
-      onKeydown: (event: KeyboardEvent) => {
-        if (event.key !== ' ' && event.key !== 'Enter') {
-          return
-        }
-
-        event.stopPropagation()
-        event.preventDefault()
-        onToggle(!checked, event)
-      },
-      onPointerenter: options?.onPointerEnter,
-      onPointerleave: options?.onPointerLeave,
-    },
-    [checked ? h(IconCheckSmallRounded, { class: 'data-grid__select-checkbox-icon' }) : options?.indeterminate ? h('span', { class: 'data-grid__select-checkbox-dash' }) : null],
-  )
-}
-
-function buildRowSelectionColumn(
-  config: DataGridRowSelectionConfig<AnyRow>,
-  options?: {
-    onToggleAll?: (nextChecked: boolean, context: { table: HeaderContext<AnyRow, unknown>['table'] }, event: MouseEvent | KeyboardEvent) => void
-    onToggleRow?: (
-      nextChecked: boolean,
-      context: {
-        row: CellRenderProps['row']
-        table: CellRenderProps['table']
-      },
-      event: MouseEvent | KeyboardEvent,
-    ) => void
-    onPreviewRowSelection?: (
-      context: {
-        row: CellRenderProps['row']
-        table: CellRenderProps['table']
-      },
-      event: PointerEvent,
-    ) => void
-    onClearRowSelectionPreview?: () => void
-  },
-): DataGridColumn<AnyRow> {
-  const columnId = config.columnId?.trim() || defaultRowSelectionColumnId
-  const columnOverrides = config.column ?? {}
-  const preset = config.preset ?? defaultRowSelectionPreset
-  const presetColumn: Partial<DataGridColumn<AnyRow>> =
-    preset === 'compact-left' || preset === 'compact-right'
-      ? {
-          size: 44,
-          minSize: 44,
-          maxSize: 44,
-          pickerLabel: 'Select',
-        }
-      : {
-          size: 52,
-          minSize: 52,
-          maxSize: 52,
-          pickerLabel: 'Select',
-        }
-  const defaultLabel = (typeof columnOverrides.pickerLabel === 'string' && columnOverrides.pickerLabel.trim()) || 'Select'
-  const baseColumn: DataGridColumn<AnyRow> = {
-    id: columnId,
-    ...presetColumn,
-    header: defaultLabel,
-    align: 'center',
-    localKind: 'action',
-    enableSorting: false,
-    showFilter: false,
-    pickerLabel: defaultLabel,
-    headerControl: ({ table }) =>
-      renderSelectionCheckbox(table.getIsAllPageRowsSelected(), (checked, event) => options?.onToggleAll?.(checked, { table }, event) ?? table.toggleAllPageRowsSelected(checked), {
-        ariaLabel: 'Zaznacz wszystkie wiersze na stronie',
-        indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
-      }),
-    cell: ({ row, table }) =>
-      renderSelectionCheckbox(row.getIsSelected(), (checked, event) => options?.onToggleRow?.(checked, { row, table }, event) ?? row.toggleSelected(checked), {
-        ariaLabel: 'Zaznacz wiersz',
-        onPointerEnter: (event) => options?.onPreviewRowSelection?.({ row, table }, event),
-        onPointerLeave: () => options?.onClearRowSelectionPreview?.(),
-      }),
-  }
-
-  return {
-    ...baseColumn,
-    ...columnOverrides,
-    id: columnId,
-    localKind: columnOverrides.localKind ?? 'action',
-    enableSorting: columnOverrides.enableSorting ?? false,
-    showFilter: columnOverrides.showFilter ?? false,
-    pickerLabel: columnOverrides.pickerLabel ?? defaultLabel,
-    headerControl: columnOverrides.headerControl ?? baseColumn.headerControl,
-  }
+  label: undefined,
 }
 
 export default defineComponent({
@@ -255,29 +114,41 @@ export default defineComponent({
       type: Function as PropType<DataGridRowIdResolver<any> | undefined>,
       default: undefined,
     },
+    locale: {
+      type: String as PropType<DataGridLocale | undefined>,
+      default: undefined,
+    },
+    preset: {
+      type: Object as PropType<DataGridPreset<any> | undefined>,
+      default: undefined,
+    },
     initialState: {
-      type: Object as PropType<DataGridInitialState>,
-      default: () => ({}),
+      type: Object as PropType<DataGridInitialState | undefined>,
+      default: undefined,
     },
     rowHeight: {
-      type: Number,
-      default: 42,
+      type: Number as PropType<number | undefined>,
+      default: undefined,
     },
     overscanRows: {
-      type: Number,
-      default: 10,
+      type: Number as PropType<number | undefined>,
+      default: undefined,
     },
     overscanColumns: {
-      type: Number,
-      default: 3,
+      type: Number as PropType<number | undefined>,
+      default: undefined,
     },
     fetchDebounceMs: {
-      type: Number,
-      default: 180,
+      type: Number as PropType<number | undefined>,
+      default: undefined,
+    },
+    resetPageOnFilterChange: {
+      type: Boolean as PropType<boolean | undefined>,
+      default: undefined,
     },
     height: {
-      type: [Number, String] as PropType<DataGridHeight | -1>,
-      default: 560,
+      type: [Number, String] as PropType<DataGridHeight | -1 | undefined>,
+      default: undefined,
     },
     loadingConfig: {
       type: Object as PropType<DataGridLoadingConfig | undefined>,
@@ -296,15 +167,12 @@ export default defineComponent({
       default: undefined,
     },
     metaItems: {
-      type: Array as PropType<DataGridMetaConfig[]>,
-      default: () => defaultMetaItems.map((item) => ({ ...item })),
+      type: Array as PropType<DataGridMetaConfig[] | undefined>,
+      default: undefined,
     },
     pageSizeConfig: {
-      type: Object as PropType<DataGridPageSizeConfig>,
-      default: () => ({
-        label: defaultPageSizeConfig.label,
-        options: [...(defaultPageSizeConfig.options ?? [])],
-      }),
+      type: Object as PropType<DataGridPageSizeConfig | undefined>,
+      default: undefined,
     },
     selectionPanelConfig: {
       type: Object as PropType<DataGridSelectionPanelConfig<AnyRow> | undefined>,
@@ -324,33 +192,69 @@ export default defineComponent({
     },
   },
   setup(props, { expose, slots }) {
+    const preset = computed<DataGridPreset<AnyRow>>(() => (props.preset ?? {}) as DataGridPreset<AnyRow>)
+    const effectiveLocale = computed<DataGridLocale>(() => props.locale ?? preset.value.locale ?? 'en')
     const localeText = computed<Required<DataGridLocaleText>>(() => ({
-      ...defaultLocaleText,
+      ...resolveDataGridLocaleText(effectiveLocale.value, preset.value.localeText),
       ...(props.localeText ?? {}),
     }))
-    const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
-      variant: props.loadingConfig?.variant ?? defaultLoadingConfig.variant,
-      label: props.loadingConfig?.label ?? localeText.value.loadingLabel,
+    const effectiveInitialState = computed<DataGridInitialState>(() => ({
+      ...(preset.value.initialState ?? {}),
+      ...(props.initialState ?? {}),
     }))
-    const isCellSelectionEnabled = computed(() => props.cellSelectionConfig?.enabled ?? true)
+    const effectiveMetaItems = computed<DataGridMetaConfig[]>(() => {
+      const items = props.metaItems ?? preset.value.metaItems ?? defaultMetaItems
+      return items.map((item) => ({ ...item }))
+    })
+    const effectivePageSizeConfig = computed<DataGridPageSizeConfig>(() => ({
+      ...defaultPageSizeConfig,
+      ...(preset.value.pageSizeConfig ?? {}),
+      ...(props.pageSizeConfig ?? {}),
+    }))
+    const effectiveLoadingConfigInput = computed<DataGridLoadingConfig>(() => ({
+      ...(preset.value.loadingConfig ?? {}),
+      ...(props.loadingConfig ?? {}),
+    }))
+    const effectiveSelectionPanelConfig = computed<DataGridSelectionPanelConfig<AnyRow> | undefined>(() =>
+      (props.selectionPanelConfig ?? preset.value.selectionPanelConfig) as DataGridSelectionPanelConfig<AnyRow> | undefined,
+    )
+    const effectiveRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | undefined>(() =>
+      (props.rowSelectionConfig ?? preset.value.rowSelectionConfig) as DataGridRowSelectionConfig<AnyRow> | undefined,
+    )
+    const effectiveCellSelectionConfig = computed<DataGridCellSelectionConfig | undefined>(() => props.cellSelectionConfig ?? preset.value.cellSelectionConfig)
+    const effectiveExcelExportInput = computed<false | DataGridExcelExportConfig<AnyRow> | undefined>(() =>
+      (props.excelExport ?? preset.value.excelExport) as false | DataGridExcelExportConfig<AnyRow> | undefined,
+    )
+    const effectiveHeight = computed<DataGridHeight | -1>(() => props.height ?? preset.value.height ?? 560)
+    const effectiveRowHeight = computed(() => props.rowHeight ?? preset.value.rowHeight ?? 42)
+    const effectiveOverscanRows = computed(() => props.overscanRows ?? preset.value.overscanRows ?? 10)
+    const effectiveOverscanColumns = computed(() => props.overscanColumns ?? preset.value.overscanColumns ?? 3)
+    const effectiveFetchDebounceMs = computed(() => props.fetchDebounceMs ?? preset.value.fetchDebounceMs ?? 180)
+    const effectiveResetPageOnFilterChange = computed(() => props.resetPageOnFilterChange ?? preset.value.resetPageOnFilterChange ?? true)
+    const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
+      variant: effectiveLoadingConfigInput.value.variant ?? defaultLoadingConfig.variant,
+      label: effectiveLoadingConfigInput.value.label ?? localeText.value.loadingLabel,
+    }))
+    const isCellSelectionEnabled = computed(() => effectiveCellSelectionConfig.value?.enabled ?? true)
     const lastSelectedRowId = ref<string | null>(null)
     const previewSelectionRowIds = shallowRef<Set<string>>(new Set())
     const rowSelectionPreviewMode = ref<SelectionPreviewMode>(null)
-    const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(props.selectionPanelConfig?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right')
-    const selectionPanelFloatingPosition = ref<DataGridFloatingPosition>(props.selectionPanelConfig?.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition ?? { x: 16, y: 16 })
+    const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(effectiveSelectionPanelConfig.value?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right')
+    const selectionPanelFloatingPosition = ref<DataGridFloatingPosition>(effectiveSelectionPanelConfig.value?.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition ?? { x: 16, y: 16 })
     const mergedRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | null>(() => {
-      if (!props.rowSelectionConfig?.enabled) {
+      const config = effectiveRowSelectionConfig.value
+      if (!config?.enabled) {
         return null
       }
 
-      const preset = props.rowSelectionConfig.preset ?? defaultRowSelectionPreset
+      const preset = config.preset ?? defaultRowSelectionPreset
 
       return {
         enabled: true,
         preset,
-        columnId: props.rowSelectionConfig.columnId?.trim() || defaultRowSelectionColumnId,
-        defaultPin: props.rowSelectionConfig.defaultPin ?? (preset === 'compact-left' ? 'left' : preset === 'compact-right' ? 'right' : false),
-        column: props.rowSelectionConfig.column ?? {},
+        columnId: config.columnId?.trim() || defaultRowSelectionColumnId,
+        defaultPin: config.defaultPin ?? (preset === 'compact-left' ? 'left' : preset === 'compact-right' ? 'right' : false),
+        column: config.column ?? {},
       }
     })
     const rowSelectionColumnSize = computed(() => getFixedColumnSize(mergedRowSelectionConfig.value?.column))
@@ -362,7 +266,7 @@ export default defineComponent({
       }
 
       const selectionColumn = normalizeColumnSize(
-        buildRowSelectionColumn(rowSelectionConfig, {
+        buildDataGridRowSelectionColumn(rowSelectionConfig, {
           onToggleAll: (checked, context) => {
             context.table.toggleAllPageRowsSelected(checked)
             lastSelectedRowId.value = null
@@ -405,7 +309,7 @@ export default defineComponent({
       return [selectionColumn, ...remainingColumns]
     })
     const mergedInitialState = computed<DataGridInitialState>(() => {
-      const initialState = props.initialState ?? {}
+      const initialState = effectiveInitialState.value
       const rowSelectionConfig = mergedRowSelectionConfig.value
 
       if (!rowSelectionConfig) {
@@ -842,8 +746,8 @@ export default defineComponent({
     const totalWidth = computed(() => table.getTotalSize())
     const visibleRowIndexByKey = rowIndexByKey
     const selectionPanelPositionStorageKey = computed(() => {
-      if (props.selectionPanelConfig?.positionStorageKey) {
-        return props.selectionPanelConfig.positionStorageKey
+      if (effectiveSelectionPanelConfig.value?.positionStorageKey) {
+        return effectiveSelectionPanelConfig.value.positionStorageKey
       }
 
       if (props.viewStorageKey) {
@@ -854,22 +758,23 @@ export default defineComponent({
     })
     const visibleColumnIndexById = computed(() => new Map(visibleColumns.value.map((column, index) => [column.id, index])))
     const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig<AnyRow> | null>(() => {
-      if (!props.selectionPanelConfig) {
+      const config = effectiveSelectionPanelConfig.value
+      if (!config) {
         return null
       }
 
       return {
-        position: selectionPanelPosition.value ?? props.selectionPanelConfig.position ?? defaultSelectionPanelConfig.position,
-        sumColumns: props.selectionPanelConfig.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
-        actions: props.selectionPanelConfig.actions ?? defaultSelectionPanelConfig.actions,
-        copyColumnIds: props.selectionPanelConfig.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
-        copyIncludeHeaders: props.selectionPanelConfig.copyIncludeHeaders ?? defaultSelectionPanelConfig.copyIncludeHeaders,
-        selectedRowsLabel: props.selectionPanelConfig.selectedRowsLabel ?? localeText.value.selectedRowsLabel,
-        copyWithHeadersLabel: props.selectionPanelConfig.copyWithHeadersLabel ?? localeText.value.copyWithHeadersLabel,
-        copyWithoutHeadersLabel: props.selectionPanelConfig.copyWithoutHeadersLabel ?? localeText.value.copyWithoutHeadersLabel,
-        allowPositionChange: props.selectionPanelConfig.allowPositionChange ?? defaultSelectionPanelConfig.allowPositionChange,
-        positionStorageKey: props.selectionPanelConfig.positionStorageKey ?? defaultSelectionPanelConfig.positionStorageKey,
-        floatingPosition: selectionPanelFloatingPosition.value ?? props.selectionPanelConfig.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition,
+        position: selectionPanelPosition.value ?? config.position ?? defaultSelectionPanelConfig.position,
+        sumColumns: config.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
+        actions: config.actions ?? defaultSelectionPanelConfig.actions,
+        copyColumnIds: config.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
+        copyIncludeHeaders: config.copyIncludeHeaders ?? defaultSelectionPanelConfig.copyIncludeHeaders,
+        selectedRowsLabel: config.selectedRowsLabel ?? localeText.value.selectedRowsLabel,
+        copyWithHeadersLabel: config.copyWithHeadersLabel ?? localeText.value.copyWithHeadersLabel,
+        copyWithoutHeadersLabel: config.copyWithoutHeadersLabel ?? localeText.value.copyWithoutHeadersLabel,
+        allowPositionChange: config.allowPositionChange ?? defaultSelectionPanelConfig.allowPositionChange,
+        positionStorageKey: config.positionStorageKey ?? defaultSelectionPanelConfig.positionStorageKey,
+        floatingPosition: selectionPanelFloatingPosition.value ?? config.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition,
       }
     })
     const selectedRows = computed(() => {
@@ -1249,6 +1154,7 @@ export default defineComponent({
       columnFilters,
       draftColumnFilters,
       pagination,
+      resetPageOnFilterChange: () => effectiveResetPageOnFilterChange.value,
       renderColumnPickerLabel,
       onOpenFilterMenu: closeOverlayState,
     })
@@ -1279,7 +1185,7 @@ export default defineComponent({
       cloneViewState,
     })
     const showViewsMenu = computed(() => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence))
-    const isAutoHeight = computed(() => props.height === 'fill' || props.height === -1)
+    const isAutoHeight = computed(() => effectiveHeight.value === 'fill' || effectiveHeight.value === -1)
 
     const { rowVirtualizer, columnVirtualizer, virtualRows, totalRowHeight, headerSequence, rowSequence, cellStylesByColumnId, getPinnedSide } = useDataGridVirtualization({
       scrollElementRef,
@@ -1289,9 +1195,9 @@ export default defineComponent({
       allLeafColumnsById,
       visibleColumnIndexById,
       columnPinning,
-      rowHeight: () => props.rowHeight,
-      overscanRows: () => props.overscanRows,
-      overscanColumns: () => props.overscanColumns,
+      rowHeight: () => effectiveRowHeight.value,
+      overscanRows: () => effectiveOverscanRows.value,
+      overscanColumns: () => effectiveOverscanColumns.value,
     })
 
     const serverFilterColumns = computed(() => allLeafColumns.value.filter((column) => Boolean((column.columnDef as DataGridColumn<AnyRow>).serverField)))
@@ -1366,7 +1272,7 @@ export default defineComponent({
       const searchFilterCount = globalFilter.value.trim() ? 1 : 0
       return columnFilters.value.length + searchFilterCount
     })
-    const excelExportConfig = computed<DataGridExcelExportConfig<AnyRow>>(() => (props.excelExport === false ? { enabled: false } : (props.excelExport ?? {})))
+    const excelExportConfig = computed<DataGridExcelExportConfig<AnyRow>>(() => (effectiveExcelExportInput.value === false ? { enabled: false } : (effectiveExcelExportInput.value ?? {})))
     const isExcelExportEnabled = computed(() => excelExportConfig.value.enabled ?? true)
     const defaultExcelExportModes: DataGridExcelExportMode[] = ['view-all-rows', 'view-current-page', 'all-columns-all-rows', 'all-columns-current-page']
     const excelExportActions = computed(() => {
@@ -1418,7 +1324,7 @@ export default defineComponent({
       requestedServerColumnsKey,
       localeText,
       fetchPage: () => props.fetchPage,
-      fetchDebounceMs: () => props.fetchDebounceMs,
+      fetchDebounceMs: () => effectiveFetchDebounceMs.value,
       onLoaded: () => rowVirtualizer.value.scrollToOffset(0),
     })
     const { exporting: isExcelExporting, exportExcel } = useDataGridExcelExport({
@@ -1495,13 +1401,30 @@ export default defineComponent({
       resetDialogFilterDraftState()
     }
 
-    watch(
-      () => [columnVisibility.value, columnPinning.value, columnOrder.value, columnSizing.value],
-      () => {
-        scheduleColumnMeasure()
-      },
-      { deep: true },
+    function resetPageForFilterChange() {
+      if (!effectiveResetPageOnFilterChange.value) {
+        return
+      }
+
+      pagination.value = {
+        ...pagination.value,
+        pageIndex: 0,
+      }
+    }
+
+    const columnMeasureKey = computed(() =>
+      [
+        columnOrder.value.join('|'),
+        Object.entries(columnSizing.value).sort(([a], [b]) => a.localeCompare(b)).map(([id, size]) => `${id}:${size}`).join('|'),
+        Object.entries(columnVisibility.value).sort(([a], [b]) => a.localeCompare(b)).map(([id, visible]) => `${id}:${visible ? 1 : 0}`).join('|'),
+        (columnPinning.value.left ?? []).join('|'),
+        (columnPinning.value.right ?? []).join('|'),
+      ].join('::'),
     )
+
+    watch(columnMeasureKey, () => {
+      scheduleColumnMeasure()
+    })
 
     watch(
       [visibleRows, cellSelectionColumns],
@@ -1562,10 +1485,7 @@ export default defineComponent({
     })
 
     function applyFilterDialogChanges() {
-      pagination.value = {
-        ...pagination.value,
-        pageIndex: 0,
-      }
+      resetPageForFilterChange()
       columnFilters.value = cloneColumnFilters(draftColumnFilters.value)
       globalFilter.value = draftGlobalFilter.value
       syncFilterDialogDraftState()
@@ -1584,10 +1504,7 @@ export default defineComponent({
     })
 
     function clearAllFilters() {
-      pagination.value = {
-        ...pagination.value,
-        pageIndex: 0,
-      }
+      resetPageForFilterChange()
       sorting.value = [...(mergedInitialState.value.sorting ?? [])]
       columnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
       globalFilter.value = mergedInitialState.value.globalFilter ?? ''
@@ -1926,7 +1843,7 @@ export default defineComponent({
               class="data-grid__viewport-shell"
               style={
                 {
-                  ...(isAutoHeight.value ? {} : { height: `${props.height}px` }),
+                  ...(isAutoHeight.value ? {} : { height: `${effectiveHeight.value}px` }),
                   '--data-grid-header-height': `${headerHeight}px`,
                 } as Record<string, string>
               }
@@ -2017,8 +1934,8 @@ export default defineComponent({
                 totalRows={requestState.value.totalRows}
                 fetchedRows={requestState.value.rows.length}
                 datasetSize={typeof requestState.value.meta?.datasetSize === 'string' || typeof requestState.value.meta?.datasetSize === 'number' ? requestState.value.meta.datasetSize : undefined}
-                metaItems={props.metaItems}
-                pageSizeConfig={props.pageSizeConfig}
+                metaItems={effectiveMetaItems.value}
+                pageSizeConfig={effectivePageSizeConfig.value}
                 pageIndex={pageIndex}
                 pageSize={pagination.value.pageSize}
                 paginationItems={paginationItems}

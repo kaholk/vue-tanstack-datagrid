@@ -12,6 +12,7 @@ type UseDataGridFiltersOptions = {
   columnFilters: Ref<ColumnFiltersState>
   draftColumnFilters: Ref<ColumnFiltersState>
   pagination: Ref<PaginationState>
+  resetPageOnFilterChange?: () => boolean
   renderColumnPickerLabel: (column: Column<AnyRow, unknown>) => string
   onOpenFilterMenu: (options?: { keepDialogsOpen?: boolean }) => void
 }
@@ -81,9 +82,11 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return
     }
 
-    options.pagination.value = {
-      ...options.pagination.value,
-      pageIndex: 0,
+    if (options.resetPageOnFilterChange?.() ?? true) {
+      options.pagination.value = {
+        ...options.pagination.value,
+        pageIndex: 0,
+      }
     }
     options.columnFilters.value = getNextColumnFilters(options.columnFilters.value, columnId, value)
   }

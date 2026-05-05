@@ -213,14 +213,17 @@ type DataGridFetchResult<TData> = {
 | --- | --- | --- | --- |
 | `columns` | `DataGridColumn<T>[]` | required | Column definitions |
 | `fetchPage` | `(params, signal?) => Promise<DataGridFetchResult<T>>` | required | Data loading function |
+| `locale` | `'en' \| 'pl'` | `en` | Built-in text preset |
+| `preset` | `DataGridPreset<T>` | `undefined` | Shared defaults for grid state, locale, selection, export, and layout |
 | `toolbarFilters` | `DataGridFilterConfig[]` | `[]` | Additional filters not tied 1:1 to a column |
 | `quickFilters` | `DataGridQuickFilterConfig[]` | `[]` | Filter shortcuts shown in the toolbar |
 | `initialState` | `DataGridInitialState` | `{}` | Initial grid state |
 | `rowHeight` | `number` | `42` | Estimated row height for virtualization |
 | `overscanRows` | `number` | `10` | Row virtualization buffer |
 | `overscanColumns` | `number` | `3` | Column virtualization buffer |
-| `height` | `number \| 'auto'` | `560` | Fixed viewport height in px or fill the available parent height |
+| `height` | `number \| 'fill'` | `560` | Fixed viewport height in px or fill the available parent height |
 | `localeText` | `DataGridLocaleText \| undefined` | built-in labels | Text labels used by the grid |
+| `resetPageOnFilterChange` | `boolean` | `true` | Reset to the first page after filter changes |
 | `viewStorageKey` | `string` | `''` | `localStorage` key for saved views |
 | `savedViewsPersistence` | `DataGridSavedViewsPersistence \| undefined` | `undefined` | Custom saved views persistence |
 | `metaItems` | `DataGridMetaConfig[]` | `rows`, `fetched`, `datasetSize` | Footer metadata to display |
@@ -256,6 +259,27 @@ import { createDataGridSelectFilterConfig } from 'vue-tanstack-datagrid'
 const selectFilter = createDataGridSelectFilterConfig<OrderRow>(statusOptions, {
   includeEmpty: true,
 })
+```
+
+## Presets
+
+Use presets to keep repeated grid setup out of feature views:
+
+```ts
+import { createDataGridPreset } from 'vue-tanstack-datagrid'
+
+const ordersGridPreset = createDataGridPreset({
+  locale: 'pl',
+  height: 'fill',
+  pageSizeConfig: { label: 'Wierszy na stronę', options: [25, 50, 100, 200] },
+  initialState: {
+    pagination: { pageIndex: 0, pageSize: 50 },
+  },
+})
+```
+
+```tsx
+<DataGrid columns={columns} fetchPage={fetchOrders} preset={ordersGridPreset} />
 ```
 
 ## Inline Mutation Helper
@@ -324,15 +348,15 @@ In most cases, public usage is limited to:
 6. The selection panel works on currently loaded rows only.
 7. Virtualization assumes a sensible `rowHeight`.
 
-## `height="auto"`
+## `height="fill"`
 
-`height="auto"` makes the grid fill the available height of its parent instead of using a fixed pixel value.
+`height="fill"` makes the grid fill the available height of its parent instead of using a fixed pixel value.
 
 Use it when the grid lives inside a flex or full-height layout:
 
 ```tsx
 <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
-  <DataGrid columns={columns} fetchPage={fetchUsers} height="auto" />
+  <DataGrid columns={columns} fetchPage={fetchUsers} height="fill" />
 </div>
 ```
 

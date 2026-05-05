@@ -73,6 +73,8 @@ function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Hea
 export function useDataGridVirtualization(options: UseDataGridVirtualizationOptions) {
   const leftPinnedColumnIds = computed(() => new Set(options.columnPinning.value.left ?? []))
   const rightPinnedColumnIds = computed(() => new Set(options.columnPinning.value.right ?? []))
+  let previousCellStylesKey = ''
+  let previousCellStylesByColumnId = new Map<string, CSSProperties>()
 
   function getPinnedSide(columnId: string): 'left' | 'right' | false {
     if (leftPinnedColumnIds.value.has(columnId)) {
@@ -114,6 +116,17 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
   const headerSequence = computed(() => buildRenderedColumnSequence(options.visibleHeaders.value, (header) => header.column, renderedNonPinnedIds.value, getPinnedSide))
   const rowSequence = computed(() => buildRenderedColumnSequence(options.visibleColumns.value, (column) => column, renderedNonPinnedIds.value, getPinnedSide))
   const cellStylesByColumnId = computed(() => {
+    const stylesKey = [
+      options.visibleColumns.value.map((column) => `${column.id}:${column.getSize()}:${(column.columnDef as DataGridColumn<AnyRow>).align ?? ''}`).join('|'),
+      (options.columnPinning.value.left ?? []).join('|'),
+      (options.columnPinning.value.right ?? []).join('|'),
+      Array.from(options.visibleColumnIndexById.value.keys()).join('|'),
+    ].join('::')
+
+    if (stylesKey === previousCellStylesKey) {
+      return previousCellStylesByColumnId
+    }
+
     const styles = new Map<string, CSSProperties>()
     let leftOffset = 0
     const leftPinnedIds = options.columnPinning.value.left ?? []
@@ -169,6 +182,8 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
       })
     }
 
+    previousCellStylesKey = stylesKey
+    previousCellStylesByColumnId = styles
     return styles
   })
 

@@ -5,6 +5,7 @@ export type DataGridColumnAlign = 'start' | 'center' | 'end'
 export type DataGridHeaderMode = 'default' | 'custom'
 export type DataGridMetaKey = 'rows' | 'fetched' | 'datasetSize'
 export type DataGridHeight = number | 'fill'
+export type DataGridLocale = 'en' | 'pl'
 export type DataGridLoadingVariant = 'none' | 'overlay'
 export type DataGridInlineEditStatusState = 'pending' | 'error'
 export type DataGridRowId = string | number

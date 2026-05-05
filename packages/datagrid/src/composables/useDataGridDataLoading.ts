@@ -26,6 +26,37 @@ type UseDataGridDataLoadingOptions<TData extends AnyRow> = {
   onLoaded?: () => void
 }
 
+function normalizeRequestValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeRequestValue)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, entry]) => [key, normalizeRequestValue(entry)]),
+    )
+  }
+
+  return value
+}
+
+function stableRequestPart(value: unknown) {
+  return JSON.stringify(normalizeRequestValue(value))
+}
+
+function createRequestKey(params: DataGridFetchParams) {
+  return [
+    params.pageIndex,
+    params.pageSize,
+    stableRequestPart(params.sorting),
+    stableRequestPart(params.filters),
+    params.search ?? '',
+    [...(params.include_columns ?? [])].sort().join('|'),
+  ].join('::')
+}
+
 export function useDataGridDataLoading<TData extends AnyRow>(options: UseDataGridDataLoadingOptions<TData>) {
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
   let activeController: AbortController | null = null
@@ -41,9 +72,9 @@ export function useDataGridDataLoading<TData extends AnyRow>(options: UseDataGri
       sorting: options.sorting.value,
       filters: options.columnFilters.value,
       search: options.globalFilter.value.trim() || undefined,
-      include_columns: options.requestedServerColumnsKey.value ? options.requestedServerColumnsKey.value.split('|') : [],
+      include_columns: options.requestedServerColumnsKey.value ? options.requestedServerColumnsKey.value.split('|').filter(Boolean).sort() : [],
     }
-    const requestKey = JSON.stringify(params)
+    const requestKey = createRequestKey(params)
 
     if (!loadOptions.force && (requestKey === activeRequestKey || requestKey === loadedRequestKey)) {
       return

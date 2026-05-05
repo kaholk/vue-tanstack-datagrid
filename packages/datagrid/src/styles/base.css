@@ -53,6 +53,16 @@
   );
 }
 
+.data-grid-fill-container {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
 .data-grid--fill-height {
   display: flex;
   flex: 1 1 auto;
