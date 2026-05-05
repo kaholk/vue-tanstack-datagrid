@@ -1,9 +1,18 @@
-import { defineComponent, type PropType, type VNodeChild } from 'vue'
+import { defineComponent, ref, type PropType, type VNodeChild } from 'vue'
 import IconDeleteRounded from '~icons/material-symbols/delete-rounded'
+import IconDownloadRounded from '~icons/material-symbols/download-rounded'
 import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
 import IconHelpOutlineRounded from '~icons/material-symbols/help-outline-rounded'
 import IconRefreshRounded from '~icons/material-symbols/refresh-rounded'
 import IconViewColumnOutlineRounded from '~icons/material-symbols/view-column-outline-rounded'
+
+import DataGridDropdownMenu from './DataGridDropdownMenu'
+import type { DataGridExcelExportMode } from '../types'
+
+type ExcelExportAction = {
+  mode: DataGridExcelExportMode
+  label: string
+}
 
 export default defineComponent({
   name: 'DataGridToolbarActions',
@@ -32,15 +41,104 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    excelExportActions: {
+      type: Array as PropType<ExcelExportAction[]>,
+      default: () => [],
+    },
+    isExcelExporting: {
+      type: Boolean,
+      default: false,
+    },
+    exportExcelLabel: {
+      type: String,
+      default: 'Excel',
+    },
+    onExportExcel: {
+      type: Function as PropType<(mode: DataGridExcelExportMode) => void>,
+      default: undefined,
+    },
     customActions: {
       type: Array as PropType<VNodeChild[] | undefined>,
       default: undefined,
     },
   },
   setup(props) {
+    const isExcelMenuOpen = ref(false)
+
+    function toggleExcelMenu() {
+      isExcelMenuOpen.value = !isExcelMenuOpen.value
+    }
+
+    function closeExcelMenu() {
+      isExcelMenuOpen.value = false
+    }
+
+    function handleExport(mode: DataGridExcelExportMode) {
+      closeExcelMenu()
+      props.onExportExcel?.(mode)
+    }
+
+    const viewActions = () => props.excelExportActions.filter((action) => action.mode.startsWith('view-'))
+    const allActions = () => props.excelExportActions.filter((action) => action.mode.startsWith('all-columns-'))
+    const renderExcelAction = (action: ExcelExportAction) => {
+      const Icon = action.mode.startsWith('all-columns-') ? IconViewColumnOutlineRounded : IconDownloadRounded
+
+      return (
+        <button
+          key={action.mode}
+          type="button"
+          class="data-grid__menu-item data-grid__excel-menu-item"
+          onClick={() => handleExport(action.mode)}
+          data-grid-excel-root="true"
+        >
+          <Icon class="data-grid__menu-item-icon" />
+          <span>{action.label}</span>
+        </button>
+      )
+    }
+
     return () => (
       <div class="data-grid__toolbar-actions" data-grid-dialog-root="true">
         {props.customActions}
+        {props.excelExportActions.length > 0 ? (
+          <div class="data-grid__excel-export" data-grid-excel-root="true">
+            <button
+              type="button"
+              class="data-grid__toolbar-button"
+              onClick={toggleExcelMenu}
+              disabled={props.isExcelExporting}
+              data-grid-excel-root="true"
+            >
+              {props.isExcelExporting ? (
+                <span class="data-grid__button-spinner" aria-hidden="true" />
+              ) : (
+                <IconDownloadRounded class="data-grid__button-icon" />
+              )}
+              <span>{props.isExcelExporting ? `${props.exportExcelLabel}...` : props.exportExcelLabel}</span>
+            </button>
+            {isExcelMenuOpen.value ? (
+              <DataGridDropdownMenu
+                menuClass="data-grid__excel-menu"
+                scopeAttr="data-grid-excel-root"
+                outsideClickRootAttr="data-grid-excel-root"
+                onOutsidePointerDown={closeExcelMenu}
+              >
+                {viewActions().length > 0 ? (
+                  <div class="data-grid__excel-menu-section">
+                    <div class="data-grid__excel-menu-section-title">Widok</div>
+                    {viewActions().map(renderExcelAction)}
+                  </div>
+                ) : null}
+                {allActions().length > 0 ? (
+                  <div class="data-grid__excel-menu-section">
+                    <div class="data-grid__excel-menu-section-title">Wszystko</div>
+                    {allActions().map(renderExcelAction)}
+                  </div>
+                ) : null}
+              </DataGridDropdownMenu>
+            ) : null}
+          </div>
+        ) : null}
         <div class="data-grid__toolbar-button-group" data-grid-dialog-root="true">
           <button
             type="button"

@@ -3,12 +3,17 @@ import { defineComponent, type PropType, type VNodeChild } from 'vue'
 import DataGridQuickFilters from './DataGridQuickFilters'
 import DataGridToolbarActions from './DataGridToolbarActions'
 import DataGridViewsMenu from './DataGridViewsMenu'
-import type { DataGridFilterConfig, DataGridSavedView } from '../types'
+import type { DataGridExcelExportMode, DataGridFilterConfig, DataGridSavedView } from '../types'
 
 type QuickFilterItem = {
   id: string
   width?: number | string
   config: DataGridFilterConfig
+}
+
+type ExcelExportAction = {
+  mode: DataGridExcelExportMode
+  label: string
 }
 
 export default defineComponent({
@@ -84,6 +89,22 @@ export default defineComponent({
       type: Function as PropType<() => void>,
       required: true,
     },
+    excelExportActions: {
+      type: Array as PropType<ExcelExportAction[]>,
+      default: () => [],
+    },
+    isExcelExporting: {
+      type: Boolean,
+      default: false,
+    },
+    exportExcelLabel: {
+      type: String,
+      default: 'Excel',
+    },
+    onExportExcel: {
+      type: Function as PropType<(mode: DataGridExcelExportMode) => void>,
+      default: undefined,
+    },
     customActions: {
       type: Array as PropType<VNodeChild[] | undefined>,
       default: undefined,
@@ -118,6 +139,10 @@ export default defineComponent({
           onRefresh={props.onRefresh}
           onClearFilters={props.onClearFilters}
           onToggleColumnPicker={props.onToggleColumnPicker}
+          excelExportActions={props.excelExportActions}
+          isExcelExporting={props.isExcelExporting}
+          exportExcelLabel={props.exportExcelLabel}
+          onExportExcel={props.onExportExcel}
         />
       </div>
     )

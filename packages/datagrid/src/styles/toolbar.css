@@ -252,6 +252,10 @@
     position: relative;
   }
 
+.data-grid__excel-export {
+    position: relative;
+  }
+
 .data-grid__views-menu {
     position: absolute;
     top: calc(100% + 0.4rem);
@@ -264,6 +268,71 @@
     border-radius: 0.65rem;
     background: var(--app-surface);
     box-shadow: var(--app-shadow-soft);
+  }
+
+.data-grid__excel-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 220;
+    display: grid;
+    gap: 0.35rem;
+    width: min(18rem, calc(100vw - 2rem));
+    padding: 0.5rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 0.65rem;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-soft);
+  }
+
+.data-grid__excel-menu-section {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+.data-grid__excel-menu-section + .data-grid__excel-menu-section {
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--app-border);
+  }
+
+.data-grid__excel-menu-section-title {
+    padding: 0.15rem 0.35rem;
+    color: var(--app-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+.data-grid__excel-menu-item {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    justify-content: stretch;
+    justify-items: start;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding-left: 0.35rem;
+    text-align: left;
+  }
+
+.data-grid__excel-menu-item span {
+    justify-self: start;
+    text-align: left;
+  }
+
+.data-grid__excel-menu-item:not(:disabled):hover {
+    background: var(--app-accent-soft);
+    border-color: var(--app-accent);
+    color: var(--app-text);
+  }
+
+.data-grid__excel-menu-item .data-grid__menu-item-icon {
+    justify-self: start;
+    width: 1rem;
+    min-width: 1rem;
+    margin-left: 0;
   }
 
 .data-grid__views-actions {
@@ -362,6 +431,21 @@
       border-color 0.18s ease,
       color 0.18s ease,
       box-shadow 0.18s ease;
+  }
+
+.data-grid__button-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: data-grid-spin 0.75s linear infinite;
+  }
+
+@keyframes data-grid-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
 .data-grid__toolbar-button:not(:disabled):hover,

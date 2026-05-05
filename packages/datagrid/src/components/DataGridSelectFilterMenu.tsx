@@ -201,6 +201,20 @@ export default defineComponent({
                 onInput={(event) => {
                   draftTextValue.value = (event.target as HTMLInputElement).value
                 }}
+                onKeydown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    applyFilter()
+                  }
+
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    resetDraft()
+                    props.onCancel()
+                  }
+                }}
               />
             ) : (
               <input

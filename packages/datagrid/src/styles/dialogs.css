@@ -208,14 +208,13 @@
 .data-grid__menu-item {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 0.35rem;
     min-height: 1.8rem;
     padding: 0.25rem 0.45rem;
     border: 1px solid var(--app-surface-strong);
     border-radius: 0.4rem;
     background: var(--app-surface);
-    text-align: center;
+    text-align: left;
     color: var(--app-text);
     transition:
       background-color 50ms ease,

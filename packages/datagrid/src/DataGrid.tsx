@@ -15,11 +15,12 @@ import DataGridToolbar from './components/DataGridToolbar'
 import { useDataGridClipboard } from './composables/useDataGridClipboard'
 import { useDataGridColumnPicker } from './composables/useDataGridColumnPicker'
 import { useDataGridDataLoading } from './composables/useDataGridDataLoading'
+import { useDataGridExcelExport } from './composables/useDataGridExcelExport'
 import { useDataGridFilters } from './composables/useDataGridFilters'
 import { useDataGridRows, type DataGridRequestState } from './composables/useDataGridRows'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
-import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridMetaConfig, DataGridPageSizeConfig, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
+import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridMetaConfig, DataGridPageSizeConfig, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
 import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
 import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
 import { toFilterGroupId } from './utils/filters'
@@ -111,6 +112,12 @@ const defaultLocaleText: Required<DataGridLocaleText> = {
   extraFiltersGroupLabel: 'Dodatkowe filtry',
   filterPlaceholder: 'Filtr',
   noFilterableColumnsMessage: 'Brak backendowych kolumn filtrowalnych.',
+  exportExcelLabel: 'Excel',
+  exportExcelViewAllRowsLabel: 'Wszystkie rekordy',
+  exportExcelViewCurrentPageLabel: 'Biezaca strona',
+  exportExcelAllColumnsAllRowsLabel: 'Wszystkie rekordy',
+  exportExcelAllColumnsCurrentPageLabel: 'Biezaca strona',
+  exportExcelErrorMessage: 'Nie udalo sie wyeksportowac danych do Excel.',
 }
 
 function renderSelectionCheckbox(
@@ -309,6 +316,10 @@ export default defineComponent({
     },
     cellSelectionConfig: {
       type: Object as PropType<DataGridCellSelectionConfig | undefined>,
+      default: undefined,
+    },
+    excelExport: {
+      type: [Object, Boolean] as PropType<false | DataGridExcelExportConfig<any> | undefined>,
       default: undefined,
     },
   },
@@ -1355,6 +1366,26 @@ export default defineComponent({
       const searchFilterCount = globalFilter.value.trim() ? 1 : 0
       return columnFilters.value.length + searchFilterCount
     })
+    const excelExportConfig = computed<DataGridExcelExportConfig<AnyRow>>(() => (props.excelExport === false ? { enabled: false } : (props.excelExport ?? {})))
+    const isExcelExportEnabled = computed(() => excelExportConfig.value.enabled ?? true)
+    const defaultExcelExportModes: DataGridExcelExportMode[] = ['view-all-rows', 'view-current-page', 'all-columns-all-rows', 'all-columns-current-page']
+    const excelExportActions = computed(() => {
+      if (!isExcelExportEnabled.value) {
+        return []
+      }
+
+      const labels: Record<DataGridExcelExportMode, string> = {
+        'view-all-rows': localeText.value.exportExcelViewAllRowsLabel,
+        'view-current-page': localeText.value.exportExcelViewCurrentPageLabel,
+        'all-columns-all-rows': localeText.value.exportExcelAllColumnsAllRowsLabel,
+        'all-columns-current-page': localeText.value.exportExcelAllColumnsCurrentPageLabel,
+      }
+
+      return (excelExportConfig.value.modes && excelExportConfig.value.modes.length > 0 ? excelExportConfig.value.modes : defaultExcelExportModes).map((mode) => ({
+        mode,
+        label: labels[mode],
+      }))
+    })
 
     const requestedServerColumns = computed(() => {
       const requested = new Set<string>(['id'])
@@ -1390,6 +1421,32 @@ export default defineComponent({
       fetchDebounceMs: () => props.fetchDebounceMs,
       onLoaded: () => rowVirtualizer.value.scrollToOffset(0),
     })
+    const { exporting: isExcelExporting, exportExcel } = useDataGridExcelExport({
+      config: excelExportConfig,
+      requestState,
+      pagination,
+      sorting,
+      columnFilters,
+      globalFilter,
+      visibleColumns,
+      allLeafColumns,
+      visibleRows,
+      fetchPage: () => props.fetchPage,
+      renderColumnLabel: renderColumnPickerLabel,
+    })
+
+    async function handleExportExcel(mode: DataGridExcelExportMode) {
+      closeOverlayState()
+      errorMessage.value = ''
+
+      try {
+        await exportExcel(mode)
+      } catch (error) {
+        if (!excelExportConfig.value.onError) {
+          errorMessage.value = error instanceof Error ? error.message : localeText.value.exportExcelErrorMessage
+        }
+      }
+    }
 
     function toggleColumnPicker() {
       const nextOpen = !isColumnPickerOpen.value
@@ -1517,6 +1574,7 @@ export default defineComponent({
 
     expose({
       refreshData,
+      exportExcel,
       patchRow,
       patchRows,
       updateRow,
@@ -1530,6 +1588,7 @@ export default defineComponent({
         ...pagination.value,
         pageIndex: 0,
       }
+      sorting.value = [...(mergedInitialState.value.sorting ?? [])]
       columnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
       globalFilter.value = mergedInitialState.value.globalFilter ?? ''
       draftColumnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
@@ -1853,6 +1912,12 @@ export default defineComponent({
                 onRefresh={refreshData}
                 onClearFilters={clearAllFilters}
                 onToggleColumnPicker={toggleColumnPicker}
+                excelExportActions={excelExportActions.value}
+                isExcelExporting={isExcelExporting.value}
+                exportExcelLabel={localeText.value.exportExcelLabel}
+                onExportExcel={(mode) => {
+                  void handleExportExcel(mode)
+                }}
                 customActions={slots['toolbar-actions']?.()}
               />
             </div>

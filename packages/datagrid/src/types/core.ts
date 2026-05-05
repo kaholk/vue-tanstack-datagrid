@@ -9,6 +9,50 @@ export type DataGridLoadingVariant = 'none' | 'overlay'
 export type DataGridInlineEditStatusState = 'pending' | 'error'
 export type DataGridRowId = string | number
 export type DataGridRowIdResolver<TData extends RowData = RowData> = (row: TData, index: number) => DataGridRowId
+export type DataGridExcelExportMode =
+  | 'view-all-rows'
+  | 'view-current-page'
+  | 'all-columns-all-rows'
+  | 'all-columns-current-page'
+export type DataGridExcelExportFormat =
+  | 'text'
+  | 'number'
+  | 'accounting'
+  | 'date'
+  | 'datetime'
+  | { numFmt: string }
+
+export type DataGridExcelCellStyle = {
+  font?: Record<string, unknown>
+  fill?: Record<string, unknown>
+  alignment?: Record<string, unknown>
+  border?: Record<string, unknown>
+}
+
+export type DataGridExcelExportStyles = {
+  header?: DataGridExcelCellStyle
+  data?: DataGridExcelCellStyle
+}
+
+export type DataGridExcelExportContext = {
+  mode: DataGridExcelExportMode
+  rowCount: number
+  columnCount: number
+}
+
+export type DataGridExcelExportConfig<TData extends RowData = RowData> = {
+  enabled?: boolean
+  fileName?: string | ((context: DataGridExcelExportContext) => string)
+  sheetName?: string
+  pageSize?: number
+  maxRows?: number
+  modes?: DataGridExcelExportMode[]
+  styles?: DataGridExcelExportStyles
+  autoFilter?: boolean
+  freezeHeader?: boolean
+  includeActionColumns?: boolean
+  onError?: (error: unknown) => void
+}
 
 export type DataGridMetaConfig = {
   key: DataGridMetaKey
@@ -46,6 +90,12 @@ export type DataGridLocaleText = {
   extraFiltersGroupLabel?: string
   filterPlaceholder?: string
   noFilterableColumnsMessage?: string
+  exportExcelLabel?: string
+  exportExcelViewAllRowsLabel?: string
+  exportExcelViewCurrentPageLabel?: string
+  exportExcelAllColumnsAllRowsLabel?: string
+  exportExcelAllColumnsCurrentPageLabel?: string
+  exportExcelErrorMessage?: string
 }
 
 export type DataGridFetchParams = {
@@ -66,6 +116,10 @@ export type DataGridFetchResult<TData> = {
 
 export type DataGridInstance<TData extends RowData = RowData> = {
   refreshData: () => void
+  exportExcel: (
+    mode: DataGridExcelExportMode,
+    overrides?: Partial<DataGridExcelExportConfig<TData>>,
+  ) => Promise<void>
   patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => void
   patchRows: (patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) => void
   updateRow: (rowId: DataGridRowId, updater: (row: TData) => TData) => void

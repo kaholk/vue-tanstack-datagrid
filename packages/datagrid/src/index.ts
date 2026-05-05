@@ -22,6 +22,7 @@ export { createDataGridSavedViewsPersistence, deserializeDataGridSavedViews, ser
 export { createDataGridBooleanSelectColumn, createDataGridCommentsColumn, createDataGridDateColumn, createDataGridEditableDateColumn, createDataGridEditableSelectColumn, createDataGridNumberColumn, createDataGridSelectFilterConfig, createDataGridTextColumn } from './columnFactories'
 export { useDataGridEditableColumn } from './composables/useDataGridEditableColumn'
 export { useDataGridFetchPage } from './composables/useDataGridFetchPage'
+export { useDataGridExcelExport } from './composables/useDataGridExcelExport'
 export { useDataGridInlineMutation } from './composables/useDataGridInlineMutation'
 export { useDataGridInlineEdit } from './composables/useDataGridInlineEdit'
 export { useDataGridStableColumns } from './composables/useDataGridStableColumns'

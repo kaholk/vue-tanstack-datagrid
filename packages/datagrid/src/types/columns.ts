@@ -1,6 +1,6 @@
 import type { Cell, ColumnDef, ColumnFiltersState, HeaderContext, Row, RowData } from '@tanstack/vue-table'
 
-import type { DataGridColumnAlign, DataGridHeaderMode } from './core'
+import type { DataGridColumnAlign, DataGridExcelExportFormat, DataGridHeaderMode } from './core'
 
 export type DataGridLocalKind = 'computed' | 'action'
 export type DataGridFilterVariant = 'text' | 'select' | 'radio'
@@ -70,6 +70,12 @@ export type DataGridColumn<TData extends RowData> = ColumnDef<TData, unknown> & 
   requiredServerFields?: string[]
   clipboardValue?: (context: DataGridValueContext<TData>) => unknown
   clipboardFormat?: (value: unknown, context: DataGridValueContext<TData>) => string
+  exportable?: boolean
+  exportHeader?: string
+  exportValue?: (context: DataGridValueContext<TData>) => unknown
+  exportFormat?: DataGridExcelExportFormat
+  exportWidth?: number
+  exportAlign?: DataGridColumnAlign
   sumValue?: (context: DataGridValueContext<TData>) => unknown
   align?: DataGridColumnAlign
   headerMode?: DataGridHeaderMode

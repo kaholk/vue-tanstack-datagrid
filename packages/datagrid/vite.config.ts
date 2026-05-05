@@ -12,7 +12,7 @@ export default defineConfig({
       fileName: (format) => (format === 'es' ? 'index.js' : 'index.cjs'),
     },
     rollupOptions: {
-      external: ['vue', '@tanstack/vue-table', '@tanstack/vue-virtual'],
+      external: ['vue', '@tanstack/vue-table', '@tanstack/vue-virtual', 'exceljs'],
     },
   },
 })
