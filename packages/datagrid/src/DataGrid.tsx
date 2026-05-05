@@ -1,6 +1,5 @@
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef, watch, type CSSProperties, type PropType, type VNodeChild } from 'vue'
-import { getCoreRowModel, useVueTable, type Cell, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type Header, type HeaderContext, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
-import { useVirtualizer } from '@tanstack/vue-virtual'
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef, watch, type CSSProperties, type PropType } from 'vue'
+import { getCoreRowModel, useVueTable, type Cell, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type HeaderContext, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
 import IconCheckSmallRounded from '~icons/material-symbols/check-small-rounded'
 
 import DataGridBodyRow from './components/DataGridBodyRow'
@@ -13,33 +12,29 @@ import DataGridHeaderCell from './components/DataGridHeaderCell'
 import DataGridSaveViewDialog from './components/DataGridSaveViewDialog'
 import DataGridSelectionPanel from './components/DataGridSelectionPanel'
 import DataGridToolbar from './components/DataGridToolbar'
+import { useDataGridClipboard } from './composables/useDataGridClipboard'
 import { useDataGridColumnPicker } from './composables/useDataGridColumnPicker'
+import { useDataGridDataLoading } from './composables/useDataGridDataLoading'
 import { useDataGridFilters } from './composables/useDataGridFilters'
+import { useDataGridRows, type DataGridRequestState } from './composables/useDataGridRows'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
-import type { DataGridColumnAlign, DataGridCellSelectionConfig, DataGridColumn, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridMetaConfig, DataGridPageSizeConfig, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
+import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
+import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridMetaConfig, DataGridPageSizeConfig, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
+import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
+import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
+import { toFilterGroupId } from './utils/filters'
+import { toNumber } from './utils/number'
+import { buildPaginationItems } from './utils/pagination'
+import { renderFlexibleContent } from './utils/render'
+import { createViewId } from './utils/savedViews'
 
 type AnyRow = Record<string, unknown>
-
-type RequestState<TData extends AnyRow> = {
-  rows: TData[]
-  totalRows: number
-  pageCount: number
-  meta?: Record<string, unknown>
-}
-
-type LoadDataOptions = {
-  force?: boolean
-}
 
 type FilterDialogSection = {
   id: string
   label: string
   items: DataGridFilterConfig[]
 }
-
-type RenderedSequenceItem<TItem> = { type: 'spacer'; key: string; width: number } | { type: 'item'; key: string; item: TItem; column: Column<AnyRow, unknown> }
-
-type PaginationItem = { type: 'page'; value: number } | { type: 'ellipsis'; key: string }
 
 type CellRenderProps = {
   table: ReturnType<Cell<AnyRow, unknown>['getContext']>['table']
@@ -155,51 +150,6 @@ function renderSelectionCheckbox(
   )
 }
 
-function normalizeColumnSize<TData extends AnyRow>(column: DataGridColumn<TData>): DataGridColumn<TData> {
-  if (typeof column.size !== 'number') {
-    return column
-  }
-
-  return {
-    ...column,
-    minSize: column.size,
-    maxSize: column.size,
-  }
-}
-
-function getFixedColumnSize<TData extends AnyRow>(column?: Partial<DataGridColumn<TData>>): number | null {
-  return typeof column?.size === 'number' ? column.size : null
-}
-
-function appendMissingColumnId(columnOrder: ColumnOrderState, columnId: string): ColumnOrderState {
-  if (columnOrder.includes(columnId)) {
-    return [...columnOrder]
-  }
-
-  return [columnId, ...columnOrder]
-}
-
-function appendMissingPinnedColumnId(columnPinning: ColumnPinningState, columnId: string, defaultPin: 'left' | 'right' | false): ColumnPinningState {
-  const left = [...(columnPinning.left ?? [])]
-  const right = [...(columnPinning.right ?? [])]
-
-  if (left.includes(columnId) || right.includes(columnId) || !defaultPin) {
-    return { left, right }
-  }
-
-  if (defaultPin === 'left') {
-    return {
-      left: [columnId, ...left],
-      right,
-    }
-  }
-
-  return {
-    left,
-    right: [columnId, ...right],
-  }
-}
-
 function buildRowSelectionColumn(
   config: DataGridRowSelectionConfig<AnyRow>,
   options?: {
@@ -274,135 +224,6 @@ function buildRowSelectionColumn(
   }
 }
 
-function toNumber(value: string, fallback: number) {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function toJustifyContent(align?: DataGridColumnAlign) {
-  if (align === 'center') {
-    return 'center'
-  }
-
-  if (align === 'end') {
-    return 'flex-end'
-  }
-
-  return 'flex-start'
-}
-
-function createViewId() {
-  return `view-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function buildPaginationItems(pageCount: number, pageIndex: number): PaginationItem[] {
-  if (pageCount <= 0) {
-    return []
-  }
-
-  if (pageCount <= 8) {
-    return Array.from({ length: pageCount }, (_, index) => ({
-      type: 'page',
-      value: index,
-    }))
-  }
-
-  const pages = new Set<number>()
-  pages.add(0)
-  pages.add(pageCount - 1)
-
-  if (pageIndex <= 3) {
-    for (let index = 0; index <= 5; index += 1) {
-      pages.add(index)
-    }
-  } else if (pageIndex >= pageCount - 4) {
-    for (let index = pageCount - 6; index < pageCount; index += 1) {
-      pages.add(index)
-    }
-  } else {
-    for (let index = pageIndex - 2; index <= pageIndex + 2; index += 1) {
-      pages.add(index)
-    }
-  }
-
-  const orderedPages = Array.from(pages).sort((left, right) => left - right)
-  const items: PaginationItem[] = []
-
-  for (let index = 0; index < orderedPages.length; index += 1) {
-    const page = orderedPages[index]
-    if (typeof page !== 'number') {
-      continue
-    }
-
-    items.push({
-      type: 'page',
-      value: page,
-    })
-
-    const nextPage = orderedPages[index + 1]
-    if (typeof nextPage === 'number' && nextPage - page > 1) {
-      items.push({
-        type: 'ellipsis',
-        key: `ellipsis-${page}-${nextPage}`,
-      })
-    }
-  }
-
-  return items
-}
-
-function cloneViewState(state: DataGridSavedViewState): DataGridSavedViewState {
-  return {
-    pagination: state.pagination ? { ...state.pagination } : undefined,
-    columnOrder: [...state.columnOrder],
-    columnSizing: { ...state.columnSizing },
-    columnVisibility: { ...state.columnVisibility },
-    columnPinning: {
-      left: [...(state.columnPinning.left ?? [])],
-      right: [...(state.columnPinning.right ?? [])],
-    },
-    columnFilters: state.columnFilters.map((filter) => ({
-      id: filter.id,
-      value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
-    })),
-    globalFilter: state.globalFilter,
-  }
-}
-
-function cloneColumnFilters(filters: ColumnFiltersState): ColumnFiltersState {
-  return filters.map((filter) => ({
-    id: filter.id,
-    value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
-  }))
-}
-
-function cloneColumnPinningState(state: ColumnPinningState): ColumnPinningState {
-  return {
-    left: [...(state.left ?? [])],
-    right: [...(state.right ?? [])],
-  }
-}
-
-function toFilterGroupId(label: string) {
-  return label.trim().toLocaleLowerCase().replace(/\s+/g, '-')
-}
-
-function escapeClipboardCell(value: string) {
-  if (value.includes('\t') || value.includes('\n') || value.includes('"')) {
-    return `"${value.replace(/"/g, '""')}"`
-  }
-
-  return value
-}
-
-function renderFlexibleContent(render: unknown, props: Record<string, unknown>): VNodeChild {
-  if (typeof render === 'function' || (typeof render === 'object' && render !== null)) {
-    return h(render as never, props)
-  }
-
-  return render as VNodeChild
-}
-
 export default defineComponent({
   name: 'DataGrid',
   props: {
@@ -421,6 +242,10 @@ export default defineComponent({
     fetchPage: {
       type: Function as PropType<(params: DataGridFetchParams, signal?: AbortSignal) => Promise<DataGridFetchResult<any>>>,
       required: true,
+    },
+    rowId: {
+      type: Function as PropType<DataGridRowIdResolver<any> | undefined>,
+      default: undefined,
     },
     initialState: {
       type: Object as PropType<DataGridInitialState>,
@@ -643,22 +468,20 @@ export default defineComponent({
     const columnMoveTargetById = ref<Record<string, string>>({})
     const draftColumnFilters = ref<ColumnFiltersState>([])
     const draftGlobalFilter = ref('')
-    const requestState = shallowRef<RequestState<AnyRow>>({
+    const requestState = shallowRef<DataGridRequestState<AnyRow>>({
       rows: [],
       totalRows: 0,
       pageCount: 0,
       meta: undefined,
     })
+    const { getRowKey, rowIndexByKey, patchRow, patchRows, updateRow, replaceRow, getRow, getVisibleRows } = useDataGridRows({
+      requestState,
+      rowId: () => props.rowId as DataGridRowIdResolver<AnyRow> | undefined,
+    })
     const isLoading = ref(false)
     const errorMessage = ref('')
 
-    let debounceTimer: ReturnType<typeof setTimeout> | undefined
-    let activeController: AbortController | null = null
-    let activeRequestKey = ''
-    let loadedRequestKey = ''
-    let activeRequestId = 0
     let measureFrame: number | null = null
-    let isUnmounted = false
 
     function closeOverlayState(options?: { keepDialogsOpen?: boolean }) {
       openMenuColumnId.value = null
@@ -962,7 +785,7 @@ export default defineComponent({
       onRowSelectionChange: (updater) => {
         rowSelection.value = typeof updater === 'function' ? updater(rowSelection.value) : updater
       },
-      getRowId: (row, index) => String((row as { id?: string | number }).id ?? index),
+      getRowId: (row, index) => getRowKey(row, index),
       get pageCount() {
         return requestState.value.pageCount
       },
@@ -974,15 +797,7 @@ export default defineComponent({
     const visibleHeaders = computed(() => table.getHeaderGroups()[0]?.headers ?? [])
     const visibleRows = computed(() => table.getRowModel().rows)
     const totalWidth = computed(() => table.getTotalSize())
-    const visibleRowIndexByKey = computed(() => {
-      const indexByKey = new Map<string, number>()
-      requestState.value.rows.forEach((row, index) => {
-        indexByKey.set(getRowKey(row, index), index)
-      })
-      return indexByKey
-    })
-    const leftPinnedColumnIds = computed(() => new Set(columnPinning.value.left ?? []))
-    const rightPinnedColumnIds = computed(() => new Set(columnPinning.value.right ?? []))
+    const visibleRowIndexByKey = rowIndexByKey
     const selectionPanelPositionStorageKey = computed(() => {
       if (props.selectionPanelConfig?.positionStorageKey) {
         return props.selectionPanelConfig.positionStorageKey
@@ -1021,12 +836,11 @@ export default defineComponent({
 
       return visibleRows.value.filter((row) => row.getIsSelected())
     })
+    const rowSelectionColumnId = computed(() => mergedRowSelectionConfig.value?.columnId ?? defaultRowSelectionColumnId)
     const cellSelectionColumns = computed(() => {
-      const rowSelectionColumnId = mergedRowSelectionConfig.value?.columnId ?? defaultRowSelectionColumnId
-
       return visibleColumns.value.filter((column) => {
         const columnDef = column.columnDef as DataGridColumn<AnyRow>
-        return column.id !== rowSelectionColumnId && columnDef.localKind !== 'action'
+        return column.id !== rowSelectionColumnId.value && columnDef.localKind !== 'action'
       })
     })
     const visibleRowIndexById = computed(() => new Map(visibleRows.value.map((row, index) => [row.id, index])))
@@ -1370,102 +1184,17 @@ export default defineComponent({
     const showViewsMenu = computed(() => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence))
     const isAutoHeight = computed(() => props.height === 'fill' || props.height === -1)
 
-    function getPinnedSide(columnId: string): 'left' | 'right' | false {
-      if (leftPinnedColumnIds.value.has(columnId)) {
-        return 'left'
-      }
-
-      if (rightPinnedColumnIds.value.has(columnId)) {
-        return 'right'
-      }
-
-      return false
-    }
-
-    const nonPinnedColumns = computed(() => visibleColumns.value.filter((column) => !getPinnedSide(column.id)))
-
-    const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(
-      computed(() => ({
-        count: visibleRows.value.length,
-        getScrollElement: () => scrollElementRef.value,
-        estimateSize: () => props.rowHeight,
-        overscan: props.overscanRows,
-      })),
-    )
-
-    const columnVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(
-      computed(() => ({
-        horizontal: true,
-        count: nonPinnedColumns.value.length,
-        getScrollElement: () => scrollElementRef.value,
-        estimateSize: (index) => nonPinnedColumns.value[index]?.getSize() ?? 160,
-        overscan: props.overscanColumns,
-      })),
-    )
-
-    const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
-    const virtualNonPinnedColumns = computed(() => columnVirtualizer.value.getVirtualItems())
-    const totalRowHeight = computed(() => rowVirtualizer.value.getTotalSize())
-    const renderedNonPinnedIds = computed(() => new Set(virtualNonPinnedColumns.value.map((virtualColumn) => nonPinnedColumns.value[virtualColumn.index]?.id).filter((value): value is string => Boolean(value))))
-    const headerSequence = computed(() => buildRenderedColumnSequence(visibleHeaders.value, (header) => header.column, renderedNonPinnedIds.value))
-    const rowSequence = computed(() => buildRenderedColumnSequence(visibleColumns.value, (column) => column, renderedNonPinnedIds.value))
-    const cellStylesByColumnId = computed(() => {
-      const styles = new Map<string, CSSProperties>()
-      let leftOffset = 0
-      const leftPinnedIds = columnPinning.value.left ?? []
-      const rightPinnedIds = columnPinning.value.right ?? []
-
-      for (let index = 0; index < leftPinnedIds.length; index += 1) {
-        const columnId = leftPinnedIds[index]
-        if (!columnId) {
-          continue
-        }
-        const column = allLeafColumnsById.value.get(columnId)
-        if (!column || !visibleColumnIndexById.value.has(columnId)) {
-          continue
-        }
-
-        styles.set(column.id, {
-          width: `${column.getSize()}px`,
-          left: `${leftOffset}px`,
-          zIndex: `${60 - index}`,
-          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-        })
-        leftOffset += column.getSize()
-      }
-
-      let rightOffset = 0
-      for (let index = rightPinnedIds.length - 1; index >= 0; index -= 1) {
-        const columnId = rightPinnedIds[index]
-        if (!columnId) {
-          continue
-        }
-        const column = allLeafColumnsById.value.get(columnId)
-        if (!column || !visibleColumnIndexById.value.has(columnId)) {
-          continue
-        }
-
-        styles.set(column.id, {
-          width: `${column.getSize()}px`,
-          right: `${rightOffset}px`,
-          zIndex: `${60 - index}`,
-          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-        })
-        rightOffset += column.getSize()
-      }
-
-      for (const column of visibleColumns.value) {
-        if (styles.has(column.id)) {
-          continue
-        }
-
-        styles.set(column.id, {
-          width: `${column.getSize()}px`,
-          justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-        })
-      }
-
-      return styles
+    const { rowVirtualizer, columnVirtualizer, virtualRows, totalRowHeight, headerSequence, rowSequence, cellStylesByColumnId, getPinnedSide } = useDataGridVirtualization({
+      scrollElementRef,
+      visibleRows,
+      visibleColumns,
+      visibleHeaders,
+      allLeafColumnsById,
+      visibleColumnIndexById,
+      columnPinning,
+      rowHeight: () => props.rowHeight,
+      overscanRows: () => props.overscanRows,
+      overscanColumns: () => props.overscanColumns,
     })
 
     const serverFilterColumns = computed(() => allLeafColumns.value.filter((column) => Boolean((column.columnDef as DataGridColumn<AnyRow>).serverField)))
@@ -1560,75 +1289,20 @@ export default defineComponent({
     })
     const requestedServerColumnsKey = computed(() => requestedServerColumns.value.join('|'))
 
-    async function loadData(options: LoadDataOptions = {}) {
-      const params: DataGridFetchParams = {
-        pageIndex: pagination.value.pageIndex,
-        pageSize: pagination.value.pageSize,
-        sorting: sorting.value,
-        filters: columnFilters.value,
-        search: globalFilter.value.trim() || undefined,
-        include_columns: requestedServerColumnsKey.value ? requestedServerColumnsKey.value.split('|') : [],
-      }
-      const requestKey = JSON.stringify(params)
-
-      if (!options.force && (requestKey === activeRequestKey || requestKey === loadedRequestKey)) {
-        return
-      }
-
-      if (activeController) {
-        activeController.abort()
-      }
-
-      const requestId = activeRequestId + 1
-      activeRequestId = requestId
-      const controller = new AbortController()
-      activeController = controller
-      activeRequestKey = requestKey
-      isLoading.value = true
-      errorMessage.value = ''
-
-      try {
-        const response = await props.fetchPage(params, controller.signal)
-
-        if (isUnmounted || requestId !== activeRequestId) {
-          return
-        }
-
-        requestState.value = {
-          rows: response.rows,
-          totalRows: response.totalRows,
-          pageCount: response.pageCount,
-          meta: response.meta,
-        }
-
-        rowVirtualizer.value.scrollToOffset(0)
-        loadedRequestKey = requestKey
-      } catch (error) {
-        if (isUnmounted || requestId !== activeRequestId || controller.signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (error instanceof Error && error.name === 'AbortError')) {
-          return
-        }
-
-        errorMessage.value = error instanceof Error ? error.message : localeText.value.fetchErrorMessage
-        requestState.value = {
-          rows: [],
-          totalRows: 0,
-          pageCount: 0,
-          meta: undefined,
-        }
-      } finally {
-        if (activeController === controller) {
-          activeController = null
-        }
-
-        if (activeRequestKey === requestKey) {
-          activeRequestKey = ''
-        }
-
-        if (!isUnmounted && requestId === activeRequestId) {
-          isLoading.value = false
-        }
-      }
-    }
+    const { refreshData } = useDataGridDataLoading({
+      requestState,
+      isLoading,
+      errorMessage,
+      pagination,
+      sorting,
+      columnFilters,
+      globalFilter,
+      requestedServerColumnsKey,
+      localeText,
+      fetchPage: () => props.fetchPage,
+      fetchDebounceMs: () => props.fetchDebounceMs,
+      onLoaded: () => rowVirtualizer.value.scrollToOffset(0),
+    })
 
     function toggleColumnPicker() {
       const nextOpen = !isColumnPickerOpen.value
@@ -1678,23 +1352,6 @@ export default defineComponent({
     }
 
     watch(
-      [pagination, sorting, columnFilters, globalFilter, requestedServerColumnsKey],
-      () => {
-        if (debounceTimer) {
-          clearTimeout(debounceTimer)
-        }
-
-        debounceTimer = setTimeout(
-          () => {
-            void loadData()
-          },
-          Math.max(0, props.fetchDebounceMs),
-        )
-      },
-      { immediate: true },
-    )
-
-    watch(
       () => [columnVisibility.value, columnPinning.value, columnOrder.value, columnSizing.value],
       () => {
         scheduleColumnMeasure()
@@ -1730,17 +1387,7 @@ export default defineComponent({
     )
 
     onBeforeUnmount(() => {
-      isUnmounted = true
-      activeRequestId += 1
       document.removeEventListener('click', handleDocumentClick)
-
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-      }
-
-      if (activeController) {
-        activeController.abort()
-      }
 
       if (measureFrame !== null && typeof window !== 'undefined') {
         window.cancelAnimationFrame(measureFrame)
@@ -1777,88 +1424,6 @@ export default defineComponent({
       globalFilter.value = draftGlobalFilter.value
       syncFilterDialogDraftState()
       closeFilterDialog()
-    }
-
-    function refreshData() {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-      }
-
-      void loadData({ force: true })
-    }
-
-    function getRowKey(row: AnyRow, index: number): string {
-      return String((row as { id?: string | number }).id ?? index)
-    }
-
-    function updateVisibleRow(rowId: string | number, resolveRow: (currentRow: AnyRow) => AnyRow) {
-      const targetRowId = String(rowId)
-      const rowIndex = visibleRowIndexByKey.value.get(targetRowId) ?? -1
-
-      if (rowIndex === -1) {
-        return
-      }
-
-      const currentRow = requestState.value.rows[rowIndex]
-      if (!currentRow) {
-        return
-      }
-
-      const nextRows = [...requestState.value.rows]
-      nextRows[rowIndex] = resolveRow(currentRow)
-      requestState.value = {
-        ...requestState.value,
-        rows: nextRows,
-      }
-    }
-
-    function patchRow(rowId: string | number, patch: Partial<AnyRow>) {
-      updateVisibleRow(rowId, (currentRow) => ({ ...currentRow, ...patch }))
-    }
-
-    function patchRows(patches: Array<{ rowId: string | number; patch: Partial<AnyRow> }>) {
-      if (patches.length === 0) {
-        return
-      }
-
-      const nextRows = [...requestState.value.rows]
-      let changed = false
-
-      for (const { rowId, patch } of patches) {
-        const rowIndex = visibleRowIndexByKey.value.get(String(rowId)) ?? -1
-        const currentRow = nextRows[rowIndex]
-
-        if (rowIndex === -1 || !currentRow) {
-          continue
-        }
-
-        nextRows[rowIndex] = { ...currentRow, ...patch }
-        changed = true
-      }
-
-      if (changed) {
-        requestState.value = {
-          ...requestState.value,
-          rows: nextRows,
-        }
-      }
-    }
-
-    function updateRow(rowId: string | number, updater: (row: AnyRow) => AnyRow) {
-      updateVisibleRow(rowId, updater)
-    }
-
-    function replaceRow(rowId: string | number, row: AnyRow) {
-      updateVisibleRow(rowId, () => row)
-    }
-
-    function getRow(rowId: string | number) {
-      const rowIndex = visibleRowIndexByKey.value.get(String(rowId)) ?? -1
-      return requestState.value.rows[rowIndex] ?? null
-    }
-
-    function getVisibleRows() {
-      return [...requestState.value.rows]
     }
 
     expose({
@@ -2053,300 +1618,26 @@ export default defineComponent({
       openMenuColumnId.value = null
     }
 
-    const selectionPanelColumns = computed(() => {
-      const configuredColumnIds = mergedSelectionPanelConfig.value?.copyColumnIds
-      const rowSelectionColumnId = mergedRowSelectionConfig.value?.columnId ?? defaultRowSelectionColumnId
-
-      if (configuredColumnIds && configuredColumnIds.length > 0) {
-        const visibleColumnById = new Map(visibleColumns.value.map((column) => [column.id, column]))
-        return configuredColumnIds.map((columnId) => visibleColumnById.get(columnId)).filter((column): column is Column<AnyRow, unknown> => Boolean(column))
-      }
-
-      return visibleColumns.value.filter((column) => {
-        const columnDef = column.columnDef as DataGridColumn<AnyRow>
-        return column.id !== rowSelectionColumnId && columnDef.localKind !== 'action'
-      })
+    const { selectionPanelSums, clearSelectedCells, clearSelectedRows, clearAllSelection, clearSelectedColumns, copySelectedRows, copySelectedCells, copyAllSelection } = useDataGridClipboard({
+      visibleColumns,
+      allLeafColumnsById,
+      mergedSelectionPanelConfig,
+      rowSelectionColumnId,
+      selectedRows,
+      cellSelectionColumns,
+      selectedCellRows,
+      selectedCellCount,
+      selectedColumnIds,
+      rowSelection,
+      selectedCellKeys,
+      previewSelectionRowIds,
+      previewCellRangeKeys,
+      hoveredCellKey,
+      currentPointerCell,
+      lastSelectedCell,
+      lastSelectedRowId,
+      renderColumnPickerLabel,
     })
-
-    function getColumnClipboardLabel(column: Column<AnyRow, unknown>) {
-      return renderColumnPickerLabel(column)
-    }
-
-    const cellsByRow = new WeakMap<Row<AnyRow>, Map<string, Cell<AnyRow, unknown>>>()
-
-    function getCellByColumnId(row: Row<AnyRow>, columnId: string) {
-      let cellsByColumnId = cellsByRow.get(row)
-      if (!cellsByColumnId) {
-        cellsByColumnId = new Map(row.getAllCells().map((cell) => [cell.column.id, cell]))
-        cellsByRow.set(row, cellsByColumnId)
-      }
-
-      return cellsByColumnId.get(columnId)
-    }
-
-    function getCustomColumnValue(row: Row<AnyRow>, column: Column<AnyRow, unknown>, kind: 'clipboard' | 'sum') {
-      const columnDef = column.columnDef as DataGridColumn<AnyRow>
-      const resolver = kind === 'clipboard' ? columnDef.clipboardValue : columnDef.sumValue
-
-      if (!resolver) {
-        return row.getValue(column.id)
-      }
-
-      const cell = getCellByColumnId(row, column.id)
-      if (!cell) {
-        return row.getValue(column.id)
-      }
-
-      return resolver({ cell, row })
-    }
-
-    function getClipboardCellValue(row: Row<AnyRow>, column: Column<AnyRow, unknown>) {
-      const rawValue = getCustomColumnValue(row, column, 'clipboard')
-      const columnDef = column.columnDef as DataGridColumn<AnyRow>
-      const cell = columnDef.clipboardFormat ? getCellByColumnId(row, column.id) : undefined
-      if (columnDef.clipboardFormat && cell) {
-        return columnDef.clipboardFormat(rawValue, { cell, row })
-      }
-
-      if (rawValue === null || rawValue === undefined) {
-        return ''
-      }
-
-      if (typeof rawValue === 'number' || typeof rawValue === 'boolean') {
-        return String(rawValue)
-      }
-
-      if (typeof rawValue === 'string') {
-        return rawValue
-      }
-
-      return JSON.stringify(rawValue)
-    }
-
-    function clearSelectedCells() {
-      selectedCellKeys.value = new Set()
-      previewCellRangeKeys.value = new Set()
-      hoveredCellKey.value = null
-      currentPointerCell.value = null
-      lastSelectedCell.value = null
-    }
-
-    function clearSelectedRows() {
-      rowSelection.value = {}
-      previewSelectionRowIds.value = new Set()
-      lastSelectedRowId.value = null
-    }
-
-    function clearAllSelection() {
-      clearSelectedRows()
-      clearSelectedCells()
-    }
-
-    function clearSelectedColumns() {
-      if (selectedColumnIds.value.length === 0) {
-        return
-      }
-
-      const columnIds = new Set(selectedColumnIds.value)
-      selectedCellKeys.value = new Set(
-        [...selectedCellKeys.value].filter((key) => {
-          const [, columnId] = key.split('::')
-          return !columnId || !columnIds.has(columnId)
-        }),
-      )
-      previewCellRangeKeys.value = new Set()
-      hoveredCellKey.value = null
-      currentPointerCell.value = null
-    }
-
-    async function copySelectedRows(includeHeaders: boolean) {
-      const columns = selectionPanelColumns.value
-      const rows = selectedRows.value
-
-      if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
-        return
-      }
-
-      const lines: string[] = []
-
-      if (includeHeaders) {
-        lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-      }
-
-      for (const row of rows) {
-        lines.push(columns.map((column) => escapeClipboardCell(getClipboardCellValue(row, column))).join('\t'))
-      }
-
-      await navigator.clipboard.writeText(lines.join('\n'))
-    }
-
-    async function copySelectedCells(includeHeaders: boolean) {
-      const columns = cellSelectionColumns.value.filter((column) => selectedCellRows.value.some((row) => row.selectedColumnIds.includes(column.id)))
-      const rows = selectedCellRows.value
-
-      if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
-        return
-      }
-
-      const lines: string[] = []
-
-      if (includeHeaders) {
-        lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-      }
-
-      for (const rowEntry of rows) {
-        lines.push(columns.map((column) => (rowEntry.selectedColumnIds.includes(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
-      }
-
-      await navigator.clipboard.writeText(lines.join('\n'))
-    }
-
-    async function copyAllSelection(includeHeaders: boolean) {
-      const parts: string[] = []
-
-      if (selectedRows.value.length > 0) {
-        const columns = selectionPanelColumns.value
-        const lines: string[] = []
-
-        if (includeHeaders) {
-          lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-        }
-
-        for (const row of selectedRows.value) {
-          lines.push(columns.map((column) => escapeClipboardCell(getClipboardCellValue(row, column))).join('\t'))
-        }
-
-        parts.push(lines.join('\n'))
-      }
-
-      if (selectedCellCount.value > 0) {
-        const columns = cellSelectionColumns.value.filter((column) => selectedCellRows.value.some((row) => row.selectedColumnIds.includes(column.id)))
-        const lines: string[] = []
-
-        if (includeHeaders) {
-          lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-        }
-
-        for (const rowEntry of selectedCellRows.value) {
-          lines.push(columns.map((column) => (rowEntry.selectedColumnIds.includes(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
-        }
-
-        parts.push(lines.join('\n'))
-      }
-
-      if (parts.length > 0 && typeof navigator !== 'undefined') {
-        await navigator.clipboard.writeText(parts.join('\n\n'))
-      }
-    }
-
-    const selectionPanelSums = computed(() => {
-      const sumConfigs = mergedSelectionPanelConfig.value?.sumColumns ?? []
-      if (!mergedSelectionPanelConfig.value || sumConfigs.length === 0 || Object.keys(rowSelection.value).length === 0) {
-        return []
-      }
-
-      const columnsById = new Map<string, Column<AnyRow, unknown>>()
-      const totalsById = new Map<string, number>()
-
-      for (const config of sumConfigs) {
-        const column = allLeafColumnsById.value.get(config.columnId)
-        if (!column) {
-          continue
-        }
-
-        columnsById.set(config.columnId, column)
-        totalsById.set(config.columnId, 0)
-      }
-
-      if (totalsById.size === 0) {
-        return []
-      }
-
-      for (const row of selectedRows.value) {
-        for (const config of sumConfigs) {
-          const column = columnsById.get(config.columnId)
-          if (!column || !totalsById.has(config.columnId)) {
-            continue
-          }
-
-          const rawValue = getCustomColumnValue(row, column, 'sum')
-          const numericValue = typeof rawValue === 'number' ? rawValue : typeof rawValue === 'string' ? Number(rawValue) : Number.NaN
-
-          if (!Number.isFinite(numericValue)) {
-            continue
-          }
-
-          totalsById.set(config.columnId, (totalsById.get(config.columnId) ?? 0) + numericValue)
-        }
-      }
-
-      return sumConfigs
-        .map((config) => {
-          const column = columnsById.get(config.columnId)
-          if (!column) {
-            return null
-          }
-          const sum = totalsById.get(config.columnId) ?? 0
-
-          return {
-            columnId: config.columnId,
-            label: config.label ?? renderColumnPickerLabel(column),
-            value: config.formatValue ? config.formatValue(sum) : String(sum),
-          }
-        })
-        .filter(
-          (
-            item,
-          ): item is {
-            columnId: string
-            label: string
-            value: string
-          } => Boolean(item),
-        )
-    })
-
-    function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Header<AnyRow, unknown>>(orderedItems: TItem[], getColumn: (item: TItem) => Column<AnyRow, unknown>, renderedNonPinnedIds: Set<string>): RenderedSequenceItem<TItem>[] {
-      const sequence: RenderedSequenceItem<TItem>[] = []
-      let spacerWidth = 0
-      let spacerIndex = 0
-
-      for (const item of orderedItems) {
-        const column = getColumn(item)
-        const pinnedSide = getPinnedSide(column.id)
-
-        if (pinnedSide || renderedNonPinnedIds.has(column.id)) {
-          if (spacerWidth > 0) {
-            sequence.push({
-              type: 'spacer',
-              key: `spacer-${spacerIndex}`,
-              width: spacerWidth,
-            })
-            spacerWidth = 0
-            spacerIndex += 1
-          }
-
-          sequence.push({
-            type: 'item',
-            key: column.id,
-            item,
-            column,
-          })
-          continue
-        }
-
-        spacerWidth += column.getSize()
-      }
-
-      if (spacerWidth > 0) {
-        sequence.push({
-          type: 'spacer',
-          key: `spacer-${spacerIndex}`,
-          width: spacerWidth,
-        })
-      }
-
-      return sequence
-    }
 
     return () => {
       const pageCount = requestState.value.pageCount
