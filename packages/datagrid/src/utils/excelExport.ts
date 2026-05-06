@@ -24,6 +24,24 @@ export type DataGridExcelExportRow<TData extends RowData = AnyRow> = {
   row?: Row<TData>
 }
 
+export type DataGridExcelExportPayloadColumn = {
+  id: string
+  header: string
+  width: number
+  explicitWidth?: boolean
+  format?: DataGridExcelExportFormat
+  align?: DataGridColumnAlign
+}
+
+export type DataGridExcelExportPayload = {
+  sheetName: string
+  columns: DataGridExcelExportPayloadColumn[]
+  rows: Record<string, unknown>[]
+  styles?: DataGridExcelExportConfig['styles']
+  autoFilter: boolean
+  freezeHeader: boolean
+}
+
 type ExcelJSImport = typeof import('exceljs')
 
 const defaultHeaderStyle: DataGridExcelCellStyle = {
@@ -46,6 +64,10 @@ export async function loadExcelJS(): Promise<ExcelJSImport> {
 
 export async function downloadWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
   const buffer = await workbook.xlsx.writeBuffer()
+  downloadWorkbookBuffer(buffer, fileName)
+}
+
+export function downloadWorkbookBuffer(buffer: BlobPart, fileName: string) {
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
@@ -179,51 +201,86 @@ function getHorizontalAlign(align: DataGridColumnAlign | undefined) {
   return 'left'
 }
 
-export async function createExcelWorkbook<TData extends RowData>(options: {
-  columns: DataGridExcelExportColumn<TData>[]
-  rows: DataGridExcelExportRow<TData>[]
-  config: Required<Pick<DataGridExcelExportConfig<TData>, 'sheetName' | 'autoFilter' | 'freezeHeader'>> & DataGridExcelExportConfig<TData>
+function getInitialColumnWidth<TData extends RowData>(
+  column: DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn,
+) {
+  if ('columnDef' in column) {
+    return Math.max(10, Math.min(80, Math.round((column.columnDef.exportWidth ?? column.size) / 8)))
+  }
+
+  return column.width
+}
+
+function getColumnHeader<TData extends RowData>(
+  column: DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn,
+) {
+  if ('columnDef' in column) return column.columnDef.exportHeader ?? column.label
+  return column.header
+}
+
+function getColumnFormat<TData extends RowData>(
+  column: DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn,
+) {
+  if ('columnDef' in column) return column.columnDef.exportFormat
+  return column.format
+}
+
+function getColumnAlign<TData extends RowData>(
+  column: DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn,
+) {
+  if ('columnDef' in column) return column.columnDef.exportAlign ?? column.columnDef.align
+  return column.align
+}
+
+function hasExplicitColumnWidth<TData extends RowData>(
+  column: DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn,
+) {
+  if ('columnDef' in column) return Boolean(column.columnDef.exportWidth)
+  return Boolean(column.explicitWidth)
+}
+
+async function createWorkbookFromValues<TData extends RowData = AnyRow>(options: {
+  sheetName: string
+  columns: Array<DataGridExcelExportColumn<TData> | DataGridExcelExportPayloadColumn>
+  rows: Record<string, unknown>[]
+  styles?: DataGridExcelExportConfig['styles']
+  autoFilter: boolean
+  freezeHeader: boolean
 }) {
   const ExcelJS = await loadExcelJS()
   const workbook = new ExcelJS.Workbook()
-  const worksheet = workbook.addWorksheet(options.config.sheetName)
+  const worksheet = workbook.addWorksheet(options.sheetName)
   const headerStyle = {
     ...defaultHeaderStyle,
-    ...(options.config.styles?.header ?? {}),
+    ...(options.styles?.header ?? {}),
   }
   const dataStyle = {
     ...defaultDataStyle,
-    ...(options.config.styles?.data ?? {}),
+    ...(options.styles?.data ?? {}),
   }
 
   worksheet.columns = options.columns.map((column) => ({
-    header: column.columnDef.exportHeader ?? column.label,
+    header: getColumnHeader(column),
     key: column.id,
-    width: Math.max(10, Math.min(80, Math.round((column.columnDef.exportWidth ?? column.size) / 8))),
+    width: getInitialColumnWidth(column),
   }))
 
   const headerRow = worksheet.getRow(1)
   headerRow.height = 22
   headerRow.eachCell((cell) => applyStyle(cell, headerStyle))
 
-  for (const row of options.rows) {
-    const values: Record<string, unknown> = {}
-    for (const column of options.columns) {
-      values[column.id] = resolveExportCellValue(row, column)
-    }
-    worksheet.addRow(values)
-  }
+  for (const row of options.rows) worksheet.addRow(row)
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return
     row.eachCell((cell, columnIndex) => {
       const exportColumn = options.columns[columnIndex - 1]
-      const align = exportColumn?.columnDef.exportAlign ?? exportColumn?.columnDef.align
+      if (!exportColumn) return
       applyStyle(cell, {
         ...dataStyle,
         alignment: {
           ...(dataStyle.alignment ?? {}),
-          horizontal: getHorizontalAlign(align),
+          horizontal: getHorizontalAlign(getColumnAlign(exportColumn)),
         },
       })
     })
@@ -231,15 +288,15 @@ export async function createExcelWorkbook<TData extends RowData>(options: {
 
   options.columns.forEach((column, index) => {
     const excelColumn = worksheet.getColumn(index + 1)
-    const numFmt = getExportFormatNumFmt(column.columnDef.exportFormat)
+    const numFmt = getExportFormatNumFmt(getColumnFormat(column))
     if (numFmt) excelColumn.numFmt = numFmt
 
-    if (column.columnDef.exportWidth) {
-      excelColumn.width = column.columnDef.exportWidth
+    if (hasExplicitColumnWidth(column)) {
+      excelColumn.width = getInitialColumnWidth(column)
       return
     }
 
-    let maxLength = String(column.columnDef.exportHeader ?? column.label).length
+    let maxLength = String(getColumnHeader(column)).length
     excelColumn.eachCell({ includeEmpty: false }, (cell) => {
       const text = cell.value instanceof Date ? 'yyyy-mm-dd hh:mm' : String(cell.value ?? '')
       maxLength = Math.max(maxLength, text.length)
@@ -247,16 +304,102 @@ export async function createExcelWorkbook<TData extends RowData>(options: {
     excelColumn.width = Math.max(excelColumn.width ?? 10, Math.min(80, maxLength + 2))
   })
 
-  if (options.config.autoFilter && options.columns.length > 0) {
+  if (options.autoFilter && options.columns.length > 0) {
     worksheet.autoFilter = {
       from: { row: 1, column: 1 },
       to: { row: 1, column: options.columns.length },
     }
   }
 
-  if (options.config.freezeHeader) {
+  if (options.freezeHeader) {
     worksheet.views = [{ state: 'frozen', ySplit: 1 }]
   }
 
   return workbook
+}
+
+export async function createExcelWorkbook<TData extends RowData>(options: {
+  columns: DataGridExcelExportColumn<TData>[]
+  rows: DataGridExcelExportRow<TData>[]
+  config: Required<Pick<DataGridExcelExportConfig<TData>, 'sheetName' | 'autoFilter' | 'freezeHeader'>> & DataGridExcelExportConfig<TData>
+}) {
+  return createWorkbookFromValues({
+    sheetName: options.config.sheetName,
+    columns: options.columns,
+    rows: await prepareExcelExportRows({
+      columns: options.columns,
+      rows: options.rows,
+      batchSize: options.config.valueBatchSize,
+    }),
+    styles: options.config.styles,
+    autoFilter: options.config.autoFilter,
+    freezeHeader: options.config.freezeHeader,
+  })
+}
+
+export function createExcelExportPayload<TData extends RowData>(options: {
+  columns: DataGridExcelExportColumn<TData>[]
+  rows: Record<string, unknown>[]
+  config: Required<Pick<DataGridExcelExportConfig<TData>, 'sheetName' | 'autoFilter' | 'freezeHeader'>> & DataGridExcelExportConfig<TData>
+}): DataGridExcelExportPayload {
+  return {
+    sheetName: options.config.sheetName,
+    columns: options.columns.map((column) => ({
+      id: column.id,
+      header: String(column.columnDef.exportHeader ?? column.label),
+      width: getInitialColumnWidth(column),
+      explicitWidth: Boolean(column.columnDef.exportWidth),
+      format: column.columnDef.exportFormat,
+      align: column.columnDef.exportAlign ?? column.columnDef.align,
+    })),
+    rows: options.rows,
+    styles: options.config.styles,
+    autoFilter: options.config.autoFilter,
+    freezeHeader: options.config.freezeHeader,
+  }
+}
+
+export async function createExcelWorkbookFromPayload(payload: DataGridExcelExportPayload) {
+  return createWorkbookFromValues(payload)
+}
+
+export async function createExcelWorkbookBufferFromPayload(payload: DataGridExcelExportPayload) {
+  const workbook = await createExcelWorkbookFromPayload(payload)
+  return workbook.xlsx.writeBuffer()
+}
+
+function yieldToBrowser() {
+  return new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => resolve())
+      return
+    }
+
+    setTimeout(resolve, 0)
+  })
+}
+
+export async function prepareExcelExportRows<TData extends RowData>(options: {
+  columns: DataGridExcelExportColumn<TData>[]
+  rows: DataGridExcelExportRow<TData>[]
+  batchSize?: number
+}) {
+  const batchSize = Math.max(1, options.batchSize ?? 500)
+  const exportRows: Record<string, unknown>[] = []
+
+  for (let rowIndex = 0; rowIndex < options.rows.length; rowIndex += 1) {
+    const row = options.rows[rowIndex]
+    if (!row) continue
+    const values: Record<string, unknown> = {}
+    for (const column of options.columns) {
+      values[column.id] = resolveExportCellValue(row, column)
+    }
+    exportRows.push(values)
+
+    if ((rowIndex + 1) % batchSize === 0) {
+      await yieldToBrowser()
+    }
+  }
+
+  return exportRows
 }

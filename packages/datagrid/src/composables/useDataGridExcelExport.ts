@@ -1,5 +1,6 @@
 import { ref, type ComputedRef, type Ref, type ShallowRef } from 'vue'
 import type { Column, ColumnFiltersState, ColumnSort, PaginationState, Row, RowData } from '@tanstack/vue-table'
+import ExcelExportWorker from '../workers/excelExportWorker?worker&inline'
 
 import type {
   DataGridColumn,
@@ -10,8 +11,12 @@ import type {
 } from '../types'
 import type { DataGridRequestState } from './useDataGridRows'
 import {
-  createExcelWorkbook,
+  createExcelExportPayload,
+  createExcelWorkbookFromPayload,
+  downloadWorkbookBuffer,
   downloadWorkbook,
+  prepareExcelExportRows,
+  type DataGridExcelExportPayload,
   type DataGridExcelExportColumn,
   type DataGridExcelExportRow,
 } from '../utils/excelExport'
@@ -32,10 +37,12 @@ type UseDataGridExcelExportOptions<TData extends AnyRow> = {
   renderColumnLabel: (column: Column<TData, unknown>) => string
 }
 
-const defaultExportConfig: Required<Pick<DataGridExcelExportConfig, 'sheetName' | 'pageSize' | 'maxRows' | 'autoFilter' | 'freezeHeader' | 'includeActionColumns'>> = {
+const defaultExportConfig: Required<Pick<DataGridExcelExportConfig, 'sheetName' | 'pageSize' | 'maxRows' | 'useWorker' | 'valueBatchSize' | 'autoFilter' | 'freezeHeader' | 'includeActionColumns'>> = {
   sheetName: 'Dane',
   pageSize: 1000,
   maxRows: 50000,
+  useWorker: true,
+  valueBatchSize: 500,
   autoFilter: true,
   freezeHeader: true,
   includeActionColumns: false,
@@ -83,6 +90,7 @@ export function useDataGridExcelExport<TData extends AnyRow>(
   options: UseDataGridExcelExportOptions<TData>,
 ) {
   const exporting = ref(false)
+  let workerRequestId = 0
 
   function resolveConfig(overrides: Partial<DataGridExcelExportConfig<TData>> = {}) {
     return {
@@ -177,6 +185,60 @@ export function useDataGridExcelExport<TData extends AnyRow>(
     return getDefaultFileName(mode)
   }
 
+  function canUseWorker(config: ReturnType<typeof resolveConfig>) {
+    return config.useWorker && typeof Worker !== 'undefined'
+  }
+
+  function exportPayloadWithWorker(payload: DataGridExcelExportPayload) {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      const requestId = (workerRequestId += 1)
+      const worker = new ExcelExportWorker()
+
+      worker.onmessage = (
+        event: MessageEvent<
+          | { id: number; ok: true; buffer: ArrayBuffer }
+          | { id: number; ok: false; error: string }
+        >,
+      ) => {
+        if (event.data.id !== requestId) return
+        worker.terminate()
+
+        if (event.data.ok) {
+          resolve(event.data.buffer)
+          return
+        }
+
+        reject(new Error(event.data.error))
+      }
+
+      worker.onerror = (event) => {
+        worker.terminate()
+        reject(new Error(event.message || 'Excel export worker failed.'))
+      }
+
+      worker.postMessage({ id: requestId, payload })
+    })
+  }
+
+  async function downloadWithWorkerFallback(
+    payload: DataGridExcelExportPayload,
+    fileName: string,
+    config: ReturnType<typeof resolveConfig>,
+  ) {
+    if (canUseWorker(config)) {
+      try {
+        const buffer = await exportPayloadWithWorker(payload)
+        downloadWorkbookBuffer(buffer, fileName)
+        return
+      } catch {
+        // Fall back to the main thread when the browser or bundler cannot start the worker.
+      }
+    }
+
+    const workbook = await createExcelWorkbookFromPayload(payload)
+    await downloadWorkbook(workbook, fileName)
+  }
+
   async function exportExcel(
     mode: DataGridExcelExportMode,
     overrides: Partial<DataGridExcelExportConfig<TData>> = {},
@@ -200,12 +262,19 @@ export function useDataGridExcelExport<TData extends AnyRow>(
         throw new Error(`Excel export row limit exceeded: ${rows.length}/${config.maxRows}.`)
       }
 
-      const workbook = await createExcelWorkbook({
+      const fileName = resolveFileName(mode, config, rows.length, columns.length)
+      const exportRows = await prepareExcelExportRows({
         columns,
         rows,
+        batchSize: config.valueBatchSize,
+      })
+      const payload = createExcelExportPayload({
+        columns,
+        rows: exportRows,
         config,
       })
-      await downloadWorkbook(workbook, resolveFileName(mode, config, rows.length, columns.length))
+
+      await downloadWithWorkerFallback(payload, fileName, config)
     } catch (error) {
       config.onError?.(error)
       throw error

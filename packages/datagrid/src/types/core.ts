@@ -47,6 +47,8 @@ export type DataGridExcelExportConfig<TData extends RowData = RowData> = {
   sheetName?: string
   pageSize?: number
   maxRows?: number
+  useWorker?: boolean
+  valueBatchSize?: number
   modes?: DataGridExcelExportMode[]
   styles?: DataGridExcelExportStyles
   autoFilter?: boolean
