@@ -916,6 +916,10 @@ export default defineComponent({
     }
 
     function renderColumnPickerDialog() {
+      if (!isColumnPickerOpen.value) {
+        return null
+      }
+
       return (
         <DataGridColumnPickerDialog
           isOpen={isColumnPickerOpen.value}
@@ -941,10 +945,18 @@ export default defineComponent({
     }
 
     function renderFilterDialog() {
+      if (!isFilterDialogOpen.value) {
+        return null
+      }
+
       return <DataGridFilterDialog isOpen={isFilterDialogOpen.value} sections={filterDialogSections.value} renderFilterControl={(config) => renderFilterControl(config, { target: 'dialog' })} onClose={closeFilterDialog} onApply={applyFilterDialogChanges} />
     }
 
     function renderFilterHelpDialog() {
+      if (!isFilterHelpDialogOpen.value) {
+        return null
+      }
+
       return (
         <DataGridHelpDialog
           isOpen={isFilterHelpDialogOpen.value}
@@ -956,6 +968,10 @@ export default defineComponent({
     }
 
     function renderSaveViewDialog() {
+      if (!isSaveViewDialogOpen.value) {
+        return null
+      }
+
       return (
         <DataGridSaveViewDialog
           isOpen={isSaveViewDialogOpen.value}
@@ -969,13 +985,26 @@ export default defineComponent({
       )
     }
 
-    const getColumnMenuStyle = (column: Column<AnyRow, unknown>) =>
-      getDataGridColumnMenuStyle({
-        column,
-        visibleColumns,
-        visibleColumnIndexById,
-        getPinnedSide,
-      })
+    const columnPickerLabelById = computed(() => {
+      const labelsById = new Map<string, string>()
+      for (const column of allLeafColumns.value) {
+        labelsById.set(column.id, renderColumnPickerLabel(column))
+      }
+      return labelsById
+    })
+    const columnMenuStyleById = computed(() => {
+      const stylesById = new Map<string, ReturnType<typeof getDataGridColumnMenuStyle>>()
+      for (const column of visibleColumns.value) {
+        stylesById.set(column.id, getDataGridColumnMenuStyle({
+          column,
+          visibleColumns,
+          visibleColumnIndexById,
+          getPinnedSide,
+        }))
+      }
+      return stylesById
+    })
+    const selectionPanelSelectedCount = computed(() => selectionPanelSections.value.reduce((total, section) => total + section.count, 0))
     const renderCell = renderDataGridCell
 
     function closeColumnMenu() {
@@ -1089,11 +1118,9 @@ export default defineComponent({
                           <div
                             key={entry.key}
                             class={['data-grid__cell', 'data-grid__cell--header', pinnedSide ? 'data-grid__cell--pinned' : '', pinnedSide ? `data-grid__cell--${pinnedSide}` : '']}
-                            style={{
-                              ...cellStylesByColumnId.value.get(entry.column.id),
-                            }}
+                            style={cellStylesByColumnId.value.get(entry.column.id)}
                           >
-                            <DataGridHeaderCell header={entry.item.getContext()} column={entry.column} pickerLabel={renderColumnPickerLabel(entry.column)} justifyContent={(cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ?? 'flex-start'} menuStyle={getColumnMenuStyle(entry.column)} isMenuOpen={openMenuColumnId.value === entry.column.id} pinnedSide={pinnedSide} renderFilterControl={(config) => renderFilterControl(config)} getColumnFilterConfig={getColumnFilterConfig} onToggleMenu={toggleColumnMenu} onToggleSorting={toggleSorting} onSetSortDesc={setSortDesc} onClearSorting={clearSorting} onSetPin={setPin} onCloseMenu={closeColumnMenu} />
+                            <DataGridHeaderCell header={entry.item.getContext()} column={entry.column} pickerLabel={columnPickerLabelById.value.get(entry.column.id) ?? entry.column.id} justifyContent={(cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ?? 'flex-start'} menuStyle={columnMenuStyleById.value.get(entry.column.id) ?? { left: '0', right: 'auto' }} isMenuOpen={openMenuColumnId.value === entry.column.id} pinnedSide={pinnedSide} renderFilterControl={(config) => renderFilterControl(config)} getColumnFilterConfig={getColumnFilterConfig} onToggleMenu={toggleColumnMenu} onToggleSorting={toggleSorting} onSetSortDesc={setSortDesc} onClearSorting={clearSorting} onSetPin={setPin} onCloseMenu={closeColumnMenu} />
                           </div>
                         )
                       })}
@@ -1129,7 +1156,7 @@ export default defineComponent({
               <DataGridSelectionPanel
                 position={mergedSelectionPanelConfig.value.position ?? selectionPanelPosition.value ?? 'bottom-right'}
                 floatingPosition={mergedSelectionPanelConfig.value.floatingPosition ?? selectionPanelFloatingPosition.value ?? null}
-                selectedRowsCount={selectionPanelSections.value.reduce((total, section) => total + section.count, 0)}
+                selectedRowsCount={selectionPanelSelectedCount.value}
                 selectedRowsLabel={localeText.value.selectedRowsTotalLabel}
                 sections={selectionPanelSections.value}
                 actions={selectionPanelActions.value}

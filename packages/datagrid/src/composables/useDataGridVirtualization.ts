@@ -9,6 +9,11 @@ type AnyRow = Record<string, unknown>
 
 export type RenderedSequenceItem<TItem> = { type: 'spacer'; key: string; width: number } | { type: 'item'; key: string; item: TItem; column: Column<AnyRow, unknown> }
 
+type CellStyleCacheEntry = {
+  key: string
+  style: CSSProperties
+}
+
 type UseDataGridVirtualizationOptions = {
   scrollElementRef: Ref<HTMLDivElement | null>
   visibleRows: Ref<Row<AnyRow>[]>
@@ -73,8 +78,7 @@ function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Hea
 export function useDataGridVirtualization(options: UseDataGridVirtualizationOptions) {
   const leftPinnedColumnIds = computed(() => new Set(options.columnPinning.value.left ?? []))
   const rightPinnedColumnIds = computed(() => new Set(options.columnPinning.value.right ?? []))
-  let previousCellStylesKey = ''
-  let previousCellStylesByColumnId = new Map<string, CSSProperties>()
+  const cellStyleCacheByColumnId = new Map<string, CellStyleCacheEntry>()
 
   function getPinnedSide(columnId: string): 'left' | 'right' | false {
     if (leftPinnedColumnIds.value.has(columnId)) {
@@ -115,18 +119,19 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
   const renderedNonPinnedIds = computed(() => new Set(virtualNonPinnedColumns.value.map((virtualColumn) => nonPinnedColumns.value[virtualColumn.index]?.id).filter((value): value is string => Boolean(value))))
   const headerSequence = computed(() => buildRenderedColumnSequence(options.visibleHeaders.value, (header) => header.column, renderedNonPinnedIds.value, getPinnedSide))
   const rowSequence = computed(() => buildRenderedColumnSequence(options.visibleColumns.value, (column) => column, renderedNonPinnedIds.value, getPinnedSide))
-  const cellStylesByColumnId = computed(() => {
-    const stylesKey = [
-      options.visibleColumns.value.map((column) => `${column.id}:${column.getSize()}:${(column.columnDef as DataGridColumn<AnyRow>).align ?? ''}`).join('|'),
-      (options.columnPinning.value.left ?? []).join('|'),
-      (options.columnPinning.value.right ?? []).join('|'),
-    ].join('::')
-
-    if (stylesKey === previousCellStylesKey) {
-      return previousCellStylesByColumnId
+  function getCachedCellStyle(column: Column<AnyRow, unknown>, key: string, style: CSSProperties) {
+    const cached = cellStyleCacheByColumnId.get(column.id)
+    if (cached?.key === key) {
+      return cached.style
     }
 
+    cellStyleCacheByColumnId.set(column.id, { key, style })
+    return style
+  }
+
+  const cellStylesByColumnId = computed(() => {
     const styles = new Map<string, CSSProperties>()
+    const visibleColumnIds = new Set<string>()
     let leftOffset = 0
     const leftPinnedIds = options.columnPinning.value.left ?? []
     const rightPinnedIds = options.columnPinning.value.right ?? []
@@ -141,13 +146,16 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
         continue
       }
 
-      styles.set(column.id, {
-        width: `${column.getSize()}px`,
+      const width = column.getSize()
+      const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
+      visibleColumnIds.add(column.id)
+      styles.set(column.id, getCachedCellStyle(column, `left:${width}:${leftOffset}:${60 - index}:${justifyContent}`, {
+        width: `${width}px`,
         left: `${leftOffset}px`,
         zIndex: `${60 - index}`,
-        justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-      })
-      leftOffset += column.getSize()
+        justifyContent,
+      }))
+      leftOffset += width
     }
 
     let rightOffset = 0
@@ -161,28 +169,38 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
         continue
       }
 
-      styles.set(column.id, {
-        width: `${column.getSize()}px`,
+      const width = column.getSize()
+      const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
+      visibleColumnIds.add(column.id)
+      styles.set(column.id, getCachedCellStyle(column, `right:${width}:${rightOffset}:${60 - index}:${justifyContent}`, {
+        width: `${width}px`,
         right: `${rightOffset}px`,
         zIndex: `${60 - index}`,
-        justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-      })
-      rightOffset += column.getSize()
+        justifyContent,
+      }))
+      rightOffset += width
     }
 
     for (const column of options.visibleColumns.value) {
+      visibleColumnIds.add(column.id)
       if (styles.has(column.id)) {
         continue
       }
 
-      styles.set(column.id, {
-        width: `${column.getSize()}px`,
-        justifyContent: toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align),
-      })
+      const width = column.getSize()
+      const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
+      styles.set(column.id, getCachedCellStyle(column, `normal:${width}:${justifyContent}`, {
+        width: `${width}px`,
+        justifyContent,
+      }))
     }
 
-    previousCellStylesKey = stylesKey
-    previousCellStylesByColumnId = styles
+    for (const columnId of cellStyleCacheByColumnId.keys()) {
+      if (!visibleColumnIds.has(columnId)) {
+        cellStyleCacheByColumnId.delete(columnId)
+      }
+    }
+
     return styles
   })
 

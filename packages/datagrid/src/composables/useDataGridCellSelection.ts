@@ -25,6 +25,21 @@ function getCellSelectionKey(rowId: string, columnId: string) {
   return `${rowId}::${columnId}`
 }
 
+function parseCellSelectionKey(key: string) {
+  const separatorIndex = key.lastIndexOf('::')
+  if (separatorIndex < 0) {
+    return null
+  }
+
+  const rowId = key.slice(0, separatorIndex)
+  const columnId = key.slice(separatorIndex + 2)
+  if (!rowId || !columnId) {
+    return null
+  }
+
+  return { rowId, columnId }
+}
+
 function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
   return {
     rowId: cell.row.id,
@@ -57,73 +72,66 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     const columnIds = cellSelectionColumnIdSet.value
     const selectedColumnIdsByRowId = new Map<string, Set<string>>()
     const selectedCountByColumnId = new Map<string, number>()
+    const selectedCellRowsByRowId = new Map<string, SelectedCellRow>()
+    const selectedColumnIds: string[] = []
 
     if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
       return {
         selectedColumnIdsByRowId,
         selectedCountByColumnId,
+        selectedCellRows: [],
+        selectedColumnIds,
       }
     }
 
     for (const key of selectedCellKeys.value) {
-      const [rowId, columnId] = key.split('::')
-      if (!rowId || !columnId || !rowIds.has(rowId) || !columnIds.has(columnId)) {
+      const parsedKey = parseCellSelectionKey(key)
+      if (!parsedKey || !rowIds.has(parsedKey.rowId) || !columnIds.has(parsedKey.columnId)) {
         continue
       }
 
-      let selectedColumnIds = selectedColumnIdsByRowId.get(rowId)
-      if (!selectedColumnIds) {
-        selectedColumnIds = new Set<string>()
-        selectedColumnIdsByRowId.set(rowId, selectedColumnIds)
+      let rowColumnIds = selectedColumnIdsByRowId.get(parsedKey.rowId)
+      if (!rowColumnIds) {
+        rowColumnIds = new Set<string>()
+        selectedColumnIdsByRowId.set(parsedKey.rowId, rowColumnIds)
       }
 
-      if (selectedColumnIds.has(columnId)) {
+      if (rowColumnIds.has(parsedKey.columnId)) {
         continue
       }
 
-      selectedColumnIds.add(columnId)
-      selectedCountByColumnId.set(columnId, (selectedCountByColumnId.get(columnId) ?? 0) + 1)
+      rowColumnIds.add(parsedKey.columnId)
+      selectedCountByColumnId.set(parsedKey.columnId, (selectedCountByColumnId.get(parsedKey.columnId) ?? 0) + 1)
+    }
+
+    const rowCount = options.visibleRows.value.length
+    if (rowCount > 0) {
+      for (const column of options.cellSelectionColumns.value) {
+        if ((selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
+          selectedColumnIds.push(column.id)
+        }
+      }
+    }
+
+    for (const row of options.visibleRows.value) {
+      const rowColumnIds = selectedColumnIdsByRowId.get(row.id)
+      if (rowColumnIds && rowColumnIds.size > 0) {
+        selectedCellRowsByRowId.set(row.id, { row, selectedColumnIds: rowColumnIds })
+      }
     }
 
     return {
       selectedColumnIdsByRowId,
       selectedCountByColumnId,
+      selectedCellRows: Array.from(selectedCellRowsByRowId.values()),
+      selectedColumnIds,
     }
   })
   const selectedColumnIds = computed(() => {
-    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
-      return []
-    }
-
-    const columns: string[] = []
-    const rowCount = options.visibleRows.value.length
-    if (rowCount === 0) {
-      return columns
-    }
-
-    for (const column of options.cellSelectionColumns.value) {
-      if ((selectedCellIndex.value.selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
-        columns.push(column.id)
-      }
-    }
-
-    return columns
+    return selectedCellIndex.value.selectedColumnIds
   })
   const selectedCellRows = computed<SelectedCellRow[]>(() => {
-    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
-      return []
-    }
-
-    const selectedColumnIdsByRowId = selectedCellIndex.value.selectedColumnIdsByRowId
-    return options.visibleRows.value
-      .map((row) => {
-        const selectedColumnIds = selectedColumnIdsByRowId.get(row.id)
-
-        return selectedColumnIds && selectedColumnIds.size > 0
-          ? { row, selectedColumnIds }
-          : null
-      })
-      .filter((item): item is SelectedCellRow => Boolean(item))
+    return selectedCellIndex.value.selectedCellRows
   })
 
   function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
@@ -502,8 +510,8 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
 
       const nextKeys = new Set<string>()
       for (const key of selectedCellKeys.value) {
-        const [rowId, columnId] = key.split('::')
-        if (rowId && columnId && availableRowIds.has(rowId) && availableColumnIds.has(columnId)) {
+        const parsedKey = parseCellSelectionKey(key)
+        if (parsedKey && availableRowIds.has(parsedKey.rowId) && availableColumnIds.has(parsedKey.columnId)) {
           nextKeys.add(key)
         }
       }
