@@ -53,6 +53,8 @@ export function createDataGridDateColumn<TData extends RowData>(
 export function createDataGridNumberColumn<TData extends RowData>(
   options: DataGridBaseColumnFactoryOptions<TData> & {
     digits?: number
+    locale?: Intl.LocalesArgument
+    minimumFractionDigits?: number
     format?: (value: number | null, row: TData) => VNodeChild
   },
 ): DataGridColumn<TData> {
@@ -71,9 +73,10 @@ export function createDataGridNumberColumn<TData extends RowData>(
         const normalizedValue = Number.isFinite(value) ? value : null
         if (options.format) return options.format(normalizedValue, row.original)
         if (normalizedValue === null) return '-'
-        return normalizedValue.toLocaleString(undefined, {
+        return normalizedValue.toLocaleString(options.locale, {
+          minimumFractionDigits: options.minimumFractionDigits,
           maximumFractionDigits: options.digits ?? 2,
-        })
+        }).replace(/[\u00a0\u202f]/g, ' ')
       }),
   } as DataGridColumn<TData>
 }
