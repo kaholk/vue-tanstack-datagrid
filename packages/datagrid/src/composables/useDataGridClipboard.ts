@@ -11,7 +11,7 @@ type CellSelectionAnchor = {
 }
 type SelectedCellRow = {
   row: Row<AnyRow>
-  selectedColumnIds: string[]
+  selectedColumnIds: Set<string>
 }
 
 type UseDataGridClipboardOptions = {
@@ -163,8 +163,14 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
   }
 
   async function copySelectedCells(includeHeaders: boolean) {
-    const columns = options.cellSelectionColumns.value.filter((column) => options.selectedCellRows.value.some((row) => row.selectedColumnIds.includes(column.id)))
     const rows = options.selectedCellRows.value
+    const selectedColumnIds = new Set<string>()
+    for (const row of rows) {
+      for (const columnId of row.selectedColumnIds) {
+        selectedColumnIds.add(columnId)
+      }
+    }
+    const columns = options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
 
     if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
       return
@@ -177,7 +183,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     }
 
     for (const rowEntry of rows) {
-      lines.push(columns.map((column) => (rowEntry.selectedColumnIds.includes(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
+      lines.push(columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
     }
 
     await navigator.clipboard.writeText(lines.join('\n'))
@@ -202,7 +208,13 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     }
 
     if (options.selectedCellCount.value > 0) {
-      const columns = options.cellSelectionColumns.value.filter((column) => options.selectedCellRows.value.some((row) => row.selectedColumnIds.includes(column.id)))
+      const selectedColumnIds = new Set<string>()
+      for (const row of options.selectedCellRows.value) {
+        for (const columnId of row.selectedColumnIds) {
+          selectedColumnIds.add(columnId)
+        }
+      }
+      const columns = options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
       const lines: string[] = []
 
       if (includeHeaders) {
@@ -210,7 +222,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       }
 
       for (const rowEntry of options.selectedCellRows.value) {
-        lines.push(columns.map((column) => (rowEntry.selectedColumnIds.includes(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
+        lines.push(columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
       }
 
       parts.push(lines.join('\n'))

@@ -120,7 +120,6 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
       options.visibleColumns.value.map((column) => `${column.id}:${column.getSize()}:${(column.columnDef as DataGridColumn<AnyRow>).align ?? ''}`).join('|'),
       (options.columnPinning.value.left ?? []).join('|'),
       (options.columnPinning.value.right ?? []).join('|'),
-      Array.from(options.visibleColumnIndexById.value.keys()).join('|'),
     ].join('::')
 
     if (stylesKey === previousCellStylesKey) {

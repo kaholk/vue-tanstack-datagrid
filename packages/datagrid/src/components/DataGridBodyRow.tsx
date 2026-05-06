@@ -134,89 +134,87 @@ export default defineComponent({
               typeof columnDef.cellClass === 'function'
                 ? columnDef.cellClass({ cell, row })
                 : columnDef.cellClass
+            const baseCellClass = [
+              'data-grid__cell',
+              pinnedSide ? 'data-grid__cell--pinned' : undefined,
+              pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
+              customCellClass,
+            ]
+            const cellClickHandlers = columnDef.onCellClick
+              ? {
+                  onClick: (event: MouseEvent) => {
+                    columnDef.onCellClick?.({ cell, row, event })
+                  },
+                }
+              : undefined
 
             if (!props.enableCellSelection) {
               return (
                 <div
                   key={cell.id}
-                  class={[
-                    'data-grid__cell',
-                    pinnedSide ? 'data-grid__cell--pinned' : '',
-                    pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
-                    customCellClass ?? '',
-                  ]}
+                  class={baseCellClass}
                   data-grid-column-id={entry.column.id}
                   style={props.cellStylesByColumnId.get(entry.column.id)}
-                  onClick={(event) => {
-                    columnDef.onCellClick?.({ cell, row, event })
-                  }}
+                  {...cellClickHandlers}
                 >
                   {props.renderCell(cell)}
                 </div>
               )
             }
 
-            const isCellSelected = props.enableCellSelection
-              ? (props.isCellSelected?.(cell) ?? false)
-              : false
-            const isCellSelectionHovered = props.enableCellSelection
-              ? (props.isCellSelectionHovered?.(cell) ?? false)
-              : false
-            const cellSelectionPreviewMode = props.enableCellSelection
-              ? (props.getCellSelectionPreviewMode?.(cell) ?? null)
-              : null
+            const isCellSelected = props.isCellSelected?.(cell) ?? false
+            const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
+            const cellSelectionPreviewMode = props.getCellSelectionPreviewMode?.(cell) ?? null
             const isCellSelectionAddPreviewed =
               !isCellSelected &&
               (cellSelectionPreviewMode === 'select' || cellSelectionPreviewMode === 'toggle')
             const isCellSelectionRevertPreviewed =
               isCellSelected &&
               (cellSelectionPreviewMode === 'deselect' || cellSelectionPreviewMode === 'toggle')
-            const cellSelectionHandlers = props.enableCellSelection
-              ? ({
-                  onPointerenter: (event: PointerEvent) => {
-                    props.onCellSelectionPointerEnter?.(cell, event)
-                  },
-                  onPointerleave: (event: PointerEvent) => {
-                    props.onCellSelectionPointerLeave?.(cell, event)
-                  },
-                  onPointerdownCapture: preventNativeCellSelection,
-                  onMousedownCapture: preventNativeCellSelection,
-                  onClickCapture: (event: MouseEvent) => {
-                    if (props.onCellSelectionClick?.(cell, event)) {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }
-                  },
-                } as Record<string, unknown>)
-              : {}
+            const cellSelectionHandlers = {
+              onPointerenter: (event: PointerEvent) => {
+                props.onCellSelectionPointerEnter?.(cell, event)
+              },
+              onPointerleave: (event: PointerEvent) => {
+                props.onCellSelectionPointerLeave?.(cell, event)
+              },
+              onPointerdownCapture: preventNativeCellSelection,
+              onMousedownCapture: preventNativeCellSelection,
+              onClickCapture: (event: MouseEvent) => {
+                if (props.onCellSelectionClick?.(cell, event)) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }
+              },
+            } as Record<string, unknown>
 
             return (
               <div
                 key={cell.id}
                 class={[
                   'data-grid__cell',
-                  pinnedSide ? 'data-grid__cell--pinned' : '',
-                  pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
-                  isCellSelected ? 'data-grid__cell--selected-cell' : '',
+                  pinnedSide ? 'data-grid__cell--pinned' : undefined,
+                  pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
+                  isCellSelected ? 'data-grid__cell--selected-cell' : undefined,
                   isCellSelected && isCellSelectionHovered
                     ? 'data-grid__cell--selection-revert-hover'
-                    : '',
+                    : undefined,
                   isCellSelectionRevertPreviewed
                     ? 'data-grid__cell--selection-revert-preview'
-                    : '',
+                    : undefined,
                   isCellSelectionAddPreviewed
                     ? 'data-grid__cell--selection-range-preview'
-                    : '',
+                    : undefined,
                   !isCellSelected && isCellSelectionHovered
                     ? 'data-grid__cell--selection-hover'
-                    : '',
-                  customCellClass ?? '',
+                    : undefined,
+                  customCellClass,
                 ]}
                 data-grid-column-id={entry.column.id}
                 style={props.cellStylesByColumnId.get(entry.column.id)}
                 {...cellSelectionHandlers}
                 onClick={(event) => {
-                  if (props.enableCellSelection && props.onCellSelectionClick?.(cell, event)) {
+                  if (props.onCellSelectionClick?.(cell, event)) {
                     return
                   }
 
