@@ -2,17 +2,8 @@ import { computed, type Ref, type ShallowRef } from 'vue'
 import type { Cell, Column, Row, RowSelectionState } from '@tanstack/vue-table'
 
 import type { DataGridColumn, DataGridSelectionPanelConfig } from '../types'
+import type { AnyRow, CellSelectionAnchor, SelectedCellRow } from '../types/internal'
 import { escapeClipboardCell } from '../utils/clipboard'
-
-type AnyRow = Record<string, unknown>
-type CellSelectionAnchor = {
-  rowId: string
-  columnId: string
-}
-type SelectedCellRow = {
-  row: Row<AnyRow>
-  selectedColumnIds: Set<string>
-}
 
 type UseDataGridClipboardOptions = {
   visibleColumns: Ref<Column<AnyRow, unknown>[]>

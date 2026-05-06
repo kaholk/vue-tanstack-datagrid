@@ -1,9 +1,7 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 import { type Cell, type Column, type Row } from '@tanstack/vue-table'
 import type { DataGridColumn } from '../types'
-
-type AnyRow = Record<string, unknown>
-type SelectionPreviewMode = 'select' | 'deselect' | 'toggle' | null
+import type { AnyRow, SelectionPreviewMode } from '../types/internal'
 
 type RenderedRowSequenceItem =
   | { type: 'spacer'; key: string; width: number }

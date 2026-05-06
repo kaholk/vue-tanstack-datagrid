@@ -1,13 +1,35 @@
-import { ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue'
+import type { Cell, Column, Row } from '@tanstack/vue-table'
 
-type CellSelectionAnchor = {
-  rowId: string
-  columnId: string
-}
+import type { DataGridRowSelectionConfig } from '../types'
+import type { AnyRow, CellSelectionAnchor, SelectedCellRow, SelectionPreviewMode } from '../types/internal'
 
 type UseDataGridCellSelectionOptions = {
-  getCellSelectionKey: (rowId: string, columnId: string) => string
-  getCellRangePreviewKeys: (target: CellSelectionAnchor) => Set<string>
+  isEnabled: Ref<boolean>
+  visibleRows: Ref<Row<AnyRow>[]>
+  visibleRowById: Ref<Map<string, Row<AnyRow>>>
+  cellSelectionColumns: Ref<Column<AnyRow, unknown>[]>
+  rowSelectionConfig: Ref<DataGridRowSelectionConfig<AnyRow> | null>
+  getTableRows: () => Row<AnyRow>[]
+  setRowSelectionPreview: (rows: Row<AnyRow>[], rowId: string, additive: boolean) => void
+  clearRowSelectionPreview: () => void
+  toggleRowSelectionRange: (
+    rows: Row<AnyRow>[],
+    row: Row<AnyRow>,
+    checked: boolean,
+    event: Pick<MouseEvent, 'shiftKey'>,
+  ) => void
+}
+
+function getCellSelectionKey(rowId: string, columnId: string) {
+  return `${rowId}::${columnId}`
+}
+
+function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
+  return {
+    rowId: cell.row.id,
+    columnId: cell.column.id,
+  }
 }
 
 export function useDataGridCellSelection(options: UseDataGridCellSelectionOptions) {
@@ -15,43 +37,495 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   const currentPointerCell = ref<CellSelectionAnchor | null>(null)
   const hoveredCellKey = ref<string | null>(null)
   const previewCellRangeKeys = shallowRef<Set<string>>(new Set())
+  const cellSelectionPreviewMode = ref<SelectionPreviewMode>(null)
   const lastSelectedCell = ref<CellSelectionAnchor | null>(null)
   const isCellSelectionCtrlDown = ref(false)
   const isCellSelectionShiftDown = ref(false)
 
-  function clearSelectionPreviewIfShiftReleased(event: KeyboardEvent) {
-    if (event.key !== 'Shift') {
+  const visibleRowIndexById = computed(() => {
+    const indexById = new Map<string, number>()
+    options.visibleRows.value.forEach((row, index) => {
+      indexById.set(row.id, index)
+    })
+    return indexById
+  })
+  const cellSelectionColumnIdSet = computed(() => new Set(options.cellSelectionColumns.value.map((column) => column.id)))
+  const cellSelectionColumnIndexById = computed(() => new Map(options.cellSelectionColumns.value.map((column, index) => [column.id, index])))
+  const selectedCellCount = computed(() => selectedCellKeys.value.size)
+  const selectedCellIndex = computed(() => {
+    const rowIds = options.visibleRowById.value
+    const columnIds = cellSelectionColumnIdSet.value
+    const selectedColumnIdsByRowId = new Map<string, Set<string>>()
+    const selectedCountByColumnId = new Map<string, number>()
+
+    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+      return {
+        selectedColumnIdsByRowId,
+        selectedCountByColumnId,
+      }
+    }
+
+    for (const key of selectedCellKeys.value) {
+      const [rowId, columnId] = key.split('::')
+      if (!rowId || !columnId || !rowIds.has(rowId) || !columnIds.has(columnId)) {
+        continue
+      }
+
+      let selectedColumnIds = selectedColumnIdsByRowId.get(rowId)
+      if (!selectedColumnIds) {
+        selectedColumnIds = new Set<string>()
+        selectedColumnIdsByRowId.set(rowId, selectedColumnIds)
+      }
+
+      if (selectedColumnIds.has(columnId)) {
+        continue
+      }
+
+      selectedColumnIds.add(columnId)
+      selectedCountByColumnId.set(columnId, (selectedCountByColumnId.get(columnId) ?? 0) + 1)
+    }
+
+    return {
+      selectedColumnIdsByRowId,
+      selectedCountByColumnId,
+    }
+  })
+  const selectedColumnIds = computed(() => {
+    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+      return []
+    }
+
+    const columns: string[] = []
+    const rowCount = options.visibleRows.value.length
+    if (rowCount === 0) {
+      return columns
+    }
+
+    for (const column of options.cellSelectionColumns.value) {
+      if ((selectedCellIndex.value.selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
+        columns.push(column.id)
+      }
+    }
+
+    return columns
+  })
+  const selectedCellRows = computed<SelectedCellRow[]>(() => {
+    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+      return []
+    }
+
+    const selectedColumnIdsByRowId = selectedCellIndex.value.selectedColumnIdsByRowId
+    return options.visibleRows.value
+      .map((row) => {
+        const selectedColumnIds = selectedColumnIdsByRowId.get(row.id)
+
+        return selectedColumnIds && selectedColumnIds.size > 0
+          ? { row, selectedColumnIds }
+          : null
+      })
+      .filter((item): item is SelectedCellRow => Boolean(item))
+  })
+
+  function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
+    if (!options.isEnabled.value) {
+      return false
+    }
+
+    return cellSelectionColumnIdSet.value.has(column.id)
+  }
+
+  function isCellSelectionColumnId(columnId: string) {
+    if (!options.isEnabled.value) {
+      return false
+    }
+
+    return cellSelectionColumnIdSet.value.has(columnId)
+  }
+
+  function isCellSelected(cell: Cell<AnyRow, unknown>) {
+    return selectedCellKeys.value.has(getCellSelectionKey(cell.row.id, cell.column.id))
+  }
+
+  function isCellSelectionHovered(cell: Cell<AnyRow, unknown>) {
+    if (!isCellSelectionCtrlDown.value || !isCellSelectionColumn(cell.column)) {
+      return false
+    }
+
+    if (isCellSelectionShiftDown.value && lastSelectedCell.value?.rowId === cell.row.id && lastSelectedCell.value.columnId === cell.column.id) {
+      return false
+    }
+
+    return hoveredCellKey.value === getCellSelectionKey(cell.row.id, cell.column.id)
+  }
+
+  function getCellSelectionPreviewMode(cell: Cell<AnyRow, unknown>): SelectionPreviewMode {
+    return previewCellRangeKeys.value.has(getCellSelectionKey(cell.row.id, cell.column.id))
+      ? cellSelectionPreviewMode.value
+      : null
+  }
+
+  function replaceSelectedCellKeys(nextKeys: Set<string>) {
+    selectedCellKeys.value = new Set(nextKeys)
+  }
+
+  function clearCellSelectionPreview() {
+    hoveredCellKey.value = null
+    previewCellRangeKeys.value = new Set()
+    cellSelectionPreviewMode.value = null
+  }
+
+  function clearSelectionPreviews() {
+    options.clearRowSelectionPreview()
+    clearCellSelectionPreview()
+  }
+
+  function getCellRangeKeys(target: CellSelectionAnchor) {
+    const anchor = lastSelectedCell.value
+    if (!anchor) {
+      return new Set<string>()
+    }
+
+    const rows = options.visibleRows.value
+    const columns = options.cellSelectionColumns.value
+    const anchorRowIndex = visibleRowIndexById.value.get(anchor.rowId) ?? -1
+    const targetRowIndex = visibleRowIndexById.value.get(target.rowId) ?? -1
+    const anchorColumnIndex = cellSelectionColumnIndexById.value.get(anchor.columnId) ?? -1
+    const targetColumnIndex = cellSelectionColumnIndexById.value.get(target.columnId) ?? -1
+
+    if (anchorRowIndex < 0 || targetRowIndex < 0 || anchorColumnIndex < 0 || targetColumnIndex < 0) {
+      return new Set<string>()
+    }
+
+    const [rowStart, rowEnd] = anchorRowIndex < targetRowIndex ? [anchorRowIndex, targetRowIndex] : [targetRowIndex, anchorRowIndex]
+    const [columnStart, columnEnd] = anchorColumnIndex < targetColumnIndex ? [anchorColumnIndex, targetColumnIndex] : [targetColumnIndex, anchorColumnIndex]
+    const keys = new Set<string>()
+
+    for (let rowIndex = rowStart; rowIndex <= rowEnd; rowIndex += 1) {
+      const row = rows[rowIndex]
+      if (!row) {
+        continue
+      }
+
+      for (let columnIndex = columnStart; columnIndex <= columnEnd; columnIndex += 1) {
+        const column = columns[columnIndex]
+        if (column) {
+          keys.add(getCellSelectionKey(row.id, column.id))
+        }
+      }
+    }
+
+    return keys
+  }
+
+  function setCellRangeSelectionPreview(target: CellSelectionAnchor) {
+    const rangeKeys = getCellRangeKeys(target)
+
+    if (rangeKeys.size === 0) {
+      clearCellSelectionPreview()
       return
     }
 
-    isCellSelectionShiftDown.value = false
-    previewCellRangeKeys.value = new Set()
+    previewCellRangeKeys.value = rangeKeys
+    cellSelectionPreviewMode.value = Array.from(rangeKeys).every((key) => selectedCellKeys.value.has(key))
+      ? 'deselect'
+      : 'select'
+  }
+
+  function selectCellRange(targetCell: Cell<AnyRow, unknown>) {
+    const anchor = lastSelectedCell.value
+    if (!anchor) {
+      const target = getCellSelectionAnchor(targetCell)
+      lastSelectedCell.value = target
+      replaceSelectedCellKeys(new Set([...selectedCellKeys.value, getCellSelectionKey(target.rowId, target.columnId)]))
+      return
+    }
+
+    const nextKeys = new Set(selectedCellKeys.value)
+    const rangeKeys = getCellRangeKeys(getCellSelectionAnchor(targetCell))
+    const shouldDeselectRange = Array.from(rangeKeys).every((key) => nextKeys.has(key))
+
+    for (const key of rangeKeys) {
+      if (shouldDeselectRange) {
+        nextKeys.delete(key)
+      } else {
+        nextKeys.add(key)
+      }
+    }
+
+    replaceSelectedCellKeys(nextKeys)
+  }
+
+  function getColumnSelectionKeys(columnId: string) {
+    if (!isCellSelectionColumnId(columnId)) {
+      return []
+    }
+
+    return options.visibleRows.value.map((row) => getCellSelectionKey(row.id, columnId))
+  }
+
+  function setColumnSelectionPreview(columnId: string) {
+    const columnKeys = getColumnSelectionKeys(columnId)
+
+    if (columnKeys.length === 0) {
+      clearCellSelectionPreview()
+      return
+    }
+
+    previewCellRangeKeys.value = new Set(columnKeys)
+    cellSelectionPreviewMode.value = columnKeys.every((key) => selectedCellKeys.value.has(key))
+      ? 'deselect'
+      : 'select'
+  }
+
+  function updateSelectionPreviewForCurrentPointer(event: Pick<KeyboardEvent | PointerEvent | MouseEvent, 'ctrlKey' | 'shiftKey' | 'altKey'>) {
+    const pointer = currentPointerCell.value
+    if (!pointer) {
+      clearSelectionPreviews()
+      return
+    }
+
+    if (event.altKey && options.rowSelectionConfig.value) {
+      clearCellSelectionPreview()
+      options.setRowSelectionPreview(options.getTableRows(), pointer.rowId, event.shiftKey)
+      return
+    }
+
+    options.clearRowSelectionPreview()
+
+    if (!isCellSelectionColumnId(pointer.columnId)) {
+      clearCellSelectionPreview()
+      return
+    }
+
+    if (event.ctrlKey) {
+      hoveredCellKey.value = getCellSelectionKey(pointer.rowId, pointer.columnId)
+      if (event.shiftKey) {
+        setCellRangeSelectionPreview(pointer)
+      } else {
+        previewCellRangeKeys.value = new Set()
+        cellSelectionPreviewMode.value = null
+      }
+      return
+    }
+
+    if (event.shiftKey) {
+      hoveredCellKey.value = null
+      setColumnSelectionPreview(pointer.columnId)
+      return
+    }
+
+    clearCellSelectionPreview()
+  }
+
+  function clearSelectionPreviewIfShiftReleased(event: KeyboardEvent) {
+    isCellSelectionCtrlDown.value = event.ctrlKey
+    isCellSelectionShiftDown.value = event.shiftKey
+    updateSelectionPreviewForCurrentPointer(event)
   }
 
   function updateCellSelectionModifierState(event: KeyboardEvent) {
     isCellSelectionCtrlDown.value = event.ctrlKey
     isCellSelectionShiftDown.value = event.shiftKey
-
-    if (!currentPointerCell.value) {
-      return
-    }
-
-    if (!event.ctrlKey) {
-      hoveredCellKey.value = null
-      previewCellRangeKeys.value = new Set()
-      return
-    }
-
-    hoveredCellKey.value = options.getCellSelectionKey(currentPointerCell.value.rowId, currentPointerCell.value.columnId)
-    previewCellRangeKeys.value = event.shiftKey ? options.getCellRangePreviewKeys(currentPointerCell.value) : new Set()
+    updateSelectionPreviewForCurrentPointer(event)
   }
 
   function clearCellSelectionModifierState() {
     isCellSelectionCtrlDown.value = false
     isCellSelectionShiftDown.value = false
-    hoveredCellKey.value = null
-    previewCellRangeKeys.value = new Set()
+    currentPointerCell.value = null
+    clearSelectionPreviews()
   }
+
+  let areCellSelectionListenersAttached = false
+
+  function attachCellSelectionListeners() {
+    if (typeof window === 'undefined' || areCellSelectionListenersAttached) {
+      return
+    }
+
+    window.addEventListener('keydown', updateCellSelectionModifierState)
+    window.addEventListener('keyup', clearSelectionPreviewIfShiftReleased)
+    window.addEventListener('blur', clearCellSelectionModifierState)
+    areCellSelectionListenersAttached = true
+  }
+
+  function detachCellSelectionListeners() {
+    if (typeof window === 'undefined' || !areCellSelectionListenersAttached) {
+      return
+    }
+
+    window.removeEventListener('keydown', updateCellSelectionModifierState)
+    window.removeEventListener('keyup', clearSelectionPreviewIfShiftReleased)
+    window.removeEventListener('blur', clearCellSelectionModifierState)
+    areCellSelectionListenersAttached = false
+  }
+
+  function handleCellSelectionPointerEnter(cell: Cell<AnyRow, unknown>, event: PointerEvent) {
+    isCellSelectionCtrlDown.value = event.ctrlKey
+    isCellSelectionShiftDown.value = event.shiftKey
+
+    if (!isCellSelectionColumn(cell.column)) {
+      currentPointerCell.value = null
+      clearSelectionPreviews()
+      return
+    }
+
+    const target = getCellSelectionAnchor(cell)
+    currentPointerCell.value = target
+    updateSelectionPreviewForCurrentPointer(event)
+  }
+
+  function handleCellSelectionPointerLeave(cell: Cell<AnyRow, unknown>) {
+    if (currentPointerCell.value?.rowId === cell.row.id && currentPointerCell.value.columnId === cell.column.id) {
+      currentPointerCell.value = null
+    }
+
+    if (hoveredCellKey.value === getCellSelectionKey(cell.row.id, cell.column.id)) {
+      clearCellSelectionPreview()
+    }
+
+    if (currentPointerCell.value === null) {
+      clearSelectionPreviews()
+    }
+  }
+
+  function handleCellSelectionClick(cell: Cell<AnyRow, unknown>, event: MouseEvent) {
+    isCellSelectionCtrlDown.value = event.ctrlKey
+    isCellSelectionShiftDown.value = event.shiftKey
+
+    if (event.altKey && options.rowSelectionConfig.value) {
+      event.preventDefault()
+      event.stopPropagation()
+
+      const checked = !cell.row.getIsSelected()
+      options.toggleRowSelectionRange(options.getTableRows(), cell.row, checked, event)
+      options.clearRowSelectionPreview()
+      return true
+    }
+
+    if (event.shiftKey && !event.ctrlKey && isCellSelectionColumn(cell.column)) {
+      event.preventDefault()
+      event.stopPropagation()
+      clearCellSelectionPreview()
+      toggleColumnSelection(cell.column)
+      return true
+    }
+
+    if (!event.ctrlKey || !isCellSelectionColumn(cell.column)) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (event.shiftKey) {
+      selectCellRange(cell)
+      updateSelectionPreviewForCurrentPointer(event)
+      return true
+    }
+
+    const anchor = getCellSelectionAnchor(cell)
+    const key = getCellSelectionKey(anchor.rowId, anchor.columnId)
+    const nextKeys = new Set(selectedCellKeys.value)
+
+    if (nextKeys.has(key)) {
+      nextKeys.delete(key)
+    } else {
+      nextKeys.add(key)
+    }
+
+    lastSelectedCell.value = anchor
+    clearCellSelectionPreview()
+    replaceSelectedCellKeys(nextKeys)
+    return true
+  }
+
+  function toggleColumnSelection(column: Column<AnyRow, unknown>) {
+    if (!isCellSelectionColumn(column)) {
+      return
+    }
+
+    const columnKeys = options.visibleRows.value.map((row) => getCellSelectionKey(row.id, column.id))
+
+    if (columnKeys.length === 0) {
+      return
+    }
+
+    const nextKeys = new Set(selectedCellKeys.value)
+    const isFullySelected = columnKeys.every((key) => nextKeys.has(key))
+
+    for (const key of columnKeys) {
+      if (isFullySelected) {
+        nextKeys.delete(key)
+      } else {
+        nextKeys.add(key)
+      }
+    }
+
+    const firstRow = options.visibleRows.value[0]
+    if (firstRow) {
+      lastSelectedCell.value = {
+        rowId: firstRow.id,
+        columnId: column.id,
+      }
+    }
+
+    replaceSelectedCellKeys(nextKeys)
+  }
+
+  watch(
+    options.isEnabled,
+    (enabled) => {
+      if (enabled) {
+        attachCellSelectionListeners()
+        return
+      }
+
+      detachCellSelectionListeners()
+      clearCellSelectionModifierState()
+    },
+    { immediate: true },
+  )
+
+  watch(
+    [options.visibleRows, options.cellSelectionColumns],
+    ([rows, columns]) => {
+      if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+        return
+      }
+
+      const availableRowIds = new Set<string>()
+      for (const row of rows) {
+        availableRowIds.add(row.id)
+      }
+      const availableColumnIds = new Set(columns.map((column) => column.id))
+
+      const nextKeys = new Set<string>()
+      for (const key of selectedCellKeys.value) {
+        const [rowId, columnId] = key.split('::')
+        if (rowId && columnId && availableRowIds.has(rowId) && availableColumnIds.has(columnId)) {
+          nextKeys.add(key)
+        }
+      }
+
+      if (nextKeys.size !== selectedCellKeys.value.size) {
+        selectedCellKeys.value = nextKeys
+      }
+
+      if (
+        lastSelectedCell.value &&
+        (!availableRowIds.has(lastSelectedCell.value.rowId) ||
+          !availableColumnIds.has(lastSelectedCell.value.columnId))
+      ) {
+        lastSelectedCell.value = null
+      }
+    },
+    { flush: 'post' },
+  )
+
+  onBeforeUnmount(() => {
+    detachCellSelectionListeners()
+  })
 
   return {
     selectedCellKeys,
@@ -61,8 +535,16 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     lastSelectedCell,
     isCellSelectionCtrlDown,
     isCellSelectionShiftDown,
-    clearSelectionPreviewIfShiftReleased,
-    updateCellSelectionModifierState,
+    selectedCellCount,
+    selectedColumnIds,
+    selectedCellRows,
+    getCellSelectionKey,
+    isCellSelected,
+    isCellSelectionHovered,
+    getCellSelectionPreviewMode,
+    handleCellSelectionPointerEnter,
+    handleCellSelectionPointerLeave,
+    handleCellSelectionClick,
     clearCellSelectionModifierState,
   }
 }

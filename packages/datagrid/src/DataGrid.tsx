@@ -1,5 +1,5 @@
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, shallowRef, watch, type CSSProperties, type PropType } from 'vue'
-import { getCoreRowModel, useVueTable, type Cell, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, shallowRef, watch, type PropType } from 'vue'
+import { getCoreRowModel, useVueTable, type Column, type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type PaginationState, type Row, type RowSelectionState } from '@tanstack/vue-table'
 
 import DataGridBodyRow from './components/DataGridBodyRow'
 import DataGridDialog from './components/DataGridDialog'
@@ -20,78 +20,20 @@ import { useDataGridFilters } from './composables/useDataGridFilters'
 import { useDataGridRows, type DataGridRequestState } from './composables/useDataGridRows'
 import { useDataGridRowSelection } from './composables/useDataGridRowSelection'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
+import { useDataGridSelectionPanel, useDataGridSelectionPanelSections } from './composables/useDataGridSelectionPanel'
+import { useDataGridToolbarState } from './composables/useDataGridToolbarState'
 import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
 import { buildDataGridRowSelectionColumn, defaultRowSelectionColumnId, defaultRowSelectionPreset } from './composables/useDataGridRowSelectionColumn'
+import { dataGridHeaderHeight, defaultDataGridLoadingConfig, defaultDataGridMetaItems, defaultDataGridPageSizeConfig } from './dataGridDefaults'
 import { resolveDataGridLocaleText } from './locales'
-import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridLocale, DataGridMetaConfig, DataGridPageSizeConfig, DataGridPreset, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelPosition, DataGridLocaleText, DataGridRowPatchOptions } from './types'
+import { getDataGridColumnMenuStyle, renderDataGridCell, renderDataGridColumnPickerLabel } from './renderers/dataGridRenderHelpers'
+import type { AnyRow } from './types/internal'
+import type { DataGridCellSelectionConfig, DataGridColumn, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridLocale, DataGridMetaConfig, DataGridPageSizeConfig, DataGridPreset, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridLocaleText, DataGridRowPatchOptions } from './types'
 import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
 import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
-import { toFilterGroupId } from './utils/filters'
 import { toNumber } from './utils/number'
 import { buildPaginationItems } from './utils/pagination'
-import { renderFlexibleContent } from './utils/render'
 import { createViewId } from './utils/savedViews'
-
-type AnyRow = Record<string, unknown>
-
-type FilterDialogSection = {
-  id: string
-  label: string
-  items: DataGridFilterConfig[]
-}
-
-type CellRenderProps = {
-  table: ReturnType<Cell<AnyRow, unknown>['getContext']>['table']
-  column: ReturnType<Cell<AnyRow, unknown>['getContext']>['column']
-  row: ReturnType<Cell<AnyRow, unknown>['getContext']>['row']
-  cell: ReturnType<Cell<AnyRow, unknown>['getContext']>['cell']
-  getValue: ReturnType<Cell<AnyRow, unknown>['getContext']>['getValue']
-  renderValue: ReturnType<Cell<AnyRow, unknown>['getContext']>['renderValue']
-  align: DataGridColumnAlign
-}
-
-type CellSelectionAnchor = {
-  rowId: string
-  columnId: string
-}
-type SelectionPreviewMode = 'select' | 'deselect' | 'toggle' | null
-
-type SelectionPanelSection = {
-  id: string
-  label: string
-  count: number
-  copyLabel: string
-  clearLabel: string
-  onCopy: (options: { includeHeaders: boolean }) => void | Promise<void>
-  onClear: () => void
-}
-
-const headerHeight = 92
-const defaultMetaItems: DataGridMetaConfig[] = [
-  { key: 'rows', label: 'Rows' },
-  { key: 'fetched', label: 'Fetched' },
-  { key: 'datasetSize', label: 'Dataset' },
-]
-const defaultPageSizeConfig: DataGridPageSizeConfig = {
-  label: 'Rows',
-  options: [50, 100, 250, 500],
-}
-const defaultSelectionPanelConfig: DataGridSelectionPanelConfig = {
-  position: 'bottom-right',
-  sumColumns: [],
-  copyColumnIds: undefined,
-  copyIncludeHeaders: true,
-  selectedRowsLabel: 'Zaznaczone wiersze',
-  copyWithHeadersLabel: 'Kopiuj z naglowkami',
-  copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',
-  allowPositionChange: true,
-  positionStorageKey: '',
-  floatingPosition: { x: 16, y: 16 },
-}
-const defaultLoadingConfig: DataGridLoadingConfig = {
-  variant: 'overlay',
-  label: undefined,
-}
 
 export default defineComponent({
   name: 'DataGrid',
@@ -217,11 +159,11 @@ export default defineComponent({
       ...(props.initialState ?? {}),
     }))
     const effectiveMetaItems = computed<DataGridMetaConfig[]>(() => {
-      const items = props.metaItems ?? preset.value.metaItems ?? defaultMetaItems
+      const items = props.metaItems ?? preset.value.metaItems ?? defaultDataGridMetaItems
       return items.map((item) => ({ ...item }))
     })
     const effectivePageSizeConfig = computed<DataGridPageSizeConfig>(() => ({
-      ...defaultPageSizeConfig,
+      ...defaultDataGridPageSizeConfig,
       ...(preset.value.pageSizeConfig ?? {}),
       ...(props.pageSizeConfig ?? {}),
     }))
@@ -252,7 +194,7 @@ export default defineComponent({
     const effectiveRefetchOnVisibleColumnsChange = computed(() => props.refetchOnVisibleColumnsChange ?? preset.value.refetchOnVisibleColumnsChange ?? true)
     const effectiveKeepRowsOnError = computed(() => props.keepRowsOnError ?? preset.value.keepRowsOnError ?? false)
     const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
-      variant: effectiveLoadingConfigInput.value.variant ?? defaultLoadingConfig.variant,
+      variant: effectiveLoadingConfigInput.value.variant ?? defaultDataGridLoadingConfig.variant,
       label: effectiveLoadingConfigInput.value.label ?? localeText.value.loadingLabel,
     }))
     const isCellSelectionEnabled = computed(() => effectiveCellSelectionConfig.value?.enabled ?? true)
@@ -265,8 +207,6 @@ export default defineComponent({
       setRowSelectionPreview,
       toggleRowSelectionRange,
     } = useDataGridRowSelection()
-    const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(effectiveSelectionPanelConfig.value?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right')
-    const selectionPanelFloatingPosition = ref<DataGridFloatingPosition>(effectiveSelectionPanelConfig.value?.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition ?? { x: 16, y: 16 })
     const mergedRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | null>(() => {
       const config = effectiveRowSelectionConfig.value
       if (!config?.enabled) {
@@ -368,19 +308,6 @@ export default defineComponent({
     const columnFilters = ref<ColumnFiltersState>(mergedInitialState.value.columnFilters ?? [])
     const globalFilter = ref(mergedInitialState.value.globalFilter ?? '')
     const rowSelection = ref<RowSelectionState>({})
-    const {
-      selectedCellKeys,
-      currentPointerCell,
-      hoveredCellKey,
-      previewCellRangeKeys,
-      lastSelectedCell,
-      isCellSelectionCtrlDown,
-      isCellSelectionShiftDown,
-    } = useDataGridCellSelection({
-      getCellSelectionKey,
-      getCellRangePreviewKeys,
-    })
-    const cellSelectionPreviewMode = ref<SelectionPreviewMode>(null)
     const openMenuColumnId = ref<string | null>(null)
     const isColumnPickerOpen = ref(false)
     const isFilterDialogOpen = ref(false)
@@ -520,170 +447,6 @@ export default defineComponent({
       isSaveViewDialogOpen.value = false
     }
 
-    function updateSelectionPanelPosition(position: DataGridSelectionPanelPosition) {
-      selectionPanelPosition.value = position
-    }
-
-    function updateSelectionPanelFloatingPosition(position: DataGridFloatingPosition) {
-      selectionPanelFloatingPosition.value = position
-    }
-
-    function clearCellSelectionPreview() {
-      hoveredCellKey.value = null
-      previewCellRangeKeys.value = new Set()
-      cellSelectionPreviewMode.value = null
-    }
-
-    function clearSelectionPreviews() {
-      clearRowSelectionPreview()
-      clearCellSelectionPreview()
-    }
-
-    function updateSelectionPreviewForCurrentPointer(event: Pick<KeyboardEvent | PointerEvent | MouseEvent, 'ctrlKey' | 'shiftKey' | 'altKey'>) {
-      const pointer = currentPointerCell.value
-      if (!pointer) {
-        clearSelectionPreviews()
-        return
-      }
-
-      if (event.altKey && mergedRowSelectionConfig.value) {
-        clearCellSelectionPreview()
-        setRowSelectionPreview(table.getRowModel().rows, pointer.rowId, event.shiftKey)
-        return
-      }
-
-      clearRowSelectionPreview()
-
-      if (!isCellSelectionColumnId(pointer.columnId)) {
-        clearCellSelectionPreview()
-        return
-      }
-
-      if (event.ctrlKey) {
-        hoveredCellKey.value = getCellSelectionKey(pointer.rowId, pointer.columnId)
-        if (event.shiftKey) {
-          setCellRangeSelectionPreview(pointer)
-        } else {
-          previewCellRangeKeys.value = new Set()
-          cellSelectionPreviewMode.value = null
-        }
-        return
-      }
-
-      if (event.shiftKey) {
-        hoveredCellKey.value = null
-        setColumnSelectionPreview(pointer.columnId)
-        return
-      }
-
-      clearCellSelectionPreview()
-    }
-
-    function clearSelectionPreviewIfShiftReleased(event: KeyboardEvent) {
-      isCellSelectionCtrlDown.value = event.ctrlKey
-      isCellSelectionShiftDown.value = event.shiftKey
-      updateSelectionPreviewForCurrentPointer(event)
-    }
-
-    function updateCellSelectionModifierState(event: KeyboardEvent) {
-      isCellSelectionCtrlDown.value = event.ctrlKey
-      isCellSelectionShiftDown.value = event.shiftKey
-      updateSelectionPreviewForCurrentPointer(event)
-    }
-
-    function clearCellSelectionModifierState() {
-      isCellSelectionCtrlDown.value = false
-      isCellSelectionShiftDown.value = false
-      currentPointerCell.value = null
-      clearSelectionPreviews()
-    }
-
-    let areCellSelectionListenersAttached = false
-
-    function attachCellSelectionListeners() {
-      if (typeof window === 'undefined' || areCellSelectionListenersAttached) {
-        return
-      }
-
-      window.addEventListener('keydown', updateCellSelectionModifierState)
-      window.addEventListener('keyup', clearSelectionPreviewIfShiftReleased)
-      window.addEventListener('blur', clearCellSelectionModifierState)
-      areCellSelectionListenersAttached = true
-    }
-
-    function detachCellSelectionListeners() {
-      if (typeof window === 'undefined' || !areCellSelectionListenersAttached) {
-        return
-      }
-
-      window.removeEventListener('keydown', updateCellSelectionModifierState)
-      window.removeEventListener('keyup', clearSelectionPreviewIfShiftReleased)
-      window.removeEventListener('blur', clearCellSelectionModifierState)
-      areCellSelectionListenersAttached = false
-    }
-
-    watch(
-      isCellSelectionEnabled,
-      (enabled) => {
-        if (enabled) {
-          attachCellSelectionListeners()
-          return
-        }
-
-        detachCellSelectionListeners()
-        clearCellSelectionModifierState()
-      },
-      { immediate: true },
-    )
-
-    onMounted(() => {
-      if (typeof window === 'undefined') {
-        return
-      }
-
-      const storageKey = selectionPanelPositionStorageKey.value
-      if (!storageKey) {
-        return
-      }
-
-      const storedPosition = window.localStorage.getItem(storageKey) as DataGridSelectionPanelPosition | null
-
-      if (storedPosition === 'bottom-left' || storedPosition === 'bottom-right' || storedPosition === 'top-left' || storedPosition === 'top-right' || storedPosition === 'floating') {
-        selectionPanelPosition.value = storedPosition
-      }
-
-      const storedFloatingPosition = window.localStorage.getItem(`${storageKey}:floating`)
-      if (storedFloatingPosition) {
-        try {
-          const parsed = JSON.parse(storedFloatingPosition) as Partial<DataGridFloatingPosition>
-          if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
-            selectionPanelFloatingPosition.value = { x: parsed.x, y: parsed.y }
-          }
-        } catch {
-          // Ignore invalid storage payloads.
-        }
-      }
-    })
-
-    watch(selectionPanelPosition, (position) => {
-      const storageKey = selectionPanelPositionStorageKey.value
-      if (!storageKey || typeof window === 'undefined') {
-        return
-      }
-
-      window.localStorage.setItem(storageKey, position)
-    })
-    watch(selectionPanelFloatingPosition, (position) => {
-      const storageKey = selectionPanelPositionStorageKey.value
-      if (!storageKey || typeof window === 'undefined') {
-        return
-      }
-
-      window.localStorage.setItem(`${storageKey}:floating`, JSON.stringify(position))
-    })
-    onBeforeUnmount(() => {
-      detachCellSelectionListeners()
-    })
     watch(
       [mergedRowSelectionConfig, rowSelectionColumnSize, columnSizing],
       ([rowSelectionConfig, forcedSize, sizingState]) => {
@@ -792,55 +555,20 @@ export default defineComponent({
     })
     const totalWidth = computed(() => table.getTotalSize())
     const visibleRowIndexByKey = rowIndexByKey
-    const selectionPanelPositionStorageKey = computed(() => {
-      if (effectiveSelectionPanelConfig.value?.positionStorageKey) {
-        return effectiveSelectionPanelConfig.value.positionStorageKey
-      }
-
-      if (props.viewStorageKey) {
-        return `${props.viewStorageKey}:selection-panel-position`
-      }
-
-      return ''
-    })
     const visibleColumnIndexById = computed(() => new Map(visibleColumns.value.map((column, index) => [column.id, index])))
-    const mergedSelectionPanelConfig = computed<DataGridSelectionPanelConfig<AnyRow> | null>(() => {
-      const config = effectiveSelectionPanelConfig.value
-      if (!config) {
-        return null
-      }
-
-      return {
-        position: selectionPanelPosition.value ?? config.position ?? defaultSelectionPanelConfig.position,
-        sumColumns: config.sumColumns ?? defaultSelectionPanelConfig.sumColumns,
-        actions: config.actions ?? defaultSelectionPanelConfig.actions,
-        copyColumnIds: config.copyColumnIds ?? defaultSelectionPanelConfig.copyColumnIds,
-        copyIncludeHeaders: config.copyIncludeHeaders ?? defaultSelectionPanelConfig.copyIncludeHeaders,
-        selectedRowsLabel: config.selectedRowsLabel ?? localeText.value.selectedRowsLabel,
-        copyWithHeadersLabel: config.copyWithHeadersLabel ?? localeText.value.copyWithHeadersLabel,
-        copyWithoutHeadersLabel: config.copyWithoutHeadersLabel ?? localeText.value.copyWithoutHeadersLabel,
-        allowPositionChange: config.allowPositionChange ?? defaultSelectionPanelConfig.allowPositionChange,
-        positionStorageKey: config.positionStorageKey ?? defaultSelectionPanelConfig.positionStorageKey,
-        floatingPosition: selectionPanelFloatingPosition.value ?? config.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition,
-      }
-    })
-    const selectedRows = computed<Row<AnyRow>[]>(() => {
-      if (!mergedSelectionPanelConfig.value || Object.keys(rowSelection.value).length === 0) {
-        return []
-      }
-
-      const rows: Row<AnyRow>[] = []
-      const rowsById = visibleRowById.value
-      for (const [rowId, selected] of Object.entries(rowSelection.value)) {
-        if (!selected) {
-          continue
-        }
-        const row = rowsById.get(rowId)
-        if (row) {
-          rows.push(row)
-        }
-      }
-      return rows
+    const {
+      selectionPanelPosition,
+      selectionPanelFloatingPosition,
+      mergedSelectionPanelConfig,
+      selectedRows,
+      updateSelectionPanelPosition,
+      updateSelectionPanelFloatingPosition,
+    } = useDataGridSelectionPanel({
+      effectiveSelectionPanelConfig,
+      localeText,
+      viewStorageKey: () => props.viewStorageKey,
+      rowSelection,
+      visibleRowById,
     })
     const rowSelectionColumnId = computed(() => mergedRowSelectionConfig.value?.columnId ?? defaultRowSelectionColumnId)
     const cellSelectionColumns = computed(() => {
@@ -849,379 +577,33 @@ export default defineComponent({
         return column.id !== rowSelectionColumnId.value && columnDef.localKind !== 'action'
       })
     })
-    const visibleRowIndexById = computed(() => {
-      const indexById = new Map<string, number>()
-      visibleRows.value.forEach((row, index) => {
-        indexById.set(row.id, index)
-      })
-      return indexById
+    const renderColumnPickerLabel = renderDataGridColumnPickerLabel
+    const {
+      selectedCellKeys,
+      currentPointerCell,
+      hoveredCellKey,
+      previewCellRangeKeys,
+      lastSelectedCell,
+      selectedCellCount,
+      selectedColumnIds,
+      selectedCellRows,
+      isCellSelected,
+      isCellSelectionHovered,
+      getCellSelectionPreviewMode,
+      handleCellSelectionPointerEnter,
+      handleCellSelectionPointerLeave,
+      handleCellSelectionClick,
+    } = useDataGridCellSelection({
+      isEnabled: isCellSelectionEnabled,
+      visibleRows,
+      visibleRowById,
+      cellSelectionColumns,
+      rowSelectionConfig: mergedRowSelectionConfig,
+      getTableRows: () => table.getRowModel().rows,
+      setRowSelectionPreview,
+      clearRowSelectionPreview,
+      toggleRowSelectionRange,
     })
-    const cellSelectionColumnIdSet = computed(() => new Set(cellSelectionColumns.value.map((column) => column.id)))
-    const cellSelectionColumnIndexById = computed(() => new Map(cellSelectionColumns.value.map((column, index) => [column.id, index])))
-    const selectedCellCount = computed(() => selectedCellKeys.value.size)
-    const selectedCellIndex = computed(() => {
-      const rowIds = visibleRowById.value
-      const columnIds = cellSelectionColumnIdSet.value
-      const selectedColumnIdsByRowId = new Map<string, Set<string>>()
-      const selectedCountByColumnId = new Map<string, number>()
-
-      if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
-        return {
-          selectedColumnIdsByRowId,
-          selectedCountByColumnId,
-        }
-      }
-
-      for (const key of selectedCellKeys.value) {
-        const [rowId, columnId] = key.split('::')
-        if (!rowId || !columnId || !rowIds.has(rowId) || !columnIds.has(columnId)) {
-          continue
-        }
-
-        let selectedColumnIds = selectedColumnIdsByRowId.get(rowId)
-        if (!selectedColumnIds) {
-          selectedColumnIds = new Set<string>()
-          selectedColumnIdsByRowId.set(rowId, selectedColumnIds)
-        }
-
-        if (selectedColumnIds.has(columnId)) {
-          continue
-        }
-
-        selectedColumnIds.add(columnId)
-        selectedCountByColumnId.set(columnId, (selectedCountByColumnId.get(columnId) ?? 0) + 1)
-      }
-
-      return {
-        selectedColumnIdsByRowId,
-        selectedCountByColumnId,
-      }
-    })
-    const selectedColumnIds = computed(() => {
-      if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
-        return []
-      }
-
-      const columns: string[] = []
-      const rowCount = visibleRows.value.length
-      if (rowCount === 0) {
-        return columns
-      }
-
-      for (const column of cellSelectionColumns.value) {
-        if ((selectedCellIndex.value.selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
-          columns.push(column.id)
-        }
-      }
-
-      return columns
-    })
-    const selectedCellRows = computed(() => {
-      if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
-        return []
-      }
-
-      const selectedColumnIdsByRowId = selectedCellIndex.value.selectedColumnIdsByRowId
-      return visibleRows.value
-        .map((row) => {
-          const selectedColumnIds = selectedColumnIdsByRowId.get(row.id)
-
-          return selectedColumnIds && selectedColumnIds.size > 0
-            ? { row, selectedColumnIds }
-            : null
-        })
-        .filter(
-          (
-            item,
-          ): item is {
-            row: (typeof visibleRows.value)[number]
-            selectedColumnIds: Set<string>
-          } => Boolean(item),
-        )
-    })
-
-    function renderColumnPickerLabel(column: Column<AnyRow, unknown>) {
-      const columnDef = column.columnDef as DataGridColumn<AnyRow>
-
-      if (columnDef.pickerLabel) {
-        return columnDef.pickerLabel
-      }
-
-      if (typeof column.columnDef.header === 'string') {
-        return column.columnDef.header
-      }
-
-      return column.id
-    }
-
-    function getCellSelectionKey(rowId: string, columnId: string) {
-      return `${rowId}::${columnId}`
-    }
-
-    function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
-      if (!isCellSelectionEnabled.value) {
-        return false
-      }
-
-      return cellSelectionColumnIdSet.value.has(column.id)
-    }
-
-    function isCellSelectionColumnId(columnId: string) {
-      if (!isCellSelectionEnabled.value) {
-        return false
-      }
-
-      return cellSelectionColumnIdSet.value.has(columnId)
-    }
-
-    function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
-      return {
-        rowId: cell.row.id,
-        columnId: cell.column.id,
-      }
-    }
-
-    function isCellSelected(cell: Cell<AnyRow, unknown>) {
-      return selectedCellKeys.value.has(getCellSelectionKey(cell.row.id, cell.column.id))
-    }
-
-    function isCellSelectionHovered(cell: Cell<AnyRow, unknown>) {
-      if (!isCellSelectionCtrlDown.value || !isCellSelectionColumn(cell.column)) {
-        return false
-      }
-
-      if (isCellSelectionShiftDown.value && lastSelectedCell.value?.rowId === cell.row.id && lastSelectedCell.value.columnId === cell.column.id) {
-        return false
-      }
-
-      return hoveredCellKey.value === getCellSelectionKey(cell.row.id, cell.column.id)
-    }
-
-    function getCellSelectionPreviewMode(cell: Cell<AnyRow, unknown>): SelectionPreviewMode {
-      return previewCellRangeKeys.value.has(getCellSelectionKey(cell.row.id, cell.column.id))
-        ? cellSelectionPreviewMode.value
-        : null
-    }
-
-    function replaceSelectedCellKeys(nextKeys: Set<string>) {
-      selectedCellKeys.value = new Set(nextKeys)
-    }
-
-    function getCellRangeKeys(target: CellSelectionAnchor) {
-      const anchor = lastSelectedCell.value
-      if (!anchor) {
-        return new Set<string>()
-      }
-
-      const rows = visibleRows.value
-      const columns = cellSelectionColumns.value
-      const anchorRowIndex = visibleRowIndexById.value.get(anchor.rowId) ?? -1
-      const targetRowIndex = visibleRowIndexById.value.get(target.rowId) ?? -1
-      const anchorColumnIndex = cellSelectionColumnIndexById.value.get(anchor.columnId) ?? -1
-      const targetColumnIndex = cellSelectionColumnIndexById.value.get(target.columnId) ?? -1
-
-      if (anchorRowIndex < 0 || targetRowIndex < 0 || anchorColumnIndex < 0 || targetColumnIndex < 0) {
-        return new Set<string>()
-      }
-
-      const [rowStart, rowEnd] = anchorRowIndex < targetRowIndex ? [anchorRowIndex, targetRowIndex] : [targetRowIndex, anchorRowIndex]
-      const [columnStart, columnEnd] = anchorColumnIndex < targetColumnIndex ? [anchorColumnIndex, targetColumnIndex] : [targetColumnIndex, anchorColumnIndex]
-      const keys = new Set<string>()
-
-      for (let rowIndex = rowStart; rowIndex <= rowEnd; rowIndex += 1) {
-        const row = rows[rowIndex]
-        if (!row) {
-          continue
-        }
-
-        for (let columnIndex = columnStart; columnIndex <= columnEnd; columnIndex += 1) {
-          const column = columns[columnIndex]
-          if (column) {
-            keys.add(getCellSelectionKey(row.id, column.id))
-          }
-        }
-      }
-
-      return keys
-    }
-
-    function getCellRangePreviewKeys(target: CellSelectionAnchor) {
-      return getCellRangeKeys(target)
-    }
-
-    function setCellRangeSelectionPreview(target: CellSelectionAnchor) {
-      const rangeKeys = getCellRangePreviewKeys(target)
-
-      if (rangeKeys.size === 0) {
-        clearCellSelectionPreview()
-        return
-      }
-
-      previewCellRangeKeys.value = rangeKeys
-      cellSelectionPreviewMode.value = Array.from(rangeKeys).every((key) => selectedCellKeys.value.has(key))
-        ? 'deselect'
-        : 'select'
-    }
-
-    function selectCellRange(targetCell: Cell<AnyRow, unknown>) {
-      const anchor = lastSelectedCell.value
-      if (!anchor) {
-        const target = getCellSelectionAnchor(targetCell)
-        lastSelectedCell.value = target
-        replaceSelectedCellKeys(new Set([...selectedCellKeys.value, getCellSelectionKey(target.rowId, target.columnId)]))
-        return
-      }
-
-      const nextKeys = new Set(selectedCellKeys.value)
-      const rangeKeys = getCellRangeKeys(getCellSelectionAnchor(targetCell))
-      const shouldDeselectRange = Array.from(rangeKeys).every((key) => nextKeys.has(key))
-
-      for (const key of rangeKeys) {
-        if (shouldDeselectRange) {
-          nextKeys.delete(key)
-        } else {
-          nextKeys.add(key)
-        }
-      }
-
-      replaceSelectedCellKeys(nextKeys)
-    }
-
-    function getColumnSelectionKeys(columnId: string) {
-      if (!isCellSelectionColumnId(columnId)) {
-        return []
-      }
-
-      return visibleRows.value.map((row) => getCellSelectionKey(row.id, columnId))
-    }
-
-    function setColumnSelectionPreview(columnId: string) {
-      const columnKeys = getColumnSelectionKeys(columnId)
-
-      if (columnKeys.length === 0) {
-        clearCellSelectionPreview()
-        return
-      }
-
-      previewCellRangeKeys.value = new Set(columnKeys)
-      cellSelectionPreviewMode.value = columnKeys.every((key) => selectedCellKeys.value.has(key))
-        ? 'deselect'
-        : 'select'
-    }
-
-    function handleCellSelectionPointerEnter(cell: Cell<AnyRow, unknown>, event: PointerEvent) {
-      isCellSelectionCtrlDown.value = event.ctrlKey
-      isCellSelectionShiftDown.value = event.shiftKey
-
-      if (!isCellSelectionColumn(cell.column)) {
-        currentPointerCell.value = null
-        clearSelectionPreviews()
-        return
-      }
-
-      const target = getCellSelectionAnchor(cell)
-      currentPointerCell.value = target
-      updateSelectionPreviewForCurrentPointer(event)
-    }
-
-    function handleCellSelectionPointerLeave(cell: Cell<AnyRow, unknown>) {
-      if (currentPointerCell.value?.rowId === cell.row.id && currentPointerCell.value.columnId === cell.column.id) {
-        currentPointerCell.value = null
-      }
-
-      if (hoveredCellKey.value === getCellSelectionKey(cell.row.id, cell.column.id)) {
-        clearCellSelectionPreview()
-      }
-
-      if (currentPointerCell.value === null) {
-        clearSelectionPreviews()
-      }
-    }
-
-    function handleCellSelectionClick(cell: Cell<AnyRow, unknown>, event: MouseEvent) {
-      isCellSelectionCtrlDown.value = event.ctrlKey
-      isCellSelectionShiftDown.value = event.shiftKey
-
-      if (event.altKey && mergedRowSelectionConfig.value) {
-        event.preventDefault()
-        event.stopPropagation()
-
-        const checked = !cell.row.getIsSelected()
-        const rows = table.getRowModel().rows
-        toggleRowSelectionRange(rows, cell.row, checked, event)
-        clearRowSelectionPreview()
-        return true
-      }
-
-      if (event.shiftKey && !event.ctrlKey && isCellSelectionColumn(cell.column)) {
-        event.preventDefault()
-        event.stopPropagation()
-        clearCellSelectionPreview()
-        toggleColumnSelection(cell.column)
-        return true
-      }
-
-      if (!event.ctrlKey || !isCellSelectionColumn(cell.column)) {
-        return false
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-
-      if (event.shiftKey) {
-        selectCellRange(cell)
-        updateSelectionPreviewForCurrentPointer(event)
-        return true
-      }
-
-      const anchor = getCellSelectionAnchor(cell)
-      const key = getCellSelectionKey(anchor.rowId, anchor.columnId)
-      const nextKeys = new Set(selectedCellKeys.value)
-
-      if (nextKeys.has(key)) {
-        nextKeys.delete(key)
-      } else {
-        nextKeys.add(key)
-      }
-
-      lastSelectedCell.value = anchor
-      clearCellSelectionPreview()
-      replaceSelectedCellKeys(nextKeys)
-      return true
-    }
-
-    function toggleColumnSelection(column: Column<AnyRow, unknown>) {
-      if (!isCellSelectionColumn(column)) {
-        return
-      }
-
-      const columnKeys = visibleRows.value.map((row) => getCellSelectionKey(row.id, column.id))
-
-      if (columnKeys.length === 0) {
-        return
-      }
-
-      const nextKeys = new Set(selectedCellKeys.value)
-      const isFullySelected = columnKeys.every((key) => nextKeys.has(key))
-
-      for (const key of columnKeys) {
-        if (isFullySelected) {
-          nextKeys.delete(key)
-        } else {
-          nextKeys.add(key)
-        }
-      }
-
-      const firstRow = visibleRows.value[0]
-      if (firstRow) {
-        lastSelectedCell.value = {
-          rowId: firstRow.id,
-          columnId: column.id,
-        }
-      }
-
-      replaceSelectedCellKeys(nextKeys)
-    }
 
     const { closeFilterMenus, getColumnFilterConfig, renderFilterControl } = useDataGridFilters({
       columnFilters,
@@ -1257,7 +639,6 @@ export default defineComponent({
       createViewId,
       cloneViewState,
     })
-    const showViewsMenu = computed(() => Boolean(props.viewStorageKey) || Boolean(props.savedViewsPersistence))
     const isAutoHeight = computed(() => effectiveHeight.value === 'fill' || effectiveHeight.value === -1)
 
     const { rowVirtualizer, columnVirtualizer, virtualRows, totalRowHeight, headerSequence, rowSequence, cellStylesByColumnId, getPinnedSide } = useDataGridVirtualization({
@@ -1273,117 +654,28 @@ export default defineComponent({
       overscanColumns: () => effectiveOverscanColumns.value,
     })
 
-    const serverFilterColumns = computed(() => allLeafColumns.value.filter((column) => Boolean((column.columnDef as DataGridColumn<AnyRow>).serverField)))
-    const toolbarFilterConfigs = computed(() => {
-      const columnConfigs = allLeafColumns.value
-        .filter((column) => {
-          const columnDef = column.columnDef as DataGridColumn<AnyRow>
-          const isServerColumn = Boolean(columnDef.serverField)
-          return columnDef.showFilter ?? isServerColumn
-        })
-        .map((column) => getColumnFilterConfig(column))
-
-      return [
-        ...columnConfigs,
-        ...props.toolbarFilters.map((config) => ({
-          ...config,
-          group: config.group ?? localeText.value.extraFiltersGroupLabel,
-        })),
-      ]
-    })
-    const filterDialogSections = computed<FilterDialogSection[]>(() => {
-      const sectionMap = new Map<string, FilterDialogSection>()
-
-      for (const config of toolbarFilterConfigs.value) {
-        const groupLabel = config.group?.trim() || localeText.value.columnFiltersGroupLabel
-        const groupId = toFilterGroupId(groupLabel)
-        const section = sectionMap.get(groupId)
-
-        if (section) {
-          section.items.push(config)
-          continue
-        }
-
-        sectionMap.set(groupId, {
-          id: groupId,
-          label: groupLabel,
-          items: [config],
-        })
-      }
-
-      return Array.from(sectionMap.values())
-    })
-    const quickFilterConfigs = computed(() => {
-      if (props.quickFilters.length === 0) {
-        return []
-      }
-
-      const configById = new Map(toolbarFilterConfigs.value.map((config) => [config.id, config]))
-
-      return props.quickFilters
-        .map((quickFilter) => {
-          const config = configById.get(quickFilter.id)
-
-          if (!config) {
-            return null
-          }
-
-          return {
-            ...quickFilter,
-            config,
-          }
-        })
-        .filter(
-          (
-            quickFilter,
-          ): quickFilter is DataGridQuickFilterConfig & {
-            config: DataGridFilterConfig
-          } => Boolean(quickFilter),
-        )
-    })
-    const activeFilterCount = computed(() => {
-      const searchFilterCount = globalFilter.value.trim() ? 1 : 0
-      return columnFilters.value.length + searchFilterCount
-    })
     const excelExportConfig = computed<DataGridExcelExportConfig<AnyRow>>(() => (effectiveExcelExportInput.value === false ? { enabled: false } : (effectiveExcelExportInput.value ?? {})))
-    const isExcelExportEnabled = computed(() => excelExportConfig.value.enabled ?? true)
-    const defaultExcelExportModes: DataGridExcelExportMode[] = ['view-all-rows', 'view-current-page', 'all-columns-all-rows', 'all-columns-current-page']
-    const excelExportActions = computed(() => {
-      if (!isExcelExportEnabled.value) {
-        return []
-      }
-
-      const labels: Record<DataGridExcelExportMode, string> = {
-        'view-all-rows': localeText.value.exportExcelViewAllRowsLabel,
-        'view-current-page': localeText.value.exportExcelViewCurrentPageLabel,
-        'all-columns-all-rows': localeText.value.exportExcelAllColumnsAllRowsLabel,
-        'all-columns-current-page': localeText.value.exportExcelAllColumnsCurrentPageLabel,
-      }
-
-      return (excelExportConfig.value.modes && excelExportConfig.value.modes.length > 0 ? excelExportConfig.value.modes : defaultExcelExportModes).map((mode) => ({
-        mode,
-        label: labels[mode],
-      }))
+    const {
+      showViewsMenu,
+      serverFilterColumns,
+      filterDialogSections,
+      quickFilterConfigs,
+      activeFilterCount,
+      excelExportActions,
+      requestedServerColumnsKey,
+    } = useDataGridToolbarState({
+      allLeafColumns,
+      visibleColumns,
+      columnFilters,
+      globalFilter,
+      excelExportConfig,
+      localeText,
+      toolbarFilters: () => props.toolbarFilters,
+      quickFilters: () => props.quickFilters,
+      viewStorageKey: () => props.viewStorageKey,
+      hasSavedViewsPersistence: () => Boolean(props.savedViewsPersistence),
+      getColumnFilterConfig,
     })
-
-    const requestedServerColumns = computed(() => {
-      const requested = new Set<string>(['id'])
-
-      for (const column of visibleColumns.value) {
-        const columnDef = column.columnDef as DataGridColumn<AnyRow>
-
-        if (columnDef.serverField) {
-          requested.add(columnDef.serverField)
-        }
-
-        for (const field of columnDef.requiredServerFields ?? []) {
-          requested.add(field)
-        }
-      }
-
-      return Array.from(requested).sort()
-    })
-    const requestedServerColumnsKey = computed(() => requestedServerColumns.value.join('|'))
     const effectiveRequestedServerColumnsKey = computed(() => (effectiveRefetchOnVisibleColumnsChange.value ? requestedServerColumnsKey.value : ''))
 
     const { refreshData } = useDataGridDataLoading({
@@ -1500,42 +792,6 @@ export default defineComponent({
     watch(columnMeasureKey, () => {
       scheduleColumnMeasure()
     })
-
-    watch(
-      [visibleRows, cellSelectionColumns],
-      ([rows, columns]) => {
-        if (!isCellSelectionEnabled.value || selectedCellKeys.value.size === 0) {
-          return
-        }
-
-        const availableRowIds = new Set<string>()
-        for (const row of rows) {
-          availableRowIds.add(row.id)
-        }
-        const availableColumnIds = new Set(columns.map((column) => column.id))
-
-        const nextKeys = new Set<string>()
-        for (const key of selectedCellKeys.value) {
-          const [rowId, columnId] = key.split('::')
-          if (rowId && columnId && availableRowIds.has(rowId) && availableColumnIds.has(columnId)) {
-            nextKeys.add(key)
-          }
-        }
-
-        if (nextKeys.size !== selectedCellKeys.value.size) {
-          selectedCellKeys.value = nextKeys
-        }
-
-        if (
-          lastSelectedCell.value &&
-          (!availableRowIds.has(lastSelectedCell.value.rowId) ||
-            !availableColumnIds.has(lastSelectedCell.value.columnId))
-        ) {
-          lastSelectedCell.value = null
-        }
-      },
-      { flush: 'post' },
-    )
 
     onBeforeUnmount(() => {
       document.removeEventListener('click', handleDocumentClick)
@@ -1713,55 +969,14 @@ export default defineComponent({
       )
     }
 
-    function getColumnMenuStyle(column: Column<AnyRow, unknown>): CSSProperties {
-      const pinnedSide = getPinnedSide(column.id)
-
-      if (pinnedSide === 'left') {
-        return {
-          left: '0',
-          right: 'auto',
-        }
-      }
-
-      if (pinnedSide === 'right') {
-        return {
-          left: 'auto',
-          right: '0',
-        }
-      }
-
-      const columnIndex = visibleColumnIndexById.value.get(column.id) ?? -1
-      const visibleCount = visibleColumns.value.length
-      const isNearRightEdge = columnIndex >= Math.max(visibleCount - 2, 0)
-
-      if (isNearRightEdge) {
-        return {
-          left: 'auto',
-          right: '0',
-        }
-      }
-
-      return {
-        left: '0',
-        right: 'auto',
-      }
-    }
-
-    function renderCell(cell: Cell<AnyRow, unknown>) {
-      const columnDef = cell.column.columnDef as DataGridColumn<AnyRow>
-      const context = cell.getContext()
-      const renderProps: CellRenderProps = {
-        table: context.table,
-        column: context.column,
-        row: context.row,
-        cell: context.cell,
-        getValue: context.getValue,
-        renderValue: context.renderValue,
-        align: columnDef.align ?? 'start',
-      }
-
-      return renderFlexibleContent(cell.column.columnDef.cell, renderProps as Record<string, unknown>)
-    }
+    const getColumnMenuStyle = (column: Column<AnyRow, unknown>) =>
+      getDataGridColumnMenuStyle({
+        column,
+        visibleColumns,
+        visibleColumnIndexById,
+        getPinnedSide,
+      })
+    const renderCell = renderDataGridCell
 
     function closeColumnMenu() {
       openMenuColumnId.value = null
@@ -1788,68 +1003,23 @@ export default defineComponent({
       renderColumnPickerLabel,
     })
 
-    const selectedRowActionContext = computed<DataGridSelectionPanelActionContext<AnyRow>>(() => ({
-      selectedRows: selectedRows.value.map((row) => row.original),
-      selectedRowIds: selectedRows.value.map((row) => row.original.id as string | number),
-      clearSelection: clearSelectedRows,
-    }))
+    const { selectionPanelSections, selectionPanelActions } = useDataGridSelectionPanelSections({
+      mergedSelectionPanelConfig,
+      localeText,
+      selectedRows,
+      selectedColumnIds,
+      selectedCellCount,
+      clearSelectedRows,
+      clearSelectedColumns,
+      clearSelectedCells,
+      copySelectedRows,
+      copySelectedCells,
+    })
 
     return () => {
       const pageCount = requestState.value.pageCount
       const pageIndex = pagination.value.pageIndex
       const paginationItems = buildPaginationItems(pageCount, pageIndex)
-      const selectionPanelSections: SelectionPanelSection[] = []
-
-      if (selectedRows.value.length > 0) {
-        selectionPanelSections.push({
-          id: 'rows',
-          label: mergedSelectionPanelConfig.value?.selectedRowsLabel ?? 'Zaznaczone wiersze',
-          count: selectedRows.value.length,
-          copyLabel: localeText.value.copyRowsLabel,
-          clearLabel: 'Wyczysc wiersze',
-          onCopy: (options: { includeHeaders: boolean }) => copySelectedRows(options.includeHeaders),
-          onClear: clearSelectedRows,
-        })
-      }
-
-      const rowActionContext = selectedRowActionContext.value
-      const selectionPanelActions =
-        mergedSelectionPanelConfig.value?.actions
-          ?.filter((action) => {
-            const hidden = typeof action.hidden === 'function' ? action.hidden(rowActionContext) : (action.hidden ?? false)
-            return !hidden
-          })
-          .map((action) => ({
-            id: action.id,
-            label: action.label,
-            title: action.title,
-            disabled: typeof action.disabled === 'function' ? action.disabled(rowActionContext) : (action.disabled ?? false),
-            onClick: () => action.onClick(rowActionContext),
-          })) ?? []
-
-      if (selectedColumnIds.value.length > 0) {
-        selectionPanelSections.push({
-          id: 'columns',
-          label: localeText.value.selectedColumnsLabel,
-          count: selectedColumnIds.value.length,
-          copyLabel: localeText.value.copyColumnsLabel,
-          clearLabel: 'Wyczysc kolumny',
-          onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
-          onClear: clearSelectedColumns,
-        })
-      }
-
-      if (selectedCellCount.value > 0) {
-        selectionPanelSections.push({
-          id: 'cells',
-          label: localeText.value.selectedCellsLabel,
-          count: selectedCellCount.value,
-          copyLabel: localeText.value.copyCellsLabel,
-          clearLabel: 'Wyczysc komorki',
-          onCopy: (options: { includeHeaders: boolean }) => copySelectedCells(options.includeHeaders),
-          onClear: clearSelectedCells,
-        })
-      }
 
       return (
         <section
@@ -1894,7 +1064,7 @@ export default defineComponent({
               style={
                 {
                   ...(isAutoHeight.value ? {} : { height: `${effectiveHeight.value}px` }),
-                  '--data-grid-header-height': `${headerHeight}px`,
+                  '--data-grid-header-height': `${dataGridHeaderHeight}px`,
                 } as Record<string, string>
               }
             >
@@ -1903,7 +1073,7 @@ export default defineComponent({
                   class="data-grid__inner"
                   style={{
                     width: `${totalWidth.value}px`,
-                    height: `${totalRowHeight.value + headerHeight}px`,
+                    height: `${totalRowHeight.value + dataGridHeaderHeight}px`,
                   }}
                 >
                   <div class="data-grid__header" style={{ width: `${totalWidth.value}px` }}>
@@ -1955,14 +1125,14 @@ export default defineComponent({
                 </div>
               ) : null}
             </div>
-            {mergedSelectionPanelConfig.value && selectionPanelSections.length > 0 ? (
+            {mergedSelectionPanelConfig.value && selectionPanelSections.value.length > 0 ? (
               <DataGridSelectionPanel
                 position={mergedSelectionPanelConfig.value.position ?? selectionPanelPosition.value ?? 'bottom-right'}
                 floatingPosition={mergedSelectionPanelConfig.value.floatingPosition ?? selectionPanelFloatingPosition.value ?? null}
-                selectedRowsCount={selectionPanelSections.reduce((total, section) => total + section.count, 0)}
+                selectedRowsCount={selectionPanelSections.value.reduce((total, section) => total + section.count, 0)}
                 selectedRowsLabel={localeText.value.selectedRowsTotalLabel}
-                sections={selectionPanelSections}
-                actions={selectionPanelActions}
+                sections={selectionPanelSections.value}
+                actions={selectionPanelActions.value}
                 sums={selectionPanelSums.value}
                 copyLabel={localeText.value.copyAllLabel}
                 copyIncludeHeaders={mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}
