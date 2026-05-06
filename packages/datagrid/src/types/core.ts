@@ -117,14 +117,29 @@ export type DataGridFetchResult<TData> = {
   meta?: Record<string, unknown>
 }
 
+export type DataGridRowPatchKeyList<TData extends RowData = RowData> =
+  | boolean
+  | Array<Extract<keyof TData, string>>
+
+export type DataGridRowPatchOptions<TData extends RowData = RowData> = {
+  preserveMissingKeys?: DataGridRowPatchKeyList<TData>
+}
+
 export type DataGridInstance<TData extends RowData = RowData> = {
   refreshData: () => void
   exportExcel: (
     mode: DataGridExcelExportMode,
     overrides?: Partial<DataGridExcelExportConfig<TData>>,
   ) => Promise<void>
-  patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => TData | null
-  patchRows: (patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) => TData[]
+  patchRow: (
+    rowId: DataGridRowId,
+    patch: Partial<TData>,
+    options?: DataGridRowPatchOptions<TData>,
+  ) => TData | null
+  patchRows: (
+    patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>,
+    options?: DataGridRowPatchOptions<TData>,
+  ) => TData[]
   updateRow: (rowId: DataGridRowId, updater: (row: TData) => TData) => TData | null
   replaceRow: (rowId: DataGridRowId, row: TData) => TData | null
   getRow: (rowId: DataGridRowId) => TData | null

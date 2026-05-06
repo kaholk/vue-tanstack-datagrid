@@ -455,6 +455,12 @@
   color: var(--data-grid-accent, #7cb8ff);
 }
 
+.data-grid__clickable-cell:hover .data-grid__clickable-cell-text,
+.data-grid__clickable-cell:hover .data-grid__comments-cell-text {
+  text-decoration: underline;
+}
+
+.data-grid__clickable-cell-text,
 .data-grid__comments-cell-text {
   min-width: 0;
   overflow: hidden;

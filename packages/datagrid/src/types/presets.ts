@@ -8,6 +8,7 @@ import type {
   DataGridLoadingConfig,
   DataGridMetaConfig,
   DataGridPageSizeConfig,
+  DataGridRowPatchOptions,
 } from './core'
 import type {
   DataGridCellSelectionConfig,
@@ -34,4 +35,5 @@ export type DataGridPreset<TData extends RowData = RowData> = {
   resetPageOnFilterChange?: boolean
   refetchOnVisibleColumnsChange?: boolean
   keepRowsOnError?: boolean
+  rowPatchConfig?: DataGridRowPatchOptions<TData>
 }

@@ -22,7 +22,7 @@ import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
 import { buildDataGridRowSelectionColumn, defaultRowSelectionColumnId, defaultRowSelectionPreset } from './composables/useDataGridRowSelectionColumn'
 import { resolveDataGridLocaleText } from './locales'
-import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridLocale, DataGridMetaConfig, DataGridPageSizeConfig, DataGridPreset, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText } from './types'
+import type { DataGridCellSelectionConfig, DataGridColumn, DataGridColumnAlign, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridFilterConfig, DataGridQuickFilterConfig, DataGridColumnVisibilityState, DataGridFetchParams, DataGridFetchResult, DataGridFloatingPosition, DataGridInitialState, DataGridHeight, DataGridLoadingConfig, DataGridLocale, DataGridMetaConfig, DataGridPageSizeConfig, DataGridPreset, DataGridRowIdResolver, DataGridRowSelectionConfig, DataGridSavedViewsPersistence, DataGridSelectionPanelConfig, DataGridSelectionPanelActionContext, DataGridSelectionPanelSumConfig, DataGridSelectionPanelPosition, DataGridSavedViewState, DataGridLocaleText, DataGridRowPatchOptions } from './types'
 import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
 import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
 import { toFilterGroupId } from './utils/filters'
@@ -184,7 +184,7 @@ export default defineComponent({
       default: undefined,
     },
     selectionPanelConfig: {
-      type: Object as PropType<DataGridSelectionPanelConfig<AnyRow> | undefined>,
+      type: Object as PropType<DataGridSelectionPanelConfig<any> | undefined>,
       default: undefined,
     },
     rowSelectionConfig: {
@@ -197,6 +197,10 @@ export default defineComponent({
     },
     excelExport: {
       type: [Object, Boolean] as PropType<false | DataGridExcelExportConfig<any> | undefined>,
+      default: undefined,
+    },
+    rowPatchConfig: {
+      type: Object as PropType<DataGridRowPatchOptions<any> | undefined>,
       default: undefined,
     },
   },
@@ -234,6 +238,10 @@ export default defineComponent({
     const effectiveExcelExportInput = computed<false | DataGridExcelExportConfig<AnyRow> | undefined>(() =>
       (props.excelExport ?? preset.value.excelExport) as false | DataGridExcelExportConfig<AnyRow> | undefined,
     )
+    const effectiveRowPatchConfig = computed<DataGridRowPatchOptions<AnyRow>>(() => ({
+      ...((preset.value.rowPatchConfig ?? {}) as DataGridRowPatchOptions<AnyRow>),
+      ...((props.rowPatchConfig ?? {}) as DataGridRowPatchOptions<AnyRow>),
+    }))
     const effectiveHeight = computed<DataGridHeight | -1>(() => props.height ?? preset.value.height ?? 560)
     const effectiveRowHeight = computed(() => props.rowHeight ?? preset.value.rowHeight ?? 42)
     const effectiveOverscanRows = computed(() => props.overscanRows ?? preset.value.overscanRows ?? 10)
@@ -386,6 +394,7 @@ export default defineComponent({
     const { getRowKey, rowIndexByKey, patchRow, patchRows, updateRow, replaceRow, getRow, getVisibleRows } = useDataGridRows({
       requestState,
       rowId: () => props.rowId as DataGridRowIdResolver<AnyRow> | undefined,
+      defaultPatchOptions: () => effectiveRowPatchConfig.value,
     })
     const isLoading = ref(false)
     const errorMessage = ref('')

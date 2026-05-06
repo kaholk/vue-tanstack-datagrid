@@ -1,16 +1,15 @@
 import { defineComponent, type PropType } from 'vue'
-import type { RowData } from '@tanstack/vue-table'
 import type { DataGridRowAction } from '../types'
 
 export default defineComponent({
   name: 'DataGridRowActions',
   props: {
     row: {
-      type: Object as PropType<RowData>,
+      type: Object as PropType<any>,
       required: true,
     },
     actions: {
-      type: Array as PropType<DataGridRowAction<RowData>[]>,
+      type: Array as PropType<DataGridRowAction<any>[]>,
       required: true,
     },
   },

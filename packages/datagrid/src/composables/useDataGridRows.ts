@@ -1,6 +1,7 @@
 import { computed, watch, type ShallowRef } from 'vue'
 
-import type { DataGridRowId, DataGridRowIdResolver } from '../types'
+import type { DataGridRowId, DataGridRowIdResolver, DataGridRowPatchOptions } from '../types'
+import { mergeDataGridRowPatch } from '../utils/rowPatch'
 
 type AnyRow = Record<string, unknown>
 
@@ -14,6 +15,7 @@ export type DataGridRequestState<TData extends AnyRow> = {
 type UseDataGridRowsOptions<TData extends AnyRow> = {
   requestState: ShallowRef<DataGridRequestState<TData>>
   rowId?: () => DataGridRowIdResolver<TData> | undefined
+  defaultPatchOptions?: () => DataGridRowPatchOptions<TData> | undefined
 }
 
 export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOptions<TData>) {
@@ -73,11 +75,23 @@ export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOp
     return nextRow
   }
 
-  function patchRow(rowId: DataGridRowId, patch: Partial<TData>): TData | null {
-    return updateRow(rowId, (currentRow) => ({ ...currentRow, ...patch }))
+  function patchRow(
+    rowId: DataGridRowId,
+    patch: Partial<TData>,
+    patchOptions?: DataGridRowPatchOptions<TData>,
+  ): TData | null {
+    return updateRow(rowId, (currentRow) =>
+      mergeDataGridRowPatch(currentRow, patch, {
+        ...(options.defaultPatchOptions?.() ?? {}),
+        ...(patchOptions ?? {}),
+      }),
+    )
   }
 
-  function patchRows(patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>): TData[] {
+  function patchRows(
+    patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>,
+    patchOptions?: DataGridRowPatchOptions<TData>,
+  ): TData[] {
     if (patches.length === 0) {
       return []
     }
@@ -94,7 +108,10 @@ export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOp
         continue
       }
 
-      const nextRow = { ...currentRow, ...patch }
+      const nextRow = mergeDataGridRowPatch(currentRow, patch, {
+        ...(options.defaultPatchOptions?.() ?? {}),
+        ...(patchOptions ?? {}),
+      })
       nextRows[rowIndex] = nextRow
       updatedRows.push(nextRow)
       changed = true
