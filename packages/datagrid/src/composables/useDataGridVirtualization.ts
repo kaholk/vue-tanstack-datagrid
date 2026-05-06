@@ -1,5 +1,5 @@
 import { computed, type CSSProperties, type Ref } from 'vue'
-import { useVirtualizer } from '@tanstack/vue-virtual'
+import { useVirtualizer, type VirtualItem } from '@tanstack/vue-virtual'
 import type { Column, ColumnPinningState, Header, Row } from '@tanstack/vue-table'
 
 import type { DataGridColumn } from '../types'
@@ -28,51 +28,70 @@ type UseDataGridVirtualizationOptions = {
 }
 
 function buildRenderedColumnSequence<TItem extends Column<AnyRow, unknown> | Header<AnyRow, unknown>>(
-  orderedItems: TItem[],
-  getColumn: (item: TItem) => Column<AnyRow, unknown>,
-  renderedNonPinnedIds: Set<string>,
-  getPinnedSide: (columnId: string) => 'left' | 'right' | false,
+  options: {
+    leftPinnedItems: TItem[]
+    rightPinnedItems: TItem[]
+    nonPinnedItems: TItem[]
+    virtualNonPinnedColumns: VirtualItem[]
+    nonPinnedTotalWidth: number
+    getColumn: (item: TItem) => Column<AnyRow, unknown>
+  },
 ): RenderedSequenceItem<TItem>[] {
   const sequence: RenderedSequenceItem<TItem>[] = []
-  let spacerWidth = 0
-  let spacerIndex = 0
-
-  for (const item of orderedItems) {
-    const column = getColumn(item)
-    const pinnedSide = getPinnedSide(column.id)
-
-    if (pinnedSide || renderedNonPinnedIds.has(column.id)) {
-      if (spacerWidth > 0) {
-        sequence.push({
-          type: 'spacer',
-          key: `spacer-${spacerIndex}`,
-          width: spacerWidth,
-        })
-        spacerWidth = 0
-        spacerIndex += 1
-      }
-
-      sequence.push({
-        type: 'item',
-        key: column.id,
-        item,
-        column,
-      })
-      continue
-    }
-
-    spacerWidth += column.getSize()
-  }
-
-  if (spacerWidth > 0) {
+  const pushItem = (item: TItem) => {
+    const column = options.getColumn(item)
     sequence.push({
-      type: 'spacer',
-      key: `spacer-${spacerIndex}`,
-      width: spacerWidth,
+      type: 'item',
+      key: column.id,
+      item,
+      column,
     })
   }
 
+  for (const item of options.leftPinnedItems) {
+    pushItem(item)
+  }
+
+  const firstVirtualColumn = options.virtualNonPinnedColumns[0]
+  if (firstVirtualColumn && firstVirtualColumn.start > 0) {
+    sequence.push({ type: 'spacer', key: 'spacer-before', width: firstVirtualColumn.start })
+  }
+
+  for (const virtualColumn of options.virtualNonPinnedColumns) {
+    const item = options.nonPinnedItems[virtualColumn.index]
+    if (item) {
+      pushItem(item)
+    }
+  }
+
+  const lastVirtualColumn = options.virtualNonPinnedColumns[options.virtualNonPinnedColumns.length - 1]
+  const trailingWidth = lastVirtualColumn
+    ? options.nonPinnedTotalWidth - lastVirtualColumn.end
+    : options.nonPinnedTotalWidth
+  if (trailingWidth > 0) {
+    sequence.push({ type: 'spacer', key: 'spacer-after', width: trailingWidth })
+  }
+
+  for (const item of options.rightPinnedItems) {
+    pushItem(item)
+  }
+
   return sequence
+}
+
+function getVisiblePinnedColumns(
+  pinnedColumnIds: string[],
+  columnById: Map<string, Column<AnyRow, unknown>>,
+  visibleColumnIndexById: Map<string, number>,
+) {
+  const columns: Column<AnyRow, unknown>[] = []
+  for (const columnId of pinnedColumnIds) {
+    const column = columnById.get(columnId)
+    if (column && visibleColumnIndexById.has(columnId)) {
+      columns.push(column)
+    }
+  }
+  return columns
 }
 
 export function useDataGridVirtualization(options: UseDataGridVirtualizationOptions) {
@@ -116,9 +135,29 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
   const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
   const virtualNonPinnedColumns = computed(() => columnVirtualizer.value.getVirtualItems())
   const totalRowHeight = computed(() => rowVirtualizer.value.getTotalSize())
-  const renderedNonPinnedIds = computed(() => new Set(virtualNonPinnedColumns.value.map((virtualColumn) => nonPinnedColumns.value[virtualColumn.index]?.id).filter((value): value is string => Boolean(value))))
-  const headerSequence = computed(() => buildRenderedColumnSequence(options.visibleHeaders.value, (header) => header.column, renderedNonPinnedIds.value, getPinnedSide))
-  const rowSequence = computed(() => buildRenderedColumnSequence(options.visibleColumns.value, (column) => column, renderedNonPinnedIds.value, getPinnedSide))
+  const nonPinnedTotalWidth = computed(() => columnVirtualizer.value.getTotalSize())
+  const visibleHeaderByColumnId = computed(() => new Map(options.visibleHeaders.value.map((header) => [header.column.id, header])))
+  const leftPinnedColumns = computed(() => getVisiblePinnedColumns(options.columnPinning.value.left ?? [], options.allLeafColumnsById.value, options.visibleColumnIndexById.value))
+  const rightPinnedColumns = computed(() => getVisiblePinnedColumns(options.columnPinning.value.right ?? [], options.allLeafColumnsById.value, options.visibleColumnIndexById.value))
+  const leftPinnedHeaders = computed(() => leftPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
+  const rightPinnedHeaders = computed(() => rightPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
+  const nonPinnedHeaders = computed(() => nonPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
+  const headerSequence = computed(() => buildRenderedColumnSequence({
+    leftPinnedItems: leftPinnedHeaders.value,
+    rightPinnedItems: rightPinnedHeaders.value,
+    nonPinnedItems: nonPinnedHeaders.value,
+    virtualNonPinnedColumns: virtualNonPinnedColumns.value,
+    nonPinnedTotalWidth: nonPinnedTotalWidth.value,
+    getColumn: (header) => header.column,
+  }))
+  const rowSequence = computed(() => buildRenderedColumnSequence({
+    leftPinnedItems: leftPinnedColumns.value,
+    rightPinnedItems: rightPinnedColumns.value,
+    nonPinnedItems: nonPinnedColumns.value,
+    virtualNonPinnedColumns: virtualNonPinnedColumns.value,
+    nonPinnedTotalWidth: nonPinnedTotalWidth.value,
+    getColumn: (column) => column,
+  }))
   function getCachedCellStyle(column: Column<AnyRow, unknown>, key: string, style: CSSProperties) {
     const cached = cellStyleCacheByColumnId.get(column.id)
     if (cached?.key === key) {

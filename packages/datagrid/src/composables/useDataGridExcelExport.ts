@@ -1,6 +1,6 @@
 import { ref, type ComputedRef, type Ref, type ShallowRef } from 'vue'
 import type { Column, ColumnFiltersState, ColumnSort, PaginationState, Row, RowData } from '@tanstack/vue-table'
-import ExcelExportWorker from '../workers/excelExportWorker?worker&inline'
+import ExcelExportWorker from '../workers/excelExportWorker?worker'
 
 import type {
   DataGridColumn,

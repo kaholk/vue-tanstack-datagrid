@@ -3,6 +3,7 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import Icons from 'unplugin-icons/vite'
 
 export default defineConfig({
+  base: './',
   plugins: [vueJsx(), Icons()],
   build: {
     copyPublicDir: false,

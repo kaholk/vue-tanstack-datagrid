@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue
 import type { Cell, Column, Row } from '@tanstack/vue-table'
 
 import type { DataGridRowSelectionConfig } from '../types'
-import type { AnyRow, CellSelectionAnchor, SelectedCellRow, SelectionPreviewMode } from '../types/internal'
+import { getCellSelectionKey, parseDataGridCellSelectionKey, type AnyRow, type CellSelectionAnchor, type SelectedCellRow, type SelectionPreviewMode } from '../types/internal'
 
 type UseDataGridCellSelectionOptions = {
   isEnabled: Ref<boolean>
@@ -19,25 +19,6 @@ type UseDataGridCellSelectionOptions = {
     checked: boolean,
     event: Pick<MouseEvent, 'shiftKey'>,
   ) => void
-}
-
-function getCellSelectionKey(rowId: string, columnId: string) {
-  return `${rowId}::${columnId}`
-}
-
-function parseCellSelectionKey(key: string) {
-  const separatorIndex = key.lastIndexOf('::')
-  if (separatorIndex < 0) {
-    return null
-  }
-
-  const rowId = key.slice(0, separatorIndex)
-  const columnId = key.slice(separatorIndex + 2)
-  if (!rowId || !columnId) {
-    return null
-  }
-
-  return { rowId, columnId }
 }
 
 function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
@@ -85,7 +66,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     }
 
     for (const key of selectedCellKeys.value) {
-      const parsedKey = parseCellSelectionKey(key)
+      const parsedKey = parseDataGridCellSelectionKey(key)
       if (!parsedKey || !rowIds.has(parsedKey.rowId) || !columnIds.has(parsedKey.columnId)) {
         continue
       }
@@ -510,7 +491,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
 
       const nextKeys = new Set<string>()
       for (const key of selectedCellKeys.value) {
-        const parsedKey = parseCellSelectionKey(key)
+        const parsedKey = parseDataGridCellSelectionKey(key)
         if (parsedKey && availableRowIds.has(parsedKey.rowId) && availableColumnIds.has(parsedKey.columnId)) {
           nextKeys.add(key)
         }

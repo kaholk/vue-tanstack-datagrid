@@ -25,6 +25,25 @@ export type CellSelectionAnchor = {
   columnId: string
 }
 
+export function getCellSelectionKey(rowId: string, columnId: string) {
+  return `${rowId}::${columnId}`
+}
+
+export function parseDataGridCellSelectionKey(key: string) {
+  const separatorIndex = key.lastIndexOf('::')
+  if (separatorIndex < 0) {
+    return null
+  }
+
+  const rowId = key.slice(0, separatorIndex)
+  const columnId = key.slice(separatorIndex + 2)
+  if (!rowId || !columnId) {
+    return null
+  }
+
+  return { rowId, columnId }
+}
+
 export type SelectionPreviewMode = 'select' | 'deselect' | 'toggle' | null
 
 export type SelectionPanelSection = {

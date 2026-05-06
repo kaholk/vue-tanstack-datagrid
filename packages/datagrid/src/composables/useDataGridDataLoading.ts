@@ -43,7 +43,20 @@ function normalizeRequestValue(value: unknown): unknown {
   return value
 }
 
+const stableRequestPartCache = new WeakMap<object, string>()
+
 function stableRequestPart(value: unknown) {
+  if (value && typeof value === 'object') {
+    const cached = stableRequestPartCache.get(value)
+    if (cached) {
+      return cached
+    }
+
+    const stable = JSON.stringify(normalizeRequestValue(value))
+    stableRequestPartCache.set(value, stable)
+    return stable
+  }
+
   return JSON.stringify(normalizeRequestValue(value))
 }
 

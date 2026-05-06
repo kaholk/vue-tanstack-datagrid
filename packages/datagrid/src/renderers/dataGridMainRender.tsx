@@ -1,3 +1,6 @@
+import type { ComputedRef, CSSProperties, Ref, ShallowRef, Slots, VNodeChild } from 'vue'
+import type { Cell, Column, ColumnSizingState, Header, PaginationState, Row, Table } from '@tanstack/vue-table'
+import type { VirtualItem } from '@tanstack/vue-virtual'
 import DataGridBodyRow from '../components/DataGridBodyRow'
 import DataGridColumnPickerDialog from '../components/DataGridColumnPickerDialog'
 import DataGridFooter from '../components/DataGridFooter'
@@ -8,9 +11,140 @@ import DataGridSaveViewDialog from '../components/DataGridSaveViewDialog'
 import DataGridSelectionPanel from '../components/DataGridSelectionPanel'
 import DataGridToolbar from '../components/DataGridToolbar'
 import { dataGridHeaderHeight } from '../dataGridDefaults'
+import type { DataGridRequestState } from '../composables/useDataGridRows'
+import type { RenderedSequenceItem } from '../composables/useDataGridVirtualization'
+import type {
+  DataGridColumn,
+  DataGridColumnVisibilityState,
+  DataGridExcelExportMode,
+  DataGridFilterConfig,
+  DataGridFloatingPosition,
+  DataGridLocaleText,
+  DataGridLoadingConfig,
+  DataGridMetaConfig,
+  DataGridPageSizeConfig,
+  DataGridQuickFilterConfig,
+  DataGridSavedView,
+  DataGridSelectionPanelConfig,
+  DataGridSelectionPanelPosition,
+} from '../types'
+import type { AnyRow, FilterDialogSection, SelectionPanelSection, SelectionPreviewMode } from '../types/internal'
 import { buildPaginationItems } from '../utils/pagination'
 
-type DataGridMainRenderContext = Record<string, any>
+type RefLike<T> = Ref<T> | ComputedRef<T> | ShallowRef<T>
+type ExcelExportAction = {
+  mode: DataGridExcelExportMode
+  label: string
+}
+type SelectionPanelAction = {
+  id: string
+  label: string
+  title?: string
+  disabled?: boolean
+  onClick: () => void | Promise<void>
+}
+
+export type DataGridMainRenderContext = {
+  requestState: RefLike<DataGridRequestState<AnyRow>>
+  pagination: Ref<PaginationState>
+  isAutoHeight: RefLike<boolean>
+  showViewsMenu: RefLike<boolean>
+  isViewsMenuOpen: Ref<boolean>
+  activeViewId: RefLike<string>
+  savedViews: RefLike<DataGridSavedView[]>
+  quickFilterConfigs: RefLike<Array<DataGridQuickFilterConfig & { config: DataGridFilterConfig }>>
+  activeFilterCount: RefLike<number>
+  renderFilterControl: (config: DataGridFilterConfig, options?: { toolbar?: boolean; target?: 'live' | 'dialog' }) => VNodeChild
+  toggleViewsMenu: () => void
+  selectSavedView: (viewId: string) => void | Promise<void>
+  openSaveViewDialog: () => void
+  overwriteActiveView: () => void | Promise<void>
+  deleteActiveView: () => void | Promise<void>
+  toggleFilterDialog: () => void
+  toggleFilterHelpDialog: () => void
+  refreshData: () => void
+  clearAllFilters: () => void
+  toggleColumnPicker: () => void
+  excelExportActions: RefLike<ExcelExportAction[]>
+  isExcelExporting: Ref<boolean>
+  localeText: RefLike<Required<DataGridLocaleText>>
+  handleExportExcel: (mode: DataGridExcelExportMode) => void | Promise<void>
+  slots: Slots
+  effectiveHeight: RefLike<number | string>
+  scrollElementRef: Ref<HTMLDivElement | null>
+  isLoading: Ref<boolean>
+  mergedLoadingConfig: RefLike<DataGridLoadingConfig>
+  totalWidth: RefLike<number>
+  totalRowHeight: RefLike<number>
+  headerSequence: RefLike<Array<RenderedSequenceItem<Header<AnyRow, unknown>>>>
+  getPinnedSide: (columnId: string) => 'left' | 'right' | false
+  cellStylesByColumnId: RefLike<Map<string, CSSProperties>>
+  columnPickerLabelById: RefLike<Map<string, string>>
+  columnMenuStyleById: RefLike<Map<string, CSSProperties>>
+  openMenuColumnId: Ref<string | null>
+  getColumnFilterConfig: (column: Column<AnyRow, unknown>) => DataGridFilterConfig
+  toggleColumnMenu: (columnId: string) => void
+  toggleSorting: (column: Column<AnyRow, unknown>) => void
+  setSortDesc: (column: Column<AnyRow, unknown>) => void
+  clearSorting: (column: Column<AnyRow, unknown>) => void
+  setPin: (column: Column<AnyRow, unknown>, side: 'left' | 'right' | false) => void
+  closeColumnMenu: () => void
+  virtualRows: RefLike<VirtualItem[]>
+  visibleRows: RefLike<Array<Row<AnyRow>>>
+  previewSelectionRowIds: ShallowRef<Set<string>>
+  rowSelectionPreviewMode: Ref<SelectionPreviewMode>
+  rowSequence: RefLike<Array<RenderedSequenceItem<Column<AnyRow, unknown>>>>
+  visibleColumnIndexById: RefLike<Map<string, number>>
+  renderCell: (cell: Cell<AnyRow, unknown>) => VNodeChild
+  isCellSelectionEnabled: RefLike<boolean>
+  isCellSelected: (cell: Cell<AnyRow, unknown>) => boolean
+  isCellSelectionHovered: (cell: Cell<AnyRow, unknown>) => boolean
+  getCellSelectionPreviewMode: (cell: Cell<AnyRow, unknown>) => SelectionPreviewMode
+  handleCellSelectionPointerEnter: (cell: Cell<AnyRow, unknown>, event: PointerEvent) => void
+  handleCellSelectionPointerLeave: (cell: Cell<AnyRow, unknown>, event: PointerEvent) => void
+  handleCellSelectionClick: (cell: Cell<AnyRow, unknown>, event: MouseEvent) => boolean | void
+  mergedSelectionPanelConfig: RefLike<DataGridSelectionPanelConfig<AnyRow> | null>
+  selectionPanelSections: RefLike<SelectionPanelSection[]>
+  selectionPanelPosition: Ref<DataGridSelectionPanelPosition>
+  selectionPanelFloatingPosition: Ref<DataGridFloatingPosition>
+  selectionPanelSelectedCount: RefLike<number>
+  selectionPanelActions: RefLike<SelectionPanelAction[]>
+  selectionPanelSums: RefLike<Array<{ columnId: string; label: string; value: string }>>
+  copyAllSelection: (includeHeaders: boolean) => void | Promise<void>
+  clearAllSelection: () => void
+  updateSelectionPanelPosition: (position: DataGridSelectionPanelPosition) => void
+  updateSelectionPanelFloatingPosition: (position: DataGridFloatingPosition) => void
+  effectiveMetaItems: RefLike<DataGridMetaConfig[]>
+  effectivePageSizeConfig: RefLike<DataGridPageSizeConfig>
+  table: Table<AnyRow>
+  serverFilterColumns: RefLike<Array<Column<AnyRow, unknown>>>
+  errorMessage: Ref<string>
+  isFilterDialogOpen: Ref<boolean>
+  filterDialogSections: RefLike<FilterDialogSection[]>
+  closeFilterDialog: () => void
+  applyFilterDialogChanges: () => void
+  isFilterHelpDialogOpen: Ref<boolean>
+  isColumnPickerOpen: Ref<boolean>
+  columnPickerColumns: RefLike<Array<Column<AnyRow, unknown>>>
+  renderColumnPickerLabel: (column: Column<AnyRow, unknown>) => string
+  draftColumnVisibility: Ref<DataGridColumnVisibilityState>
+  getDraftPinnedSide: (columnId: string) => 'left' | 'right' | false
+  draftColumnSizing: Ref<ColumnSizingState>
+  allLeafColumnsById: RefLike<Map<string, Column<AnyRow, unknown>>>
+  getDraftColumnMoveTarget: (columnId: string) => string
+  closeColumnPicker: () => void
+  applyColumnDialogChanges: () => void
+  toggleDraftColumnVisibility: (columnId: string, isVisible: boolean) => void
+  updateDraftColumnSize: (columnId: string, rawValue: string) => void
+  setDraftPin: (columnId: string, side: 'left' | 'right' | false) => void
+  moveDraftColumn: (columnId: string, direction: -1 | 1) => void
+  updateDraftColumnMoveTarget: (columnId: string, targetColumnId: string) => void
+  moveDraftColumnRelative: (columnId: string, targetColumnId: string, position: 'before' | 'after') => void
+  isSaveViewDialogOpen: Ref<boolean>
+  newViewName: Ref<string>
+  closeSaveViewDialog: () => void
+  saveNewView: () => void
+}
 
 function renderColumnPickerDialog(context: DataGridMainRenderContext) {
   if (!context.isColumnPickerOpen.value) {
@@ -144,7 +278,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             >
               <div class="data-grid__header" style={{ width: `${context.totalWidth.value}px` }}>
                 <div class="data-grid__row data-grid__row--header" style={{ transform: 'translateY(0px)' }}>
-                  {context.headerSequence.value.map((entry: any) => {
+                  {context.headerSequence.value.map((entry) => {
                     if (entry.type === 'spacer') {
                       return <div key={entry.key} class="data-grid__cell-spacer" style={{ width: `${entry.width}px` }} />
                     }
@@ -165,7 +299,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
               </div>
 
               <div class="data-grid__body" style={{ width: `${context.totalWidth.value}px` }}>
-                {context.virtualRows.value.map((virtualRow: any) => {
+                {context.virtualRows.value.map((virtualRow) => {
                   const row = context.visibleRows.value[virtualRow.index]
                   if (!row) {
                     return null

@@ -2,7 +2,7 @@ import { computed, type Ref, type ShallowRef } from 'vue'
 import type { Cell, Column, Row, RowSelectionState } from '@tanstack/vue-table'
 
 import type { DataGridColumn, DataGridSelectionPanelConfig } from '../types'
-import type { AnyRow, CellSelectionAnchor, SelectedCellRow } from '../types/internal'
+import { parseDataGridCellSelectionKey, type AnyRow, type CellSelectionAnchor, type SelectedCellRow } from '../types/internal'
 import { escapeClipboardCell } from '../utils/clipboard'
 
 type UseDataGridClipboardOptions = {
@@ -123,8 +123,8 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     const columnIds = new Set(options.selectedColumnIds.value)
     options.selectedCellKeys.value = new Set(
       [...options.selectedCellKeys.value].filter((key) => {
-        const [, columnId] = key.split('::')
-        return !columnId || !columnIds.has(columnId)
+        const parsedKey = parseDataGridCellSelectionKey(key)
+        return !parsedKey || !columnIds.has(parsedKey.columnId)
       }),
     )
     options.previewCellRangeKeys.value = new Set()
@@ -153,15 +153,19 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     await navigator.clipboard.writeText(lines.join('\n'))
   }
 
-  async function copySelectedCells(includeHeaders: boolean) {
-    const rows = options.selectedCellRows.value
+  function getSelectedCellColumns(rows: SelectedCellRow[]) {
     const selectedColumnIds = new Set<string>()
     for (const row of rows) {
       for (const columnId of row.selectedColumnIds) {
         selectedColumnIds.add(columnId)
       }
     }
-    const columns = options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
+    return options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
+  }
+
+  async function copySelectedCells(includeHeaders: boolean) {
+    const rows = options.selectedCellRows.value
+    const columns = getSelectedCellColumns(rows)
 
     if (columns.length === 0 || rows.length === 0 || typeof navigator === 'undefined') {
       return
@@ -199,13 +203,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     }
 
     if (options.selectedCellCount.value > 0) {
-      const selectedColumnIds = new Set<string>()
-      for (const row of options.selectedCellRows.value) {
-        for (const columnId of row.selectedColumnIds) {
-          selectedColumnIds.add(columnId)
-        }
-      }
-      const columns = options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
+      const columns = getSelectedCellColumns(options.selectedCellRows.value)
       const lines: string[] = []
 
       if (includeHeaders) {
