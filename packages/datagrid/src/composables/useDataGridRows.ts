@@ -1,4 +1,4 @@
-import { computed, type ShallowRef } from 'vue'
+import { computed, watch, type ShallowRef } from 'vue'
 
 import type { DataGridRowId, DataGridRowIdResolver } from '../types'
 
@@ -17,50 +17,73 @@ type UseDataGridRowsOptions<TData extends AnyRow> = {
 }
 
 export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOptions<TData>) {
+  let indexedRows: TData[] | null = null
+  let cachedRowIndexByKey = new Map<string, number>()
+
   function getRowKey(row: TData, index: number): string {
     const customId = options.rowId?.()?.(row, index)
     return String(customId ?? (row as { id?: DataGridRowId }).id ?? index)
   }
 
-  const rowIndexByKey = computed(() => {
-    const indexByKey = new Map<string, number>()
-    options.requestState.value.rows.forEach((row, index) => {
-      indexByKey.set(getRowKey(row, index), index)
+  function buildRowIndexByKey(rows: TData[]) {
+    const nextIndexByKey = new Map<string, number>()
+    rows.forEach((row, index) => {
+      nextIndexByKey.set(getRowKey(row, index), index)
     })
-    return indexByKey
+    indexedRows = rows
+    cachedRowIndexByKey = nextIndexByKey
+    return nextIndexByKey
+  }
+
+  const rowIndexByKey = computed(() => {
+    const rows = options.requestState.value.rows
+    return rows === indexedRows ? cachedRowIndexByKey : buildRowIndexByKey(rows)
   })
 
-  function updateRow(rowId: DataGridRowId, updater: (row: TData) => TData) {
+  watch(
+    () => options.requestState.value.rows,
+    (rows) => {
+      if (rows !== indexedRows) {
+        buildRowIndexByKey(rows)
+      }
+    },
+    { immediate: true },
+  )
+
+  function updateRow(rowId: DataGridRowId, updater: (row: TData) => TData): TData | null {
     const targetRowId = String(rowId)
     const rowIndex = rowIndexByKey.value.get(targetRowId) ?? -1
 
     if (rowIndex === -1) {
-      return
+      return null
     }
 
     const currentRow = options.requestState.value.rows[rowIndex]
     if (!currentRow) {
-      return
+      return null
     }
 
     const nextRows = [...options.requestState.value.rows]
-    nextRows[rowIndex] = updater(currentRow)
+    const nextRow = updater(currentRow)
+    nextRows[rowIndex] = nextRow
     options.requestState.value = {
       ...options.requestState.value,
       rows: nextRows,
     }
+    return nextRow
   }
 
-  function patchRow(rowId: DataGridRowId, patch: Partial<TData>) {
-    updateRow(rowId, (currentRow) => ({ ...currentRow, ...patch }))
+  function patchRow(rowId: DataGridRowId, patch: Partial<TData>): TData | null {
+    return updateRow(rowId, (currentRow) => ({ ...currentRow, ...patch }))
   }
 
-  function patchRows(patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) {
+  function patchRows(patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>): TData[] {
     if (patches.length === 0) {
-      return
+      return []
     }
 
     const nextRows = [...options.requestState.value.rows]
+    const updatedRows: TData[] = []
     let changed = false
 
     for (const { rowId, patch } of patches) {
@@ -71,7 +94,9 @@ export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOp
         continue
       }
 
-      nextRows[rowIndex] = { ...currentRow, ...patch }
+      const nextRow = { ...currentRow, ...patch }
+      nextRows[rowIndex] = nextRow
+      updatedRows.push(nextRow)
       changed = true
     }
 
@@ -81,10 +106,12 @@ export function useDataGridRows<TData extends AnyRow>(options: UseDataGridRowsOp
         rows: nextRows,
       }
     }
+
+    return updatedRows
   }
 
-  function replaceRow(rowId: DataGridRowId, row: TData) {
-    updateRow(rowId, () => row)
+  function replaceRow(rowId: DataGridRowId, row: TData): TData | null {
+    return updateRow(rowId, () => row)
   }
 
   function getRow(rowId: DataGridRowId) {

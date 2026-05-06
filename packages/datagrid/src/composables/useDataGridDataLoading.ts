@@ -21,6 +21,7 @@ type UseDataGridDataLoadingOptions<TData extends AnyRow> = {
   globalFilter: Ref<string>
   requestedServerColumnsKey: Ref<string>
   localeText: Ref<Required<DataGridLocaleText>>
+  keepRowsOnError?: () => boolean
   fetchPage: () => (params: DataGridFetchParams, signal?: AbortSignal) => Promise<DataGridFetchResult<TData>>
   fetchDebounceMs: () => number
   onLoaded?: () => void
@@ -114,11 +115,13 @@ export function useDataGridDataLoading<TData extends AnyRow>(options: UseDataGri
       }
 
       options.errorMessage.value = error instanceof Error ? error.message : (options.localeText.value.fetchErrorMessage ?? 'Fetch failed.')
-      options.requestState.value = {
-        rows: [],
-        totalRows: 0,
-        pageCount: 0,
-        meta: undefined,
+      if (!options.keepRowsOnError?.()) {
+        options.requestState.value = {
+          rows: [],
+          totalRows: 0,
+          pageCount: 0,
+          meta: undefined,
+        }
       }
     } finally {
       if (activeController === controller) {

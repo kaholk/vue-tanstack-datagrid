@@ -82,19 +82,20 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
+      if (!event.ctrlKey && !event.shiftKey && !event.altKey) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      window.getSelection()?.removeAllRanges()
+    }
+
     return () => {
       const row = props.row
       const isSelected = row.getIsSelected()
       const visibleCells = row.getVisibleCells()
-      const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
-        if (!event.ctrlKey && !event.shiftKey && !event.altKey) {
-          return
-        }
-
-        event.preventDefault()
-        event.stopPropagation()
-        window.getSelection()?.removeAllRanges()
-      }
 
       return (
         <div
@@ -133,6 +134,28 @@ export default defineComponent({
               typeof columnDef.cellClass === 'function'
                 ? columnDef.cellClass({ cell, row })
                 : columnDef.cellClass
+
+            if (!props.enableCellSelection) {
+              return (
+                <div
+                  key={cell.id}
+                  class={[
+                    'data-grid__cell',
+                    pinnedSide ? 'data-grid__cell--pinned' : '',
+                    pinnedSide ? `data-grid__cell--${pinnedSide}` : '',
+                    customCellClass ?? '',
+                  ]}
+                  data-grid-column-id={entry.column.id}
+                  style={props.cellStylesByColumnId.get(entry.column.id)}
+                  onClick={(event) => {
+                    columnDef.onCellClick?.({ cell, row, event })
+                  }}
+                >
+                  {props.renderCell(cell)}
+                </div>
+              )
+            }
+
             const isCellSelected = props.enableCellSelection
               ? (props.isCellSelected?.(cell) ?? false)
               : false

@@ -17,6 +17,7 @@ import { useDataGridDataLoading } from './composables/useDataGridDataLoading'
 import { useDataGridExcelExport } from './composables/useDataGridExcelExport'
 import { useDataGridFilters } from './composables/useDataGridFilters'
 import { useDataGridRows, type DataGridRequestState } from './composables/useDataGridRows'
+import { useDataGridRowSelection } from './composables/useDataGridRowSelection'
 import { useDataGridSavedViews } from './composables/useDataGridSavedViews'
 import { useDataGridVirtualization } from './composables/useDataGridVirtualization'
 import { buildDataGridRowSelectionColumn, defaultRowSelectionColumnId, defaultRowSelectionPreset } from './composables/useDataGridRowSelectionColumn'
@@ -146,6 +147,14 @@ export default defineComponent({
       type: Boolean as PropType<boolean | undefined>,
       default: undefined,
     },
+    refetchOnVisibleColumnsChange: {
+      type: Boolean as PropType<boolean | undefined>,
+      default: undefined,
+    },
+    keepRowsOnError: {
+      type: Boolean as PropType<boolean | undefined>,
+      default: undefined,
+    },
     height: {
       type: [Number, String] as PropType<DataGridHeight | -1 | undefined>,
       default: undefined,
@@ -231,14 +240,22 @@ export default defineComponent({
     const effectiveOverscanColumns = computed(() => props.overscanColumns ?? preset.value.overscanColumns ?? 3)
     const effectiveFetchDebounceMs = computed(() => props.fetchDebounceMs ?? preset.value.fetchDebounceMs ?? 180)
     const effectiveResetPageOnFilterChange = computed(() => props.resetPageOnFilterChange ?? preset.value.resetPageOnFilterChange ?? true)
+    const effectiveRefetchOnVisibleColumnsChange = computed(() => props.refetchOnVisibleColumnsChange ?? preset.value.refetchOnVisibleColumnsChange ?? true)
+    const effectiveKeepRowsOnError = computed(() => props.keepRowsOnError ?? preset.value.keepRowsOnError ?? false)
     const mergedLoadingConfig = computed<DataGridLoadingConfig>(() => ({
       variant: effectiveLoadingConfigInput.value.variant ?? defaultLoadingConfig.variant,
       label: effectiveLoadingConfigInput.value.label ?? localeText.value.loadingLabel,
     }))
     const isCellSelectionEnabled = computed(() => effectiveCellSelectionConfig.value?.enabled ?? true)
-    const lastSelectedRowId = ref<string | null>(null)
-    const previewSelectionRowIds = shallowRef<Set<string>>(new Set())
-    const rowSelectionPreviewMode = ref<SelectionPreviewMode>(null)
+    const {
+      lastSelectedRowId,
+      previewSelectionRowIds,
+      rowSelectionPreviewMode,
+      clearRowSelectionPreview,
+      resetRowSelectionAnchor,
+      setRowSelectionPreview,
+      toggleRowSelectionRange,
+    } = useDataGridRowSelection()
     const selectionPanelPosition = ref<DataGridSelectionPanelPosition>(effectiveSelectionPanelConfig.value?.position ?? defaultSelectionPanelConfig.position ?? 'bottom-right')
     const selectionPanelFloatingPosition = ref<DataGridFloatingPosition>(effectiveSelectionPanelConfig.value?.floatingPosition ?? defaultSelectionPanelConfig.floatingPosition ?? { x: 16, y: 16 })
     const mergedRowSelectionConfig = computed<DataGridRowSelectionConfig<AnyRow> | null>(() => {
@@ -269,32 +286,15 @@ export default defineComponent({
         buildDataGridRowSelectionColumn(rowSelectionConfig, {
           onToggleAll: (checked, context) => {
             context.table.toggleAllPageRowsSelected(checked)
-            lastSelectedRowId.value = null
-            previewSelectionRowIds.value = new Set()
-            rowSelectionPreviewMode.value = null
+            resetRowSelectionAnchor()
           },
           onToggleRow: (checked, context, event) => {
             const rows = context.table.getRowModel().rows
-            const currentIndex = rows.findIndex((row) => row.id === context.row.id)
-            const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
-
-            if (event.shiftKey && currentIndex >= 0 && anchorIndex >= 0) {
-              const [start, end] = currentIndex < anchorIndex ? [currentIndex, anchorIndex] : [anchorIndex, currentIndex]
-
-              for (let index = start; index <= end; index += 1) {
-                rows[index]?.toggleSelected(checked)
-              }
-            } else {
-              context.row.toggleSelected(checked)
-            }
-
-            lastSelectedRowId.value = context.row.id
-            previewSelectionRowIds.value = new Set()
-            rowSelectionPreviewMode.value = null
+            toggleRowSelectionRange(rows, context.row, checked, event)
           },
           onPreviewRowSelection: (context, event) => {
             if (event.shiftKey) {
-              setRowSelectionPreview(context.row.id, true)
+              setRowSelectionPreview(context.table.getRowModel().rows, context.row.id, true)
               return
             }
 
@@ -513,11 +513,6 @@ export default defineComponent({
       selectionPanelFloatingPosition.value = position
     }
 
-    function clearRowSelectionPreview() {
-      previewSelectionRowIds.value = new Set()
-      rowSelectionPreviewMode.value = null
-    }
-
     function clearCellSelectionPreview() {
       hoveredCellKey.value = null
       previewCellRangeKeys.value = new Set()
@@ -538,7 +533,7 @@ export default defineComponent({
 
       if (event.altKey && mergedRowSelectionConfig.value) {
         clearCellSelectionPreview()
-        setRowSelectionPreview(pointer.rowId, event.shiftKey)
+        setRowSelectionPreview(table.getRowModel().rows, pointer.rowId, event.shiftKey)
         return
       }
 
@@ -979,28 +974,6 @@ export default defineComponent({
       replaceSelectedCellKeys(nextKeys)
     }
 
-    function setRowSelectionPreview(rowId: string, useRange: boolean) {
-      const rows = table.getRowModel().rows
-      const currentIndex = rows.findIndex((row) => row.id === rowId)
-
-      if (currentIndex < 0) {
-        clearRowSelectionPreview()
-        return
-      }
-
-      const targetRow = rows[currentIndex]
-      const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
-
-      if (useRange && anchorIndex >= 0) {
-        const [start, end] = currentIndex < anchorIndex ? [currentIndex, anchorIndex] : [anchorIndex, currentIndex]
-        previewSelectionRowIds.value = new Set(rows.slice(start, end + 1).map((row) => row.id))
-      } else {
-        previewSelectionRowIds.value = new Set([rowId])
-      }
-
-      rowSelectionPreviewMode.value = targetRow?.getIsSelected() ? 'deselect' : 'select'
-    }
-
     function getColumnSelectionKeys(columnId: string) {
       if (!isCellSelectionColumnId(columnId)) {
         return []
@@ -1062,20 +1035,7 @@ export default defineComponent({
 
         const checked = !cell.row.getIsSelected()
         const rows = table.getRowModel().rows
-        const currentIndex = rows.findIndex((row) => row.id === cell.row.id)
-        const anchorIndex = rows.findIndex((row) => row.id === lastSelectedRowId.value)
-
-        if (event.shiftKey && currentIndex >= 0 && anchorIndex >= 0) {
-          const [start, end] = currentIndex < anchorIndex ? [currentIndex, anchorIndex] : [anchorIndex, currentIndex]
-
-          for (let index = start; index <= end; index += 1) {
-            rows[index]?.toggleSelected(checked)
-          }
-        } else {
-          cell.row.toggleSelected(checked)
-        }
-
-        lastSelectedRowId.value = cell.row.id
+        toggleRowSelectionRange(rows, cell.row, checked, event)
         clearRowSelectionPreview()
         return true
       }
@@ -1311,6 +1271,7 @@ export default defineComponent({
       return Array.from(requested).sort()
     })
     const requestedServerColumnsKey = computed(() => requestedServerColumns.value.join('|'))
+    const effectiveRequestedServerColumnsKey = computed(() => (effectiveRefetchOnVisibleColumnsChange.value ? requestedServerColumnsKey.value : ''))
 
     const { refreshData } = useDataGridDataLoading({
       requestState,
@@ -1321,8 +1282,9 @@ export default defineComponent({
       sorting,
       columnFilters,
       globalFilter,
-      requestedServerColumnsKey,
+      requestedServerColumnsKey: effectiveRequestedServerColumnsKey,
       localeText,
+      keepRowsOnError: () => effectiveKeepRowsOnError.value,
       fetchPage: () => props.fetchPage,
       fetchDebounceMs: () => effectiveFetchDebounceMs.value,
       onLoaded: () => rowVirtualizer.value.scrollToOffset(0),

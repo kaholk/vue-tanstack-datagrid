@@ -123,10 +123,10 @@ export type DataGridInstance<TData extends RowData = RowData> = {
     mode: DataGridExcelExportMode,
     overrides?: Partial<DataGridExcelExportConfig<TData>>,
   ) => Promise<void>
-  patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => void
-  patchRows: (patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) => void
-  updateRow: (rowId: DataGridRowId, updater: (row: TData) => TData) => void
-  replaceRow: (rowId: DataGridRowId, row: TData) => void
+  patchRow: (rowId: DataGridRowId, patch: Partial<TData>) => TData | null
+  patchRows: (patches: Array<{ rowId: DataGridRowId; patch: Partial<TData> }>) => TData[]
+  updateRow: (rowId: DataGridRowId, updater: (row: TData) => TData) => TData | null
+  replaceRow: (rowId: DataGridRowId, row: TData) => TData | null
   getRow: (rowId: DataGridRowId) => TData | null
   getVisibleRows: () => TData[]
 }

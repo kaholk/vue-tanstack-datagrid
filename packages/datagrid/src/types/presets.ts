@@ -32,4 +32,6 @@ export type DataGridPreset<TData extends RowData = RowData> = {
   overscanColumns?: number
   fetchDebounceMs?: number
   resetPageOnFilterChange?: boolean
+  refetchOnVisibleColumnsChange?: boolean
+  keepRowsOnError?: boolean
 }
