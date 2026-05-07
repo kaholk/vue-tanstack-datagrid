@@ -7,6 +7,9 @@ type RenderedRowSequenceItem =
   | { type: 'spacer'; key: string; width: number }
   | { type: 'item'; key: string; item: Column<AnyRow, unknown>; column: Column<AnyRow, unknown> }
 
+const baseCellClassName = 'data-grid__cell'
+const pinnedCellClassName = 'data-grid__cell--pinned'
+
 export default defineComponent({
   name: 'DataGridBodyRow',
   props: {
@@ -138,7 +141,7 @@ export default defineComponent({
                 ? columnDef.cellClass({ cell, row })
                 : columnDef.cellClass
             const baseCellClass = [
-              'data-grid__cell',
+              baseCellClassName,
               pinnedSide ? 'data-grid__cell--pinned' : undefined,
               pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
               customCellClass,
@@ -183,8 +186,8 @@ export default defineComponent({
               <div
                 key={cell.id}
                 class={[
-                  'data-grid__cell',
-                  pinnedSide ? 'data-grid__cell--pinned' : undefined,
+                  baseCellClassName,
+                  pinnedSide ? pinnedCellClassName : undefined,
                   pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
                   isCellSelected ? 'data-grid__cell--selected-cell' : undefined,
                   isCellSelected && isCellSelectionHovered

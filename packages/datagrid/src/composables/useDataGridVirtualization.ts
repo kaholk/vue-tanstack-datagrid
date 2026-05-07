@@ -168,9 +168,27 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
     return style
   }
 
-  const cellStylesByColumnId = computed(() => {
+  function createNormalCellStyle(column: Column<AnyRow, unknown>) {
+    const width = column.getSize()
+    const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
+    return getCachedCellStyle(column, `normal:${width}:${justifyContent}`, {
+      width: `${width}px`,
+      justifyContent,
+    })
+  }
+
+  const normalCellStylesByColumnId = computed(() => {
     const styles = new Map<string, CSSProperties>()
-    const visibleColumnIds = new Set<string>()
+
+    for (const column of nonPinnedColumns.value) {
+      styles.set(column.id, createNormalCellStyle(column))
+    }
+
+    return styles
+  })
+
+  const pinnedCellStylesByColumnId = computed(() => {
+    const styles = new Map<string, CSSProperties>()
     let leftOffset = 0
     const leftPinnedIds = options.columnPinning.value.left ?? []
     const rightPinnedIds = options.columnPinning.value.right ?? []
@@ -187,7 +205,6 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
 
       const width = column.getSize()
       const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
-      visibleColumnIds.add(column.id)
       styles.set(column.id, getCachedCellStyle(column, `left:${width}:${leftOffset}:${60 - index}:${justifyContent}`, {
         width: `${width}px`,
         left: `${leftOffset}px`,
@@ -210,7 +227,6 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
 
       const width = column.getSize()
       const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
-      visibleColumnIds.add(column.id)
       styles.set(column.id, getCachedCellStyle(column, `right:${width}:${rightOffset}:${60 - index}:${justifyContent}`, {
         width: `${width}px`,
         right: `${rightOffset}px`,
@@ -220,22 +236,22 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
       rightOffset += width
     }
 
-    for (const column of options.visibleColumns.value) {
-      visibleColumnIds.add(column.id)
-      if (styles.has(column.id)) {
-        continue
-      }
+    return styles
+  })
 
-      const width = column.getSize()
-      const justifyContent = toJustifyContent((column.columnDef as DataGridColumn<AnyRow>).align)
-      styles.set(column.id, getCachedCellStyle(column, `normal:${width}:${justifyContent}`, {
-        width: `${width}px`,
-        justifyContent,
-      }))
+  const cellStylesByColumnId = computed(() => {
+    const styles = new Map<string, CSSProperties>()
+    const normalStyles = normalCellStylesByColumnId.value
+    const pinnedStyles = pinnedCellStylesByColumnId.value
+
+    for (const [columnId, style] of normalStyles) {
+      styles.set(columnId, style)
     }
-
+    for (const [columnId, style] of pinnedStyles) {
+      styles.set(columnId, style)
+    }
     for (const columnId of cellStyleCacheByColumnId.keys()) {
-      if (!visibleColumnIds.has(columnId)) {
+      if (!styles.has(columnId)) {
         cellStyleCacheByColumnId.delete(columnId)
       }
     }

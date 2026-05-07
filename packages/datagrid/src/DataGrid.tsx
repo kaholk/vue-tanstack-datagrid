@@ -522,19 +522,18 @@ export default defineComponent({
       }
     }
 
-    const columnMeasureKey = computed(() =>
+    watch(
       [
-        columnOrder.value.join('|'),
-        Object.entries(columnSizing.value).sort(([a], [b]) => a.localeCompare(b)).map(([id, size]) => `${id}:${size}`).join('|'),
-        Object.entries(columnVisibility.value).sort(([a], [b]) => a.localeCompare(b)).map(([id, visible]) => `${id}:${visible ? 1 : 0}`).join('|'),
-        (columnPinning.value.left ?? []).join('|'),
-        (columnPinning.value.right ?? []).join('|'),
-      ].join('::'),
+        columnOrder,
+        columnSizing,
+        columnVisibility,
+        () => columnPinning.value.left,
+        () => columnPinning.value.right,
+      ],
+      () => {
+        scheduleColumnMeasure()
+      },
     )
-
-    watch(columnMeasureKey, () => {
-      scheduleColumnMeasure()
-    })
 
     onBeforeUnmount(() => {
       document.removeEventListener('click', handleDocumentClick)

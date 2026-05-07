@@ -28,6 +28,16 @@ function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAncho
   }
 }
 
+function areAllKeysSelected(keys: Iterable<string>, selectedKeys: Set<string>) {
+  for (const key of keys) {
+    if (!selectedKeys.has(key)) {
+      return false
+    }
+  }
+
+  return true
+}
+
 export function useDataGridCellSelection(options: UseDataGridCellSelectionOptions) {
   const selectedCellKeys = shallowRef<Set<string>>(new Set())
   const currentPointerCell = ref<CellSelectionAnchor | null>(null)
@@ -215,7 +225,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     }
 
     previewCellRangeKeys.value = rangeKeys
-    cellSelectionPreviewMode.value = Array.from(rangeKeys).every((key) => selectedCellKeys.value.has(key))
+    cellSelectionPreviewMode.value = areAllKeysSelected(rangeKeys, selectedCellKeys.value)
       ? 'deselect'
       : 'select'
   }
@@ -231,7 +241,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
 
     const nextKeys = new Set(selectedCellKeys.value)
     const rangeKeys = getCellRangeKeys(getCellSelectionAnchor(targetCell))
-    const shouldDeselectRange = Array.from(rangeKeys).every((key) => nextKeys.has(key))
+    const shouldDeselectRange = areAllKeysSelected(rangeKeys, nextKeys)
 
     for (const key of rangeKeys) {
       if (shouldDeselectRange) {
@@ -246,22 +256,26 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
 
   function getColumnSelectionKeys(columnId: string) {
     if (!isCellSelectionColumnId(columnId)) {
-      return []
+      return new Set<string>()
     }
 
-    return options.visibleRows.value.map((row) => getCellSelectionKey(row.id, columnId))
+    const keys = new Set<string>()
+    for (const row of options.visibleRows.value) {
+      keys.add(getCellSelectionKey(row.id, columnId))
+    }
+    return keys
   }
 
   function setColumnSelectionPreview(columnId: string) {
     const columnKeys = getColumnSelectionKeys(columnId)
 
-    if (columnKeys.length === 0) {
+    if (columnKeys.size === 0) {
       clearCellSelectionPreview()
       return
     }
 
-    previewCellRangeKeys.value = new Set(columnKeys)
-    cellSelectionPreviewMode.value = columnKeys.every((key) => selectedCellKeys.value.has(key))
+    previewCellRangeKeys.value = columnKeys
+    cellSelectionPreviewMode.value = areAllKeysSelected(columnKeys, selectedCellKeys.value)
       ? 'deselect'
       : 'select'
   }
@@ -434,14 +448,14 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
       return
     }
 
-    const columnKeys = options.visibleRows.value.map((row) => getCellSelectionKey(row.id, column.id))
+    const columnKeys = getColumnSelectionKeys(column.id)
 
-    if (columnKeys.length === 0) {
+    if (columnKeys.size === 0) {
       return
     }
 
     const nextKeys = new Set(selectedCellKeys.value)
-    const isFullySelected = columnKeys.every((key) => nextKeys.has(key))
+    const isFullySelected = areAllKeysSelected(columnKeys, nextKeys)
 
     for (const key of columnKeys) {
       if (isFullySelected) {
