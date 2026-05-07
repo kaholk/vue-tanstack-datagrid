@@ -41,6 +41,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   const openDialogFilterColumnId = ref<string | null>(null)
   const filterSearchByColumnId = ref<Record<string, string>>({})
   const textFallbackFilterIds = ref<Set<string>>(new Set())
+  const columnFilterConfigCache = new Map<string, { key: string; filterOptions: DataGridColumn<AnyRow>['filterOptions']; config: DataGridFilterConfig }>()
 
   function closeFilterMenus() {
     openHeaderFilterColumnId.value = null
@@ -218,8 +219,22 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
 
   function getColumnFilterConfig(column: Column<AnyRow, unknown>): DataGridFilterConfig {
     const columnDef = column.columnDef as DataGridColumn<AnyRow>
+    const key = [
+      options.renderColumnPickerLabel(column),
+      columnDef.filterGroup ?? 'Kolumny',
+      columnDef.filterVariant ?? '',
+      columnDef.filterTextFallback ? '1' : '0',
+      columnDef.filterValueSeparator ?? '',
+      columnDef.filterIncludeEmptyOption ? '1' : '0',
+      columnDef.filterEmptyOptionLabel ?? '',
+      columnDef.filterPlaceholder ?? 'Filtr',
+    ].join('::')
+    const cached = columnFilterConfigCache.get(column.id)
+    if (cached?.key === key && cached.filterOptions === columnDef.filterOptions) {
+      return cached.config
+    }
 
-    return {
+    const config = {
       id: column.id,
       label: options.renderColumnPickerLabel(column),
       group: columnDef.filterGroup ?? 'Kolumny',
@@ -233,6 +248,8 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       emptyOptionLabel: columnDef.filterEmptyOptionLabel,
       placeholder: columnDef.filterPlaceholder ?? 'Filtr',
     }
+    columnFilterConfigCache.set(column.id, { key, filterOptions: columnDef.filterOptions, config })
+    return config
   }
 
   function getVisibleFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
@@ -341,34 +358,37 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   ): VNodeChild {
     const isToolbar = renderOptions?.toolbar ?? false
     const target = renderOptions?.target ?? 'live'
-    const selectedValues =
-      config.variant === 'radio'
-        ? (() => {
-            const singleValue = getSingleSelectFilterValue(config.id, target)
-            return singleValue === undefined ? [] : [singleValue]
-          })()
-        : getSelectFilterValues(config, target)
-    const selectedValueKeys = new Set(selectedValues.map((value) => toFilterOptionKey(value)))
     const isOpen =
       target === 'dialog'
         ? openDialogFilterColumnId.value === config.id
         : isToolbar
           ? openToolbarFilterColumnId.value === config.id
           : openHeaderFilterColumnId.value === config.id
+    const isSelectFilter = config.variant === 'select' || config.variant === 'radio'
+    const selectedValues =
+      isSelectFilter
+        ? config.variant === 'radio'
+          ? (() => {
+              const singleValue = getSingleSelectFilterValue(config.id, target)
+              return singleValue === undefined ? [] : [singleValue]
+            })()
+          : getSelectFilterValues(config, target)
+        : []
+    const selectedValueKeys = isSelectFilter ? new Set(selectedValues.map((value) => toFilterOptionKey(value))) : undefined
 
     return h(DataGridFilterControl, {
       config,
       isToolbar,
       isOpen,
       inputValue:
-        config.variant === 'select' || config.variant === 'radio'
+        isSelectFilter
           ? getFilterTextValue(config, target)
           : getFilterValue(config.id, target),
       buttonLabel: getFilterButtonLabel(config, target),
       selectedCount: selectedValues.length,
       selectedValueKeys,
-      allOptions: getFilterOptions(config),
-      visibleOptions: getVisibleFilterOptions(config, target),
+      allOptions: isSelectFilter && isOpen ? getFilterOptions(config) : [],
+      visibleOptions: isSelectFilter && isOpen ? getVisibleFilterOptions(config, target) : [],
       searchValue: getSelectFilterSearch(config.id, target),
       textMode: isTextFallbackFilter(config, target),
       onToggleMenu: (event: MouseEvent) => {

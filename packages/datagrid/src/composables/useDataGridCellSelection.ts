@@ -21,6 +21,13 @@ type UseDataGridCellSelectionOptions = {
   ) => void
 }
 
+type CellSelectionPreviewRange = {
+  rowStart: number
+  rowEnd: number
+  columnStart: number
+  columnEnd: number
+}
+
 function getCellSelectionAnchor(cell: Cell<AnyRow, unknown>): CellSelectionAnchor {
   return {
     rowId: cell.row.id,
@@ -43,6 +50,8 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   const currentPointerCell = ref<CellSelectionAnchor | null>(null)
   const hoveredCellKey = ref<string | null>(null)
   const previewCellRangeKeys = shallowRef<Set<string>>(new Set())
+  const previewCellRange = ref<CellSelectionPreviewRange | null>(null)
+  const previewColumnId = ref<string | null>(null)
   const cellSelectionPreviewMode = ref<SelectionPreviewMode>(null)
   const lastSelectedCell = ref<CellSelectionAnchor | null>(null)
   const isCellSelectionCtrlDown = ref(false)
@@ -158,6 +167,29 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   }
 
   function getCellSelectionPreviewMode(cell: Cell<AnyRow, unknown>): SelectionPreviewMode {
+    if (!currentPointerCell.value) {
+      return null
+    }
+
+    if (previewColumnId.value) {
+      return cell.column.id === previewColumnId.value
+        ? cellSelectionPreviewMode.value
+        : null
+    }
+
+    const range = previewCellRange.value
+    if (range) {
+      const rowIndex = visibleRowIndexById.value.get(cell.row.id) ?? -1
+      const columnIndex = cellSelectionColumnIndexById.value.get(cell.column.id) ?? -1
+
+      return rowIndex >= range.rowStart &&
+        rowIndex <= range.rowEnd &&
+        columnIndex >= range.columnStart &&
+        columnIndex <= range.columnEnd
+        ? cellSelectionPreviewMode.value
+        : null
+    }
+
     return previewCellRangeKeys.value.has(getCellSelectionKey(cell.row.id, cell.column.id))
       ? cellSelectionPreviewMode.value
       : null
@@ -170,6 +202,8 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   function clearCellSelectionPreview() {
     hoveredCellKey.value = null
     previewCellRangeKeys.value = new Set()
+    previewCellRange.value = null
+    previewColumnId.value = null
     cellSelectionPreviewMode.value = null
   }
 
@@ -216,16 +250,78 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     return keys
   }
 
-  function setCellRangeSelectionPreview(target: CellSelectionAnchor) {
-    const rangeKeys = getCellRangeKeys(target)
+  function getCellRangePreview(target: CellSelectionAnchor): CellSelectionPreviewRange | null {
+    const anchor = lastSelectedCell.value
+    if (!anchor) {
+      return null
+    }
 
-    if (rangeKeys.size === 0) {
+    const anchorRowIndex = visibleRowIndexById.value.get(anchor.rowId) ?? -1
+    const targetRowIndex = visibleRowIndexById.value.get(target.rowId) ?? -1
+    const anchorColumnIndex = cellSelectionColumnIndexById.value.get(anchor.columnId) ?? -1
+    const targetColumnIndex = cellSelectionColumnIndexById.value.get(target.columnId) ?? -1
+
+    if (anchorRowIndex < 0 || targetRowIndex < 0 || anchorColumnIndex < 0 || targetColumnIndex < 0) {
+      return null
+    }
+
+    return {
+      rowStart: Math.min(anchorRowIndex, targetRowIndex),
+      rowEnd: Math.max(anchorRowIndex, targetRowIndex),
+      columnStart: Math.min(anchorColumnIndex, targetColumnIndex),
+      columnEnd: Math.max(anchorColumnIndex, targetColumnIndex),
+    }
+  }
+
+  function isCellRangePreviewFullySelected(range: CellSelectionPreviewRange) {
+    const rows = options.visibleRows.value
+    const columns = options.cellSelectionColumns.value
+    const selectedKeys = selectedCellKeys.value
+
+    for (let rowIndex = range.rowStart; rowIndex <= range.rowEnd; rowIndex += 1) {
+      const row = rows[rowIndex]
+      if (!row) {
+        return false
+      }
+
+      for (let columnIndex = range.columnStart; columnIndex <= range.columnEnd; columnIndex += 1) {
+        const column = columns[columnIndex]
+        if (!column || !selectedKeys.has(getCellSelectionKey(row.id, column.id))) {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
+  function isColumnSelectionFullySelected(columnId: string) {
+    if (!isCellSelectionColumnId(columnId)) {
+      return false
+    }
+
+    const selectedKeys = selectedCellKeys.value
+    for (const row of options.visibleRows.value) {
+      if (!selectedKeys.has(getCellSelectionKey(row.id, columnId))) {
+        return false
+      }
+    }
+
+    return options.visibleRows.value.length > 0
+  }
+
+  function setCellRangeSelectionPreview(target: CellSelectionAnchor) {
+    const range = getCellRangePreview(target)
+
+    if (!range) {
       clearCellSelectionPreview()
       return
     }
 
-    previewCellRangeKeys.value = rangeKeys
-    cellSelectionPreviewMode.value = areAllKeysSelected(rangeKeys, selectedCellKeys.value)
+    previewCellRangeKeys.value = new Set()
+    previewColumnId.value = null
+    previewCellRange.value = range
+    cellSelectionPreviewMode.value = isCellRangePreviewFullySelected(range)
       ? 'deselect'
       : 'select'
   }
@@ -267,15 +363,15 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   }
 
   function setColumnSelectionPreview(columnId: string) {
-    const columnKeys = getColumnSelectionKeys(columnId)
-
-    if (columnKeys.size === 0) {
+    if (!isCellSelectionColumnId(columnId) || options.visibleRows.value.length === 0) {
       clearCellSelectionPreview()
       return
     }
 
-    previewCellRangeKeys.value = columnKeys
-    cellSelectionPreviewMode.value = areAllKeysSelected(columnKeys, selectedCellKeys.value)
+    previewCellRangeKeys.value = new Set()
+    previewCellRange.value = null
+    previewColumnId.value = columnId
+    cellSelectionPreviewMode.value = isColumnSelectionFullySelected(columnId)
       ? 'deselect'
       : 'select'
   }
@@ -306,6 +402,8 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
         setCellRangeSelectionPreview(pointer)
       } else {
         previewCellRangeKeys.value = new Set()
+        previewCellRange.value = null
+        previewColumnId.value = null
         cellSelectionPreviewMode.value = null
       }
       return

@@ -1,14 +1,11 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 import { type Cell, type Column, type Row } from '@tanstack/vue-table'
-import type { DataGridColumn } from '../types'
+import DataGridBodyCell from './DataGridBodyCell'
 import type { AnyRow, SelectionPreviewMode } from '../types/internal'
 
 type RenderedRowSequenceItem =
   | { type: 'spacer'; key: string; width: number }
   | { type: 'item'; key: string; item: Column<AnyRow, unknown>; column: Column<AnyRow, unknown> }
-
-const baseCellClassName = 'data-grid__cell'
-const pinnedCellClassName = 'data-grid__cell--pinned'
 
 export default defineComponent({
   name: 'DataGridBodyRow',
@@ -83,21 +80,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const preventNativeCellSelection = (event: MouseEvent | PointerEvent) => {
-      if (!event.ctrlKey && !event.shiftKey && !event.altKey) {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-      window.getSelection()?.removeAllRanges()
-    }
-    const nativeCellSelectionHandlers = {
-      onPointerdownCapture: preventNativeCellSelection,
-      onMousedownCapture: preventNativeCellSelection,
-    } as Record<string, unknown>
-    const capturedCellSelectionClickEvents = new WeakSet<MouseEvent>()
-
     return () => {
       const row = props.row
       const isSelected = row.getIsSelected()
@@ -135,105 +117,23 @@ export default defineComponent({
             }
 
             const pinnedSide = props.getPinnedSide(entry.column.id)
-            const columnDef = entry.column.columnDef as DataGridColumn<AnyRow>
-            const customCellClass =
-              typeof columnDef.cellClass === 'function'
-                ? columnDef.cellClass({ cell, row })
-                : columnDef.cellClass
-            const baseCellClass = [
-              baseCellClassName,
-              pinnedSide ? 'data-grid__cell--pinned' : undefined,
-              pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
-              customCellClass,
-            ]
-            if (!props.enableCellSelection) {
-              return (
-                <div
-                  key={cell.id}
-                  class={baseCellClass}
-                  data-grid-column-id={entry.column.id}
-                  style={props.cellStylesByColumnId.get(entry.column.id)}
-                  onClick={columnDef.onCellClick
-                    ? (event) => {
-                        columnDef.onCellClick?.({ cell, row, event })
-                      }
-                    : undefined}
-                >
-                  {props.renderCell(cell)}
-                </div>
-              )
-            }
-
-            const isCellSelected = props.isCellSelected?.(cell) ?? false
-            const isCellSelectionHovered = props.isCellSelectionHovered?.(cell) ?? false
-            const cellSelectionPreviewMode = props.getCellSelectionPreviewMode?.(cell) ?? null
-            const isCellSelectionAddPreviewed =
-              !isCellSelected &&
-              (cellSelectionPreviewMode === 'select' || cellSelectionPreviewMode === 'toggle')
-            const isCellSelectionRevertPreviewed =
-              isCellSelected &&
-              (cellSelectionPreviewMode === 'deselect' || cellSelectionPreviewMode === 'toggle')
-            const cellSelectionClickCaptureHandler = {
-              onClickCapture: (event: MouseEvent) => {
-                capturedCellSelectionClickEvents.add(event)
-                if (props.onCellSelectionClick?.(cell, event)) {
-                  event.preventDefault()
-                  event.stopPropagation()
-                }
-              },
-            } as Record<string, unknown>
             return (
-              <div
+              <DataGridBodyCell
                 key={cell.id}
-                class={[
-                  baseCellClassName,
-                  pinnedSide ? pinnedCellClassName : undefined,
-                  pinnedSide ? `data-grid__cell--${pinnedSide}` : undefined,
-                  isCellSelected ? 'data-grid__cell--selected-cell' : undefined,
-                  isCellSelected && isCellSelectionHovered
-                    ? 'data-grid__cell--selection-revert-hover'
-                    : undefined,
-                  isCellSelectionRevertPreviewed
-                    ? 'data-grid__cell--selection-revert-preview'
-                    : undefined,
-                  isCellSelectionAddPreviewed
-                    ? 'data-grid__cell--selection-range-preview'
-                    : undefined,
-                  !isCellSelected && isCellSelectionHovered
-                    ? 'data-grid__cell--selection-hover'
-                    : undefined,
-                  customCellClass,
-                ]}
-                data-grid-column-id={entry.column.id}
-                style={props.cellStylesByColumnId.get(entry.column.id)}
-                onPointerenter={(event) => {
-                  props.onCellSelectionPointerEnter?.(cell, event)
-                }}
-                onPointerleave={(event) => {
-                  props.onCellSelectionPointerLeave?.(cell, event)
-                }}
-                {...nativeCellSelectionHandlers}
-                {...cellSelectionClickCaptureHandler}
-                onClick={(event) => {
-                  if (capturedCellSelectionClickEvents.has(event)) {
-                    capturedCellSelectionClickEvents.delete(event)
-                    if (event.defaultPrevented) {
-                      return
-                    }
-
-                    columnDef.onCellClick?.({ cell, row, event })
-                    return
-                  }
-
-                  if (props.onCellSelectionClick?.(cell, event)) {
-                    return
-                  }
-
-                  columnDef.onCellClick?.({ cell, row, event })
-                }}
-              >
-                {props.renderCell(cell)}
-              </div>
+                cell={cell}
+                row={row}
+                column={entry.column}
+                pinnedSide={pinnedSide}
+                cellStyle={props.cellStylesByColumnId.get(entry.column.id)}
+                renderCell={props.renderCell}
+                enableCellSelection={props.enableCellSelection}
+                isCellSelected={props.isCellSelected}
+                isCellSelectionHovered={props.isCellSelectionHovered}
+                getCellSelectionPreviewMode={props.getCellSelectionPreviewMode}
+                onCellSelectionPointerEnter={props.onCellSelectionPointerEnter}
+                onCellSelectionPointerLeave={props.onCellSelectionPointerLeave}
+                onCellSelectionClick={props.onCellSelectionClick}
+              />
             )
           })}
         </div>

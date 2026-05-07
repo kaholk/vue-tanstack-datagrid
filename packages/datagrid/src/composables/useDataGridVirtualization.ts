@@ -14,6 +14,11 @@ type CellStyleCacheEntry = {
   style: CSSProperties
 }
 
+type CachedValue<TValue> = {
+  key: string
+  value: TValue
+}
+
 type UseDataGridVirtualizationOptions = {
   scrollElementRef: Ref<HTMLDivElement | null>
   visibleRows: Ref<Row<AnyRow>[]>
@@ -94,10 +99,23 @@ function getVisiblePinnedColumns(
   return columns
 }
 
+function getVirtualColumnsKey(virtualColumns: VirtualItem[]) {
+  return virtualColumns.map((item) => `${item.index}:${item.start}:${item.end}`).join('|')
+}
+
+function getColumnsKey(columns: Column<AnyRow, unknown>[]) {
+  return columns.map((column) => `${column.id}:${column.getSize()}:${(column.columnDef as DataGridColumn<AnyRow>).align ?? 'start'}`).join('|')
+}
+
 export function useDataGridVirtualization(options: UseDataGridVirtualizationOptions) {
   const leftPinnedColumnIds = computed(() => new Set(options.columnPinning.value.left ?? []))
   const rightPinnedColumnIds = computed(() => new Set(options.columnPinning.value.right ?? []))
   const cellStyleCacheByColumnId = new Map<string, CellStyleCacheEntry>()
+  let cachedHeaderSequence: CachedValue<Array<RenderedSequenceItem<Header<AnyRow, unknown>>>> | null = null
+  let cachedRowSequence: CachedValue<Array<RenderedSequenceItem<Column<AnyRow, unknown>>>> | null = null
+  let cachedNormalCellStyles: CachedValue<Map<string, CSSProperties>> | null = null
+  let cachedPinnedCellStyles: CachedValue<Map<string, CSSProperties>> | null = null
+  let cachedCellStyles: CachedValue<Map<string, CSSProperties>> | null = null
 
   function getPinnedSide(columnId: string): 'left' | 'right' | false {
     if (leftPinnedColumnIds.value.has(columnId)) {
@@ -142,22 +160,54 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
   const leftPinnedHeaders = computed(() => leftPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
   const rightPinnedHeaders = computed(() => rightPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
   const nonPinnedHeaders = computed(() => nonPinnedColumns.value.map((column) => visibleHeaderByColumnId.value.get(column.id)).filter((header): header is Header<AnyRow, unknown> => Boolean(header)))
-  const headerSequence = computed(() => buildRenderedColumnSequence({
-    leftPinnedItems: leftPinnedHeaders.value,
-    rightPinnedItems: rightPinnedHeaders.value,
-    nonPinnedItems: nonPinnedHeaders.value,
-    virtualNonPinnedColumns: virtualNonPinnedColumns.value,
-    nonPinnedTotalWidth: nonPinnedTotalWidth.value,
-    getColumn: (header) => header.column,
-  }))
-  const rowSequence = computed(() => buildRenderedColumnSequence({
-    leftPinnedItems: leftPinnedColumns.value,
-    rightPinnedItems: rightPinnedColumns.value,
-    nonPinnedItems: nonPinnedColumns.value,
-    virtualNonPinnedColumns: virtualNonPinnedColumns.value,
-    nonPinnedTotalWidth: nonPinnedTotalWidth.value,
-    getColumn: (column) => column,
-  }))
+  const headerSequence = computed(() => {
+    const key = [
+      getColumnsKey(leftPinnedColumns.value),
+      getColumnsKey(nonPinnedColumns.value),
+      getColumnsKey(rightPinnedColumns.value),
+      getVirtualColumnsKey(virtualNonPinnedColumns.value),
+      nonPinnedTotalWidth.value,
+    ].join('::')
+
+    if (cachedHeaderSequence?.key === key) {
+      return cachedHeaderSequence.value
+    }
+
+    const value = buildRenderedColumnSequence({
+      leftPinnedItems: leftPinnedHeaders.value,
+      rightPinnedItems: rightPinnedHeaders.value,
+      nonPinnedItems: nonPinnedHeaders.value,
+      virtualNonPinnedColumns: virtualNonPinnedColumns.value,
+      nonPinnedTotalWidth: nonPinnedTotalWidth.value,
+      getColumn: (header) => header.column,
+    })
+    cachedHeaderSequence = { key, value }
+    return value
+  })
+  const rowSequence = computed(() => {
+    const key = [
+      getColumnsKey(leftPinnedColumns.value),
+      getColumnsKey(nonPinnedColumns.value),
+      getColumnsKey(rightPinnedColumns.value),
+      getVirtualColumnsKey(virtualNonPinnedColumns.value),
+      nonPinnedTotalWidth.value,
+    ].join('::')
+
+    if (cachedRowSequence?.key === key) {
+      return cachedRowSequence.value
+    }
+
+    const value = buildRenderedColumnSequence({
+      leftPinnedItems: leftPinnedColumns.value,
+      rightPinnedItems: rightPinnedColumns.value,
+      nonPinnedItems: nonPinnedColumns.value,
+      virtualNonPinnedColumns: virtualNonPinnedColumns.value,
+      nonPinnedTotalWidth: nonPinnedTotalWidth.value,
+      getColumn: (column) => column,
+    })
+    cachedRowSequence = { key, value }
+    return value
+  })
   function getCachedCellStyle(column: Column<AnyRow, unknown>, key: string, style: CSSProperties) {
     const cached = cellStyleCacheByColumnId.get(column.id)
     if (cached?.key === key) {
@@ -178,16 +228,33 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
   }
 
   const normalCellStylesByColumnId = computed(() => {
+    const key = getColumnsKey(nonPinnedColumns.value)
+    if (cachedNormalCellStyles?.key === key) {
+      return cachedNormalCellStyles.value
+    }
+
     const styles = new Map<string, CSSProperties>()
 
     for (const column of nonPinnedColumns.value) {
       styles.set(column.id, createNormalCellStyle(column))
     }
 
+    cachedNormalCellStyles = { key, value: styles }
     return styles
   })
 
   const pinnedCellStylesByColumnId = computed(() => {
+    const key = [
+      (options.columnPinning.value.left ?? []).join('|'),
+      (options.columnPinning.value.right ?? []).join('|'),
+      getColumnsKey(leftPinnedColumns.value),
+      getColumnsKey(rightPinnedColumns.value),
+    ].join('::')
+
+    if (cachedPinnedCellStyles?.key === key) {
+      return cachedPinnedCellStyles.value
+    }
+
     const styles = new Map<string, CSSProperties>()
     let leftOffset = 0
     const leftPinnedIds = options.columnPinning.value.left ?? []
@@ -236,10 +303,16 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
       rightOffset += width
     }
 
+    cachedPinnedCellStyles = { key, value: styles }
     return styles
   })
 
   const cellStylesByColumnId = computed(() => {
+    const key = `${normalCellStylesByColumnId.value.size}:${pinnedCellStylesByColumnId.value.size}:${getColumnsKey(options.visibleColumns.value)}:${(options.columnPinning.value.left ?? []).join('|')}:${(options.columnPinning.value.right ?? []).join('|')}`
+    if (cachedCellStyles?.key === key) {
+      return cachedCellStyles.value
+    }
+
     const styles = new Map<string, CSSProperties>()
     const normalStyles = normalCellStylesByColumnId.value
     const pinnedStyles = pinnedCellStylesByColumnId.value
@@ -256,6 +329,7 @@ export function useDataGridVirtualization(options: UseDataGridVirtualizationOpti
       }
     }
 
+    cachedCellStyles = { key, value: styles }
     return styles
   })
 

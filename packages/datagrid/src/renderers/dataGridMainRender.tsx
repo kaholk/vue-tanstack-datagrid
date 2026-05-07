@@ -69,6 +69,13 @@ export type DataGridMainRenderContext = {
   isExcelExporting: Ref<boolean>
   localeText: RefLike<Required<DataGridLocaleText>>
   handleExportExcel: (mode: DataGridExcelExportMode) => void | Promise<void>
+  handleOverwriteActiveView: () => void
+  handleDeleteActiveView: () => void
+  handlePreviousPage: () => void
+  handleNextPage: () => void
+  handleSetPageIndex: (nextPageIndex: number) => void
+  handlePageSizeChange: (pageSize: number) => void
+  handleCopyAllSelection: (options: { includeHeaders: boolean }) => void
   slots: Slots
   effectiveHeight: RefLike<number | string>
   scrollElementRef: Ref<HTMLDivElement | null>
@@ -238,12 +245,8 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             onToggleViewsMenu={context.toggleViewsMenu}
             onSelectSavedView={context.selectSavedView}
             onOpenSaveViewDialog={context.openSaveViewDialog}
-            onOverwriteActiveView={() => {
-              void context.overwriteActiveView()
-            }}
-            onDeleteActiveView={() => {
-              void context.deleteActiveView()
-            }}
+            onOverwriteActiveView={context.handleOverwriteActiveView}
+            onDeleteActiveView={context.handleDeleteActiveView}
             onToggleFilterDialog={context.toggleFilterDialog}
             onToggleFilterHelpDialog={context.toggleFilterHelpDialog}
             onRefresh={context.refreshData}
@@ -252,9 +255,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             excelExportActions={context.excelExportActions.value}
             isExcelExporting={context.isExcelExporting.value}
             exportExcelLabel={context.localeText.value.exportExcelLabel}
-            onExportExcel={(mode) => {
-              void context.handleExportExcel(mode)
-            }}
+            onExportExcel={context.handleExportExcel}
             customActions={context.slots['toolbar-actions']?.()}
           />
         </div>
@@ -291,7 +292,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
                         class={['data-grid__cell', 'data-grid__cell--header', pinnedSide ? 'data-grid__cell--pinned' : '', pinnedSide ? `data-grid__cell--${pinnedSide}` : '']}
                         style={context.cellStylesByColumnId.value.get(entry.column.id)}
                       >
-                        <DataGridHeaderCell header={entry.item.getContext()} column={entry.column} pickerLabel={context.columnPickerLabelById.value.get(entry.column.id) ?? entry.column.id} justifyContent={(context.cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ?? 'flex-start'} menuStyle={context.columnMenuStyleById.value.get(entry.column.id) ?? { left: '0', right: 'auto' }} isMenuOpen={context.openMenuColumnId.value === entry.column.id} pinnedSide={pinnedSide} renderFilterControl={(config) => context.renderFilterControl(config)} getColumnFilterConfig={context.getColumnFilterConfig} onToggleMenu={context.toggleColumnMenu} onToggleSorting={context.toggleSorting} onSetSortDesc={context.setSortDesc} onClearSorting={context.clearSorting} onSetPin={context.setPin} onCloseMenu={context.closeColumnMenu} />
+                        <DataGridHeaderCell header={entry.item.getContext()} column={entry.column} pickerLabel={context.columnPickerLabelById.value.get(entry.column.id) ?? entry.column.id} justifyContent={(context.cellStylesByColumnId.value.get(entry.column.id)?.justifyContent as string) ?? 'flex-start'} menuStyle={context.columnMenuStyleById.value.get(entry.column.id) ?? { left: '0', right: 'auto' }} isMenuOpen={context.openMenuColumnId.value === entry.column.id} pinnedSide={pinnedSide} renderFilterControl={context.renderFilterControl} getColumnFilterConfig={context.getColumnFilterConfig} onToggleMenu={context.toggleColumnMenu} onToggleSorting={context.toggleSorting} onSetSortDesc={context.setSortDesc} onClearSorting={context.clearSorting} onSetPin={context.setPin} onCloseMenu={context.closeColumnMenu} />
                       </div>
                     )
                   })}
@@ -337,9 +338,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             copyWithHeadersLabel={context.mergedSelectionPanelConfig.value.copyWithHeadersLabel ?? context.localeText.value.copyWithHeadersLabel}
             copyWithoutHeadersLabel={context.mergedSelectionPanelConfig.value.copyWithoutHeadersLabel ?? context.localeText.value.copyWithoutHeadersLabel}
             allowPositionChange={context.mergedSelectionPanelConfig.value.allowPositionChange ?? true}
-            onCopy={(options) => {
-              void context.copyAllSelection(options.includeHeaders)
-            }}
+            onCopy={context.handleCopyAllSelection}
             onClearSelection={context.clearAllSelection}
             onUpdatePosition={context.updateSelectionPanelPosition}
             onUpdateFloatingPosition={context.updateSelectionPanelFloatingPosition}
@@ -359,15 +358,10 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             paginationItems={paginationItems}
             canPreviousPage={context.table.getCanPreviousPage()}
             canNextPage={context.table.getCanNextPage()}
-            onPreviousPage={() => context.table.previousPage()}
-            onNextPage={() => context.table.nextPage()}
-            onSetPageIndex={(nextPageIndex) => context.table.setPageIndex(nextPageIndex)}
-            onPageSizeChange={(pageSize) => {
-              context.pagination.value = {
-                pageIndex: 0,
-                pageSize,
-              }
-            }}
+            onPreviousPage={context.handlePreviousPage}
+            onNextPage={context.handleNextPage}
+            onSetPageIndex={context.handleSetPageIndex}
+            onPageSizeChange={context.handlePageSizeChange}
           />
         </div>
       </div>

@@ -511,6 +511,37 @@ export default defineComponent({
       }
     }
 
+    function handleOverwriteActiveView() {
+      void overwriteActiveView()
+    }
+
+    function handleDeleteActiveView() {
+      void deleteActiveView()
+    }
+
+    function handlePreviousPage() {
+      table.previousPage()
+    }
+
+    function handleNextPage() {
+      table.nextPage()
+    }
+
+    function handleSetPageIndex(nextPageIndex: number) {
+      table.setPageIndex(nextPageIndex)
+    }
+
+    function handlePageSizeChange(pageSize: number) {
+      pagination.value = {
+        pageIndex: 0,
+        pageSize,
+      }
+    }
+
+    function handleCopyAllSelection(options: { includeHeaders: boolean }) {
+      void copyAllSelection(options.includeHeaders)
+    }
+
     function resetPageForFilterChange() {
       if (!effectiveResetPageOnFilterChange.value) {
         return
@@ -733,6 +764,13 @@ export default defineComponent({
       isExcelExporting,
       localeText,
       handleExportExcel,
+      handleOverwriteActiveView,
+      handleDeleteActiveView,
+      handlePreviousPage,
+      handleNextPage,
+      handleSetPageIndex,
+      handlePageSizeChange,
+      handleCopyAllSelection,
       slots,
       effectiveHeight,
       scrollElementRef,
