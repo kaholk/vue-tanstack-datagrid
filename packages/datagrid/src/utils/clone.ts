@@ -5,6 +5,7 @@ import type { DataGridSavedViewState } from '../types'
 export function cloneViewState(state: DataGridSavedViewState): DataGridSavedViewState {
   return {
     pagination: state.pagination ? { ...state.pagination } : undefined,
+    sorting: state.sorting?.map((sort) => ({ ...sort })),
     columnOrder: [...state.columnOrder],
     columnSizing: { ...state.columnSizing },
     columnVisibility: { ...state.columnVisibility },

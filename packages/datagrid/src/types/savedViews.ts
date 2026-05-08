@@ -1,9 +1,10 @@
-import type { ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, PaginationState } from '@tanstack/vue-table'
+import type { ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ColumnSort, PaginationState } from '@tanstack/vue-table'
 
 import type { DataGridColumnVisibilityState } from './core'
 
 export type DataGridSavedViewState = {
   pagination?: PaginationState
+  sorting?: ColumnSort[]
   columnOrder: ColumnOrderState
   columnSizing: ColumnSizingState
   columnVisibility: DataGridColumnVisibilityState

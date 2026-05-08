@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type PaginationState, type RowSelectionState } from '@tanstack/vue-table'
+import { type ColumnFiltersState, type ColumnOrderState, type ColumnPinningState, type ColumnSizingState, type ColumnSort, type PaginationState, type RowSelectionState } from '@tanstack/vue-table'
 
 import { deserializeDataGridSavedViews, serializeDataGridSavedViews } from '../savedViews'
 import type {
@@ -14,6 +14,7 @@ type UseDataGridSavedViewsOptions = {
   viewStorageKey: string
   savedViewsPersistence?: DataGridSavedViewsPersistence
   initialState: DataGridInitialState
+  sorting: Ref<ColumnSort[]>
   columnOrder: Ref<ColumnOrderState>
   columnSizing: Ref<ColumnSizingState>
   columnVisibility: Ref<DataGridColumnVisibilityState>
@@ -47,6 +48,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
         pageIndex: 0,
         pageSize: options.pagination.value.pageSize,
       },
+      sorting: options.sorting.value.map((sort) => ({ ...sort })),
       columnOrder: [...options.columnOrder.value],
       columnSizing: { ...options.columnSizing.value },
       columnVisibility: { ...options.columnVisibility.value },
@@ -64,6 +66,9 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
 
   function applyViewState(state: DataGridSavedViewState) {
     const nextState = options.cloneViewState(state)
+    options.sorting.value = nextState.sorting
+      ? nextState.sorting.map((sort) => ({ ...sort }))
+      : (options.initialState.sorting ?? []).map((sort) => ({ ...sort }))
     options.columnOrder.value = nextState.columnOrder
     options.columnSizing.value = nextState.columnSizing
     options.columnVisibility.value = nextState.columnVisibility
@@ -84,6 +89,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
       pagination: options.initialState.pagination
         ? { ...options.initialState.pagination, pageIndex: 0 }
         : undefined,
+      sorting: (options.initialState.sorting ?? []).map((sort) => ({ ...sort })),
       columnOrder: [...(options.initialState.columnOrder ?? [])],
       columnSizing: { ...(options.initialState.columnSizing ?? {}) },
       columnVisibility: { ...(options.initialState.columnVisibility ?? {}) },

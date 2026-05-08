@@ -416,6 +416,7 @@ export default defineComponent({
       viewStorageKey: props.viewStorageKey,
       savedViewsPersistence: props.savedViewsPersistence,
       initialState: mergedInitialState.value,
+      sorting,
       columnOrder,
       columnSizing,
       columnVisibility,
