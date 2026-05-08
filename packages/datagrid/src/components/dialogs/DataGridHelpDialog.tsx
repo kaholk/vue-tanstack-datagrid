@@ -1,6 +1,6 @@
 import { defineComponent, ref, type PropType } from 'vue'
 
-import howToSearchImage from '../assets/datagrid_help.png'
+import howToSearchImage from '../../assets/datagrid_help.png'
 import DataGridDialog from './DataGridDialog'
 
 export default defineComponent({

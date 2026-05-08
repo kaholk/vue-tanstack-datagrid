@@ -1,7 +1,7 @@
 import { h, onBeforeUnmount, ref, type Ref, type VNodeChild } from 'vue'
 import { type Column, type ColumnFiltersState, type PaginationState } from '@tanstack/vue-table'
 
-import DataGridFilterControl from '../components/DataGridFilterControl'
+import DataGridFilterControl from '../components/common/DataGridFilterControl'
 import type { DataGridColumn, DataGridFilterConfig, DataGridFilterOption } from '../types'
 
 type AnyRow = Record<string, unknown>

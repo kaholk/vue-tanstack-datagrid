@@ -6,11 +6,11 @@ import {
   type PropType,
 } from 'vue'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
 import DataGridSelectMenuContent, {
   toDataGridSelectOptionKey,
 } from './DataGridSelectMenuContent'
-import type { DataGridFilterOption, DataGridFilterOptionValue } from '../types'
+import type { DataGridFilterOption, DataGridFilterOptionValue } from '../../types'
 
 export default defineComponent({
   name: 'DataGridInlineSelectEditor',

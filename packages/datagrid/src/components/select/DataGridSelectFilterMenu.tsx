@@ -1,10 +1,10 @@
 import { defineComponent, ref, type PropType } from 'vue'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
 import DataGridSelectMenuContent, {
   toDataGridSelectOptionKey,
 } from './DataGridSelectMenuContent'
-import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
+import type { DataGridFilterConfig, DataGridFilterOption } from '../../types'
 
 type ElementRef = {
   value: HTMLElement | null

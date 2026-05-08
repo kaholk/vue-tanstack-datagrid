@@ -1,7 +1,7 @@
 import { defineComponent, type PropType, type VNodeChild } from 'vue'
 
 import DataGridDialog from './DataGridDialog'
-import type { DataGridFilterConfig } from '../types'
+import type { DataGridFilterConfig } from '../../types'
 
 type FilterDialogSection = {
   id: string

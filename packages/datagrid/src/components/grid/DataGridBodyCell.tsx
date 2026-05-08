@@ -1,7 +1,7 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 import { type Cell, type Column, type Row } from '@tanstack/vue-table'
-import type { DataGridColumn } from '../types'
-import type { AnyRow, SelectionPreviewMode } from '../types/internal'
+import type { DataGridColumn } from '../../types'
+import type { AnyRow, SelectionPreviewMode } from '../../types/internal'
 
 const baseCellClassName = 'data-grid__cell'
 const pinnedCellClassName = 'data-grid__cell--pinned'

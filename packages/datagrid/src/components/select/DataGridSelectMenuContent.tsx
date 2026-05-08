@@ -1,6 +1,10 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, type PropType, type Ref } from 'vue'
 
-import type { DataGridFilterOption, DataGridFilterOptionValue } from '../types'
+import type { DataGridFilterOption, DataGridFilterOptionValue } from '../../types'
+
+export type DataGridSelectMenuOption = DataGridFilterOption & {
+  description?: string
+}
 
 export function toDataGridSelectOptionKey(value: DataGridFilterOptionValue) {
   return value === null ? '__data_grid_null__' : String(value)
@@ -18,7 +22,7 @@ export default defineComponent({
       default: 'Szukaj opcji',
     },
     options: {
-      type: Array as PropType<DataGridFilterOption[]>,
+      type: Array as PropType<DataGridSelectMenuOption[]>,
       required: true,
     },
     selectedValueKeys: {
@@ -64,6 +68,18 @@ export default defineComponent({
     emptyLabel: {
       type: String,
       default: 'Brak opcji',
+    },
+    loading: {
+      type: Boolean,
+      default: false,
+    },
+    loadingLabel: {
+      type: String,
+      default: 'Ladowanie...',
+    },
+    searchInputRef: {
+      type: Object as PropType<Ref<HTMLInputElement | null>>,
+      default: undefined,
     },
     showFooter: {
       type: Boolean,
@@ -117,6 +133,7 @@ export default defineComponent({
         <div class="data-grid__filter-select-search-actions" {...rootAttrs()}>
         {props.showSearch ? (
           <input
+            ref={props.searchInputRef}
             class="data-grid__filter-select-search"
             value={props.searchValue}
             placeholder={props.searchPlaceholder}
@@ -180,7 +197,11 @@ export default defineComponent({
           class={['data-grid__filter-select-options', props.optionsMenuClass]}
           {...rootAttrs()}
         >
-          {props.options.length > 0 ? (
+          {props.loading ? (
+            <div class="data-grid__filter-select-empty" {...rootAttrs()}>
+              {props.loadingLabel}
+            </div>
+          ) : props.options.length > 0 ? (
             props.options.map((option) => {
               const optionKey = toDataGridSelectOptionKey(option.value)
               const selected = props.selectedValueKeys.has(optionKey)
@@ -213,7 +234,14 @@ export default defineComponent({
                     {...rootAttrs()}
                     aria-hidden="true"
                   />
-                  <span>{option.label}</span>
+                  <span class="data-grid__filter-select-option-copy">
+                    <span class="data-grid__filter-select-option-label">{option.label}</span>
+                    {option.description ? (
+                      <span class="data-grid__filter-select-option-description">
+                        {option.description}
+                      </span>
+                    ) : null}
+                  </span>
                 </label>
               )
             })

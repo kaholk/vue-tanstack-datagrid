@@ -9,7 +9,10 @@ import {
   type PropType,
 } from 'vue'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import DataGridSelectMenuContent, {
+  toDataGridSelectOptionKey,
+} from './DataGridSelectMenuContent'
 
 export type DataGridAsyncSelectOption = {
   label: string
@@ -110,6 +113,11 @@ export default defineComponent({
 
       return props.emptyLabel
     })
+    const selectedValueKeys = computed(() =>
+      props.modelValue === null || props.modelValue === undefined || props.modelValue === ''
+        ? new Set<string>()
+        : new Set([toDataGridSelectOptionKey(props.modelValue)]),
+    )
 
     async function runSearch(query: string) {
       const currentRequestId = ++requestId.value
@@ -148,6 +156,24 @@ export default defineComponent({
       searchTimer = window.setTimeout(() => {
         void runSearch(query)
       }, Math.max(0, props.searchDebounceMs))
+    }
+
+    function clearValue() {
+      selectedOption.value = null
+      searchValue.value = ''
+      props.onUpdateModelValue(null, null)
+      props.onClose?.()
+    }
+
+    function selectOption(optionValue: string | number | null) {
+      const selected = mergedOptions.value.find(
+        (option) =>
+          toDataGridSelectOptionKey(option.value) === toDataGridSelectOptionKey(optionValue),
+      ) ?? null
+
+      selectedOption.value = selected
+      props.onUpdateModelValue(optionValue, selected)
+      props.onClose?.()
     }
 
     async function ensureSelectedOption() {
@@ -222,83 +248,36 @@ export default defineComponent({
           zIndex={props.zIndex}
           menuMaxHeightVar="--data-grid-filter-select-menu-max-height"
           optionsMaxHeightVar="--data-grid-filter-select-options-max-height"
+          optionsMinHeightVar="--data-grid-filter-select-options-min-height"
           outsideClickRootAttr="data-grid-inline-select-root"
           onOutsidePointerDown={() => props.onClose?.()}
         >
-            <div
-              class="data-grid__inline-async-select-content"
-              data-grid-inline-select-root="true"
-            >
-              <div class="data-grid__inline-async-select-toolbar" data-grid-inline-select-root="true">
-                <input
-                  ref={searchRef}
-                  class="data-grid__filter-select-search"
-                  value={searchValue.value}
-                  placeholder={props.searchPlaceholder}
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => event.stopPropagation()}
-                  onInput={(event) => {
-                    searchValue.value = (event.target as HTMLInputElement).value
-                    scheduleSearch(searchValue.value)
-                  }}
-                />
-                <button
-                  type="button"
-                  class="data-grid__filter-select-action"
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    selectedOption.value = null
-                    searchValue.value = ''
-                    props.onUpdateModelValue(null, null)
-                    props.onClose?.()
-                  }}
-                >
-                  {props.clearLabel}
-                </button>
-              </div>
-              <div class="data-grid__inline-async-select-options" data-grid-inline-select-root="true">
-                {loading.value ? (
-                  <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
-                    {props.loadingLabel}
-                  </div>
-                ) : null}
-                {!loading.value && mergedOptions.value.length === 0 ? (
-                  <div class="data-grid__inline-async-select-state" data-grid-inline-select-root="true">
-                    {props.noOptionsLabel}
-                  </div>
-                ) : null}
-                {!loading.value
-                  ? mergedOptions.value.map((option) => (
-                      <button
-                        key={String(option.value ?? '__null__')}
-                        type="button"
-                        class={[
-                          'data-grid__inline-async-select-option',
-                          option.value === props.modelValue
-                            ? 'data-grid__inline-async-select-option--active'
-                            : '',
-                        ]}
-                        data-grid-inline-select-root="true"
-                        onClick={() => {
-                          props.onUpdateModelValue(option.value, option)
-                          props.onClose?.()
-                        }}
-                      >
-                        <span class="data-grid__inline-async-select-copy">
-                          <span class="data-grid__inline-async-select-label">{option.label}</span>
-                          {option.description ? (
-                            <span class="data-grid__inline-async-select-description">
-                              {option.description}
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    ))
-                  : null}
-              </div>
-            </div>
+          <DataGridSelectMenuContent
+            searchInputRef={searchRef}
+            searchValue={searchValue.value}
+            searchPlaceholder={props.searchPlaceholder}
+            options={mergedOptions.value}
+            selectedValueKeys={selectedValueKeys.value}
+            multiple={false}
+            optionName="data-grid-inline-async-select-single"
+            inlineRootAttr="data-grid-inline-select-root"
+            showActions
+            showFooter={false}
+            clearLabel={props.clearLabel}
+            emptyLabel={props.noOptionsLabel}
+            loading={loading.value}
+            loadingLabel={props.loadingLabel}
+            onSearchChange={(value) => {
+              searchValue.value = value
+              scheduleSearch(value)
+            }}
+            onClearAll={clearValue}
+            onToggleValue={(optionValue, checked) => {
+              if (checked) {
+                selectOption(optionValue)
+              }
+            }}
+          />
         </DataGridDropdownMenu>
       </div>
     )

@@ -2,7 +2,7 @@ import { type Column } from '@tanstack/vue-table'
 import { defineComponent, type PropType } from 'vue'
 
 import DataGridDialog from './DataGridDialog'
-import DataGridValidatedNumberInput from './DataGridValidatedNumberInput'
+import DataGridValidatedNumberInput from '../common/DataGridValidatedNumberInput'
 
 type AnyRow = Record<string, unknown>
 

@@ -6,8 +6,8 @@ import {
   type PropType,
 } from 'vue'
 
-import DataGridSelectFilterMenu from './DataGridSelectFilterMenu'
-import type { DataGridFilterConfig, DataGridFilterOption } from '../types'
+import DataGridSelectFilterMenu from '../select/DataGridSelectFilterMenu'
+import type { DataGridFilterConfig, DataGridFilterOption } from '../../types'
 
 export default defineComponent({
   name: 'DataGridFilterControl',

@@ -1,6 +1,6 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 
-import type { DataGridFilterConfig } from '../types'
+import type { DataGridFilterConfig } from '../../types'
 
 type QuickFilterItem = {
   id: string

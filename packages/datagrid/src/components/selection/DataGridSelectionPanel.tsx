@@ -3,8 +3,8 @@ import IconContentCopyRounded from '~icons/material-symbols/content-copy-rounded
 import IconCloseRounded from '~icons/material-symbols/close-rounded'
 import IconSettingsRounded from '~icons/material-symbols/settings-rounded'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
-import type { DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../types'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import type { DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../../types'
 
 type SumItem = {
   columnId: string

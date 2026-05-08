@@ -4,8 +4,8 @@ import IconSaveRounded from '~icons/material-symbols/save-rounded'
 import IconSaveAsOutlineSharp from '~icons/material-symbols/save-as-outline-sharp'
 import IconTuneRounded from '~icons/material-symbols/tune-rounded'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
-import type { DataGridSavedView } from '../types'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import type { DataGridSavedView } from '../../types'
 
 export default defineComponent({
   name: 'DataGridViewsMenu',

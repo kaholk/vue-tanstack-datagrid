@@ -7,42 +7,22 @@ import {
   type PropType,
 } from 'vue'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
 
 export default defineComponent({
-  name: 'DataGridInlineNumberInput',
+  name: 'DataGridInlineDateInput',
   props: {
     modelValue: {
-      type: [String, Number] as PropType<string | number | null>,
-      default: '',
+      type: String as PropType<string | null>,
+      default: null,
     },
-    type: {
-      type: String,
-      default: 'number',
-    },
-    step: {
-      type: String,
-      default: '1',
-    },
-    min: {
-      type: String,
-      default: undefined,
-    },
-    loading: {
+    clearable: {
       type: Boolean,
-      default: false,
-    },
-    decimalSeparator: {
-      type: String as PropType<'.' | ',' | 'both'>,
-      default: 'both',
+      default: true,
     },
     onUpdateModelValue: {
-      type: Function as PropType<(value: string) => void>,
+      type: Function as PropType<(value: string | null) => void>,
       required: true,
-    },
-    onEnter: {
-      type: Function as PropType<(value: string) => void>,
-      default: undefined,
     },
     onClose: {
       type: Function as PropType<() => void>,
@@ -52,12 +32,12 @@ export default defineComponent({
   setup(props) {
     const triggerRef = ref<HTMLButtonElement | null>(null)
     const inputRef = ref<HTMLInputElement | null>(null)
-    const localValue = ref(String(props.modelValue ?? ''))
+    const localValue = ref(props.modelValue ?? '')
 
     watch(
       () => props.modelValue,
       (value) => {
-        localValue.value = String(value ?? '')
+        localValue.value = value ?? ''
       },
     )
 
@@ -65,25 +45,13 @@ export default defineComponent({
       nextTick(() => inputRef.value?.focus())
     })
 
-    function normalizeValue(value: string) {
-      return props.decimalSeparator === ',' || props.decimalSeparator === 'both'
-        ? value.replace(',', '.')
-        : value
-    }
-
-    function saveAndClose() {
-      const normalizedValue = normalizeValue(localValue.value)
-      localValue.value = normalizedValue
-      props.onUpdateModelValue(normalizedValue)
-      if (props.onEnter) {
-        props.onEnter(localValue.value)
-      }
-
+    function submitAndClose() {
+      props.onUpdateModelValue(localValue.value.trim() === '' ? null : localValue.value)
       props.onClose?.()
     }
 
     return () => (
-      <div class="data-grid__inline-number-input-wrap" data-grid-inline-select-root="true">
+      <div class="data-grid__inline-date-input-wrap" data-grid-inline-select-root="true">
         <button
           ref={triggerRef}
           type="button"
@@ -94,15 +62,15 @@ export default defineComponent({
             props.onClose?.()
           }}
         >
-          <span class="data-grid__filter-select-label">{localValue.value || '-'}</span>
+          <span class="data-grid__filter-select-label">{localValue.value || 'Data'}</span>
         </button>
         <DataGridDropdownMenu
           triggerRef={triggerRef}
           teleport
           menuClass="data-grid__filter-select-menu data-grid__inline-input-menu"
           scopeAttr="data-grid-filter-root"
-          minWidth={220}
-          desiredHeight={112}
+          minWidth={260}
+          desiredHeight={120}
           zIndex={500}
           outsideClickRootAttr="data-grid-inline-select-root"
           onOutsidePointerDown={() => props.onClose?.()}
@@ -110,23 +78,17 @@ export default defineComponent({
             <div class="data-grid__inline-input-panel" data-grid-inline-select-root="true">
               <input
                 ref={inputRef}
-                class={[
-                  'data-grid__inline-number-input',
-                  props.loading ? 'data-grid__inline-number-input--loading' : '',
-                ]}
-                type={props.decimalSeparator === ',' || props.decimalSeparator === 'both' ? 'text' : props.type}
-                inputmode="decimal"
-                step={props.step}
-                min={props.min}
+                class="data-grid__inline-date-input"
+                type="date"
                 value={localValue.value}
                 data-grid-inline-select-root="true"
                 onInput={(event) => {
-                  localValue.value = (event.target as HTMLInputElement).value.replace(',', '.')
+                  localValue.value = (event.target as HTMLInputElement).value
                 }}
                 onKeydown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault()
-                    saveAndClose()
+                    submitAndClose()
                   }
 
                   if (event.key === 'Escape') {
@@ -136,18 +98,20 @@ export default defineComponent({
                 }}
               />
               <div class="data-grid__inline-input-actions" data-grid-inline-select-root="true">
-                <button
-                  type="button"
-                  class="data-grid__filter-select-action"
-                  data-grid-inline-select-root="true"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    props.onClose?.()
-                  }}
-                >
-                  Anuluj
-                </button>
+                {props.clearable ? (
+                  <button
+                    type="button"
+                    class="data-grid__filter-select-action"
+                    data-grid-inline-select-root="true"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      localValue.value = ''
+                    }}
+                  >
+                    Wyczyść
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   class="data-grid__filter-select-action data-grid__filter-select-action--primary"
@@ -155,7 +119,7 @@ export default defineComponent({
                   onClick={(event) => {
                     event.preventDefault()
                     event.stopPropagation()
-                    saveAndClose()
+                    submitAndClose()
                   }}
                 >
                   Zapisz

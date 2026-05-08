@@ -1,6 +1,6 @@
 import { h, type Ref, type VNodeChild } from 'vue'
 import type { RowData } from '@tanstack/vue-table'
-import DataGridEditableCellTrigger from '../components/DataGridEditableCellTrigger'
+import DataGridEditableCellTrigger from '../components/editors/DataGridEditableCellTrigger'
 import type { DataGridInlineEditCell } from './useDataGridInlineEdit'
 
 type EditableCellAlign = 'start' | 'center' | 'end'

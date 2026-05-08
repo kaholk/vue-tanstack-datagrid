@@ -3,7 +3,7 @@ import { defineComponent, type PropType, type VNodeChild } from 'vue'
 import DataGridQuickFilters from './DataGridQuickFilters'
 import DataGridToolbarActions from './DataGridToolbarActions'
 import DataGridViewsMenu from './DataGridViewsMenu'
-import type { DataGridExcelExportMode, DataGridFilterConfig, DataGridSavedView } from '../types'
+import type { DataGridExcelExportMode, DataGridFilterConfig, DataGridSavedView } from '../../types'
 
 type QuickFilterItem = {
   id: string

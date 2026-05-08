@@ -8,8 +8,8 @@ import IconCheckRounded from '~icons/material-symbols/check-rounded'
 import IconUndoRounded from '~icons/material-symbols/undo-rounded'
 import IconViewColumnOutlineRounded from '~icons/material-symbols/view-column-outline-rounded'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
-import type { DataGridExcelExportMode } from '../types'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import type { DataGridExcelExportMode } from '../../types'
 
 type ExcelExportAction = {
   mode: DataGridExcelExportMode

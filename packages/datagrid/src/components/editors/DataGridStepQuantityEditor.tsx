@@ -6,8 +6,8 @@ import {
   type PropType,
 } from 'vue'
 
-import DataGridDropdownMenu from './DataGridDropdownMenu'
-import type { DataGridStepQuantityEditorLocaleText } from '../types'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import type { DataGridStepQuantityEditorLocaleText } from '../../types'
 
 import IconSaveRounded from '~icons/material-symbols/save-rounded';
 

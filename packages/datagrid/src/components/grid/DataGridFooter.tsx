@@ -2,7 +2,7 @@ import { defineComponent, type PropType } from 'vue'
 import IconArrowBackRounded from '~icons/material-symbols/arrow-back-rounded'
 import IconArrowForwardRounded from '~icons/material-symbols/arrow-forward-rounded'
 
-import type { DataGridMetaConfig, DataGridPageSizeConfig } from '../types'
+import type { DataGridMetaConfig, DataGridPageSizeConfig } from '../../types'
 
 type PaginationItem =
   | { type: 'page'; value: number }

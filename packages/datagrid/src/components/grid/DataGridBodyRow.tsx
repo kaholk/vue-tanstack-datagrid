@@ -1,7 +1,7 @@
 import { defineComponent, type CSSProperties, type PropType, type VNodeChild } from 'vue'
 import { type Cell, type Column, type Row } from '@tanstack/vue-table'
 import DataGridBodyCell from './DataGridBodyCell'
-import type { AnyRow, SelectionPreviewMode } from '../types/internal'
+import type { AnyRow, SelectionPreviewMode } from '../../types/internal'
 
 type RenderedRowSequenceItem =
   | { type: 'spacer'; key: string; width: number }

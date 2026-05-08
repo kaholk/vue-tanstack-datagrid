@@ -1,6 +1,6 @@
 import { h, ref, type VNodeChild } from 'vue'
 import type { RowData } from '@tanstack/vue-table'
-import DataGridInlineEditStatus from '../components/DataGridInlineEditStatus'
+import DataGridInlineEditStatus from '../components/editors/DataGridInlineEditStatus'
 import {
   useDataGridInlineMutation,
   type DataGridInlineMutationStatus,

@@ -4,8 +4,8 @@ import IconNorthRounded from '~icons/material-symbols/north-rounded'
 import IconSouthRounded from '~icons/material-symbols/south-rounded'
 import IconUnfoldMoreRounded from '~icons/material-symbols/unfold-more-rounded'
 
-import DataGridColumnMenu from './DataGridColumnMenu'
-import type { DataGridColumn, DataGridFilterConfig } from '../types'
+import DataGridColumnMenu from '../menus/DataGridColumnMenu'
+import type { DataGridColumn, DataGridFilterConfig } from '../../types'
 
 type AnyRow = Record<string, unknown>
 
