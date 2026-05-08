@@ -10,7 +10,12 @@ export type DataGridFilterOption = {
   value: DataGridFilterOptionValue
 }
 
-export type DataGridFilterOptionsResolver = (context: { columnFilters: ColumnFiltersState; draftColumnFilters: ColumnFiltersState }) => DataGridFilterOption[]
+export type DataGridFilterOptionsResolver = (context: {
+  columnFilters: ColumnFiltersState
+  draftColumnFilters: ColumnFiltersState
+  searchValue: string
+  target: 'live' | 'dialog'
+}) => DataGridFilterOption[] | Promise<DataGridFilterOption[]>
 
 export type DataGridCellContext<TData extends RowData> = {
   cell: Cell<TData, unknown>

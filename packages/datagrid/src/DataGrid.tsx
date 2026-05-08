@@ -161,8 +161,10 @@ export default defineComponent({
     const globalFilter = ref(mergedInitialState.value.globalFilter ?? '')
     const rowSelection = ref<RowSelectionState>({})
     const columnMoveTargetById = ref<Record<string, string>>({})
-    const draftColumnFilters = ref<ColumnFiltersState>([])
-    const draftGlobalFilter = ref('')
+    const draftColumnFilters = ref<ColumnFiltersState>(
+      cloneColumnFilters(mergedInitialState.value.columnFilters ?? []),
+    )
+    const draftGlobalFilter = ref(mergedInitialState.value.globalFilter ?? '')
     const requestState = shallowRef<DataGridRequestState<AnyRow>>({
       rows: [],
       totalRows: 0,
@@ -399,7 +401,16 @@ export default defineComponent({
       onOpenFilterMenu: closeOverlayState,
     })
     closeFilterMenus = dataGridFilters.closeFilterMenus
-    const { getColumnFilterConfig, renderFilterControl } = dataGridFilters
+    const {
+      acceptFilterDraftModes,
+      clearFilterDraftModes,
+      getColumnFilterConfig,
+      hasPendingFilterModeChanges,
+      isFilterPending,
+      resetDraftColumnFilter,
+      resetFilterDraftModes,
+      renderFilterControl,
+    } = dataGridFilters
 
     const savedViewsState = useDataGridSavedViews({
       viewStorageKey: props.viewStorageKey,
@@ -416,6 +427,7 @@ export default defineComponent({
       onAfterApplyViewState: () => {
         openMenuColumnId.value = null
         closeFilterMenus()
+        syncFilterDialogDraftState()
         isViewsMenuOpen.value = false
         isSaveViewDialogOpen.value = false
         columnVirtualizer.value.measure()
@@ -603,8 +615,22 @@ export default defineComponent({
       resetPageForFilterChange()
       columnFilters.value = cloneColumnFilters(draftColumnFilters.value)
       globalFilter.value = draftGlobalFilter.value
+      acceptFilterDraftModes()
       syncFilterDialogDraftState()
       closeFilterDialog()
+    }
+
+    function resetFilterDraftChanges() {
+      syncFilterDialogDraftState()
+      resetFilterDraftModes()
+      closeFilterMenus()
+    }
+
+    function hasPendingFilterChanges() {
+      return (
+        JSON.stringify(columnFilters.value) !== JSON.stringify(draftColumnFilters.value) ||
+        hasPendingFilterModeChanges()
+      )
     }
 
     expose({
@@ -625,6 +651,7 @@ export default defineComponent({
       globalFilter.value = mergedInitialState.value.globalFilter ?? ''
       draftColumnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
       draftGlobalFilter.value = mergedInitialState.value.globalFilter ?? ''
+      clearFilterDraftModes()
       closeFilterMenus()
     }
 
@@ -749,6 +776,7 @@ export default defineComponent({
       savedViews,
       quickFilterConfigs,
       activeFilterCount,
+      hasPendingFilterChanges,
       renderFilterControl,
       toggleViewsMenu,
       selectSavedView,
@@ -823,8 +851,11 @@ export default defineComponent({
       errorMessage,
       isFilterDialogOpen,
       filterDialogSections,
+      isFilterPending,
+      resetDraftColumnFilter,
       closeFilterDialog,
       applyFilterDialogChanges,
+      resetFilterDraftChanges,
       isFilterHelpDialogOpen,
       isColumnPickerOpen,
       columnPickerColumns,

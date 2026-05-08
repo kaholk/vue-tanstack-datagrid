@@ -43,9 +43,13 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    hasPendingFilterChanges: {
+      type: Boolean,
+      default: false,
+    },
     renderFilterControl: {
       type: Function as PropType<
-        (config: DataGridFilterConfig, options?: { toolbar?: boolean }) => VNodeChild
+        (config: DataGridFilterConfig, options?: { toolbar?: boolean; target?: 'live' | 'dialog' }) => VNodeChild
       >,
       required: true,
     },
@@ -82,6 +86,14 @@ export default defineComponent({
       required: true,
     },
     onClearFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onApplyFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onResetFilterDraft: {
       type: Function as PropType<() => void>,
       required: true,
     },
@@ -134,10 +146,13 @@ export default defineComponent({
         <DataGridToolbarActions
           customActions={props.customActions}
           activeFilterCount={props.activeFilterCount}
+          hasPendingFilterChanges={props.hasPendingFilterChanges}
           onToggleFilterDialog={props.onToggleFilterDialog}
           onToggleFilterHelpDialog={props.onToggleFilterHelpDialog}
           onRefresh={props.onRefresh}
           onClearFilters={props.onClearFilters}
+          onApplyFilters={props.onApplyFilters}
+          onResetFilterDraft={props.onResetFilterDraft}
           onToggleColumnPicker={props.onToggleColumnPicker}
           excelExportActions={props.excelExportActions}
           isExcelExporting={props.isExcelExporting}

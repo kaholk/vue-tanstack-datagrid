@@ -66,6 +66,10 @@ export default defineComponent({
       type: Array as PropType<DataGridFilterOption[]>,
       required: true,
     },
+    optionsLoading: {
+      type: Boolean,
+      default: false,
+    },
     selectedValueKeys: {
       type: Object as PropType<Set<string>>,
       required: true,
@@ -73,6 +77,10 @@ export default defineComponent({
     triggerRef: {
       type: Object as PropType<ElementRef>,
       default: undefined,
+    },
+    teleport: {
+      type: Boolean,
+      default: true,
     },
     textMode: {
       type: Boolean,
@@ -90,6 +98,10 @@ export default defineComponent({
       type: Function as PropType<(value: string | DataGridFilterOption['value'][], textMode: boolean) => void>,
       required: true,
     },
+    onCommit: {
+      type: Function as PropType<(value: string | DataGridFilterOption['value'][], textMode: boolean) => void>,
+      required: true,
+    },
     onCancel: {
       type: Function as PropType<() => void>,
       required: true,
@@ -97,6 +109,7 @@ export default defineComponent({
   },
   setup(props) {
     const isRadioVariant = () => props.config.variant === 'radio'
+    const isAsyncOptions = () => Boolean(props.config.optionsResolver)
     const valueSeparator = () => props.config.valueSeparator ?? '|'
     const draftTextMode = ref(props.textMode)
     const draftTextValue = ref(props.textValue)
@@ -171,14 +184,27 @@ export default defineComponent({
       props.onApply(getDraftSelectedValues(), false)
     }
 
+    function commitDraft() {
+      if (draftTextMode.value) {
+        props.onCommit(draftTextValue.value.trim(), true)
+        return
+      }
+
+      props.onCommit(getDraftSelectedValues(), false)
+    }
+
     function toggleMode() {
       switchTextMode(!draftTextMode.value)
+    }
+
+    function getVisibleOptions() {
+      return props.visibleOptions
     }
 
     return () => (
       <DataGridDropdownMenu
         triggerRef={props.triggerRef}
-        teleport
+        teleport={props.teleport}
         menuClass="data-grid__filter-select-menu"
         scopeAttr="data-grid-filter-root"
         minWidth={280}
@@ -189,6 +215,8 @@ export default defineComponent({
         zIndex={500}
         menuMaxHeightVar="--data-grid-filter-select-menu-max-height"
         optionsMaxHeightVar="--data-grid-filter-select-options-max-height"
+        outsideClickRootAttr="data-grid-filter-root"
+        onOutsidePointerDown={commitDraft}
       >
         <div class="data-grid__filter-select-content data-grid__filter-select-content--compact">
           <div class="data-grid__filter-select-toolbar">
@@ -217,13 +245,34 @@ export default defineComponent({
                 }}
               />
             ) : (
-              <input
-                class="data-grid__filter-select-search"
-                value={props.searchValue}
-                placeholder="Szukaj opcji"
-                onClick={(event) => event.stopPropagation()}
-                onInput={(event) => props.onSearchChange((event.target as HTMLInputElement).value)}
-              />
+              <div class="data-grid__filter-select-search-wrap">
+                <input
+                  class={[
+                    'data-grid__filter-select-search',
+                    isAsyncOptions() && props.searchValue ? 'data-grid__filter-select-search--clearable' : '',
+                  ]}
+                  value={props.searchValue}
+                  placeholder="Szukaj opcji"
+                  onClick={(event) => event.stopPropagation()}
+                  onInput={(event) =>
+                    props.onSearchChange((event.target as HTMLInputElement).value)
+                  }
+                />
+                {isAsyncOptions() && props.searchValue ? (
+                  <button
+                    type="button"
+                    class="data-grid__filter-select-search-clear"
+                    title="Wyczyść"
+                    aria-label="Wyczyść"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      props.onSearchChange('')
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
             )}
             {props.config.textFallback ? (
               <button
@@ -272,7 +321,8 @@ export default defineComponent({
             <DataGridSelectMenuContent
               searchValue=""
               searchPlaceholder="Szukaj opcji"
-              options={props.visibleOptions}
+              options={getVisibleOptions()}
+              emptyLabel={props.optionsLoading ? 'Ładowanie...' : 'Brak opcji'}
               selectedValueKeys={draftSelectedValueKeys.value}
               multiple={!isRadioVariant()}
               optionName={isRadioVariant() ? `data-grid-filter-${props.config.id}` : undefined}

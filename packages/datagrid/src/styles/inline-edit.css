@@ -374,6 +374,14 @@
     background: var(--app-surface-muted);
   }
 
+.data-grid__filter-dialog-row--pending {
+    border-color: #ffcb6b;
+    background: color-mix(in srgb, #ffcb6b 18%, var(--app-surface-muted));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, #ffcb6b 55%, transparent),
+      0 0 0 2px color-mix(in srgb, #ffcb6b 18%, transparent);
+  }
+
 .data-grid__filter-dialog-main,
   .data-grid__filter-dialog-control {
     display: grid;
@@ -384,6 +392,29 @@
     font-weight: 700;
     color: var(--app-text);
     font-size: 0.92rem;
+  }
+
+.data-grid__filter-dialog-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+.data-grid__filter-dialog-reset {
+    min-height: 1.45rem;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid #ffcb6b;
+    border-radius: 0.35rem;
+    background: color-mix(in srgb, #ffcb6b 12%, var(--app-surface));
+    color: #ffcb6b;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+.data-grid__filter-dialog-reset:hover {
+    background: color-mix(in srgb, #ffcb6b 22%, var(--app-surface));
   }
 
 .data-grid__filter-dialog-empty {

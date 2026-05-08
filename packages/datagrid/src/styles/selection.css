@@ -343,6 +343,16 @@
     background: var(--app-accent-soft-strong);
   }
 
+.data-grid__filter-select-trigger--pending,
+  .data-grid__filter-input--pending {
+    border-color: #ffcb6b;
+    color: #ffcb6b;
+    background: color-mix(in srgb, #ffcb6b 22%, var(--app-surface));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, #ffcb6b 58%, transparent),
+      0 0 0 2px color-mix(in srgb, #ffcb6b 20%, transparent);
+  }
+
 .data-grid__filter-select-label {
     min-width: 0;
     overflow: hidden;
@@ -396,6 +406,38 @@
 .data-grid__filter-select-search {
     width: 100%;
     padding: 0.3rem 0.45rem;
+  }
+
+.data-grid__filter-select-search-wrap {
+    position: relative;
+    min-width: 0;
+  }
+
+.data-grid__filter-select-search--clearable {
+    padding-right: 2rem;
+  }
+
+.data-grid__filter-select-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--app-text-muted);
+    line-height: 1;
+    transform: translateY(-50%);
+  }
+
+.data-grid__filter-select-search-clear:hover {
+    background: var(--app-surface-muted);
+    color: var(--app-text);
   }
 
 .data-grid__filter-select-search-actions {

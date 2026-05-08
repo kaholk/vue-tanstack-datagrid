@@ -498,6 +498,19 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-error) 20%, transparent);
   }
 
+.data-grid__toolbar-button--pending {
+    border-color: #ffcb6b;
+    background: color-mix(in srgb, #ffcb6b 18%, var(--app-surface));
+    color: #ffcb6b;
+    font-weight: 700;
+  }
+
+.data-grid__toolbar-button--pending:not(:disabled):hover {
+    border-color: #ffdb8a;
+    background: color-mix(in srgb, #ffcb6b 28%, var(--app-surface));
+    color: #ffdb8a;
+  }
+
 .data-grid__button-icon,
   .data-grid__icon,
   .data-grid__menu-item-icon {

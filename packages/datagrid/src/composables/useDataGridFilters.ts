@@ -1,4 +1,4 @@
-import { h, ref, type Ref, type VNodeChild } from 'vue'
+import { h, onBeforeUnmount, ref, type Ref, type VNodeChild } from 'vue'
 import { type Column, type ColumnFiltersState, type PaginationState } from '@tanstack/vue-table'
 
 import DataGridFilterControl from '../components/DataGridFilterControl'
@@ -7,6 +7,7 @@ import type { DataGridColumn, DataGridFilterConfig, DataGridFilterOption } from 
 type AnyRow = Record<string, unknown>
 
 export type FilterControlTarget = 'live' | 'dialog'
+const ASYNC_FILTER_SEARCH_DEBOUNCE_MS = 300
 
 type UseDataGridFiltersOptions = {
   columnFilters: Ref<ColumnFiltersState>
@@ -39,9 +40,21 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   const openHeaderFilterColumnId = ref<string | null>(null)
   const openToolbarFilterColumnId = ref<string | null>(null)
   const openDialogFilterColumnId = ref<string | null>(null)
+  const filterSearchInputByColumnId = ref<Record<string, string>>({})
   const filterSearchByColumnId = ref<Record<string, string>>({})
   const textFallbackFilterIds = ref<Set<string>>(new Set())
+  const appliedTextFallbackFilterIds = ref<Set<string>>(new Set())
+  const asyncFilterOptionsByStateKey = ref<Record<string, DataGridFilterOption[]>>({})
+  const asyncFilterOptionsByColumnId = ref<Record<string, DataGridFilterOption[]>>({})
+  const filterOptionsLoadingByStateKey = ref<Record<string, boolean>>({})
+  const filterOptionsRequestByStateKey = ref<Record<string, string>>({})
+  const filterSearchDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const columnFilterConfigCache = new Map<string, { key: string; filterOptions: DataGridColumn<AnyRow>['filterOptions']; config: DataGridFilterConfig }>()
+
+  onBeforeUnmount(() => {
+    filterSearchDebounceTimers.forEach((timer) => clearTimeout(timer))
+    filterSearchDebounceTimers.clear()
+  })
 
   function closeFilterMenus() {
     openHeaderFilterColumnId.value = null
@@ -70,7 +83,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function updateColumnFilter(columnId: string, value: string, target: FilterControlTarget = 'live') {
-    setColumnFilterValue(columnId, value.trim() ? value : undefined, target)
+    setColumnFilterValue(columnId, value.trim() ? value : undefined, target === 'live' ? 'dialog' : target)
   }
 
   function setColumnFilterValue(columnId: string, value: unknown, target: FilterControlTarget = 'live') {
@@ -90,6 +103,52 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       }
     }
     options.columnFilters.value = getNextColumnFilters(options.columnFilters.value, columnId, value)
+    options.draftColumnFilters.value = getNextColumnFilters(options.draftColumnFilters.value, columnId, value)
+  }
+
+  function applyDraftColumnFilter(columnId: string) {
+    const draftValue = getFilterRawValue(columnId, 'dialog')
+
+    if (options.resetPageOnFilterChange?.() ?? true) {
+      options.pagination.value = {
+        ...options.pagination.value,
+        pageIndex: 0,
+      }
+    }
+
+    options.columnFilters.value = getNextColumnFilters(options.columnFilters.value, columnId, draftValue)
+  }
+
+  function resetDraftColumnFilter(config: DataGridFilterConfig) {
+    const columnId = config.id
+    const liveValue = getFilterRawValue(columnId, 'live')
+    const nextTextFallbackIds = new Set(textFallbackFilterIds.value)
+
+    if (appliedTextFallbackFilterIds.value.has(columnId)) {
+      nextTextFallbackIds.add(columnId)
+    } else {
+      nextTextFallbackIds.delete(columnId)
+    }
+
+    textFallbackFilterIds.value = nextTextFallbackIds
+    options.draftColumnFilters.value = getNextColumnFilters(
+      options.draftColumnFilters.value,
+      columnId,
+      liveValue,
+    )
+  }
+
+  function acceptFilterDraftModes() {
+    appliedTextFallbackFilterIds.value = new Set(textFallbackFilterIds.value)
+  }
+
+  function resetFilterDraftModes() {
+    textFallbackFilterIds.value = new Set(appliedTextFallbackFilterIds.value)
+  }
+
+  function clearFilterDraftModes() {
+    textFallbackFilterIds.value = new Set()
+    appliedTextFallbackFilterIds.value = new Set()
   }
 
   function getFilterRawValue(columnId: string, target: FilterControlTarget = 'live') {
@@ -139,7 +198,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return []
     }
 
-    const filterOptions = getFilterOptions(config)
+    const filterOptions = getFilterOptions(config, target)
 
     return rawValue
       .split(config.valueSeparator ?? '|')
@@ -181,40 +240,192 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     return `${target}:${columnId}`
   }
 
+  function isPromiseLike<T>(value: unknown): value is PromiseLike<T> {
+    return typeof value === 'object' && value !== null && 'then' in value && typeof (value as { then?: unknown }).then === 'function'
+  }
+
   function updateSelectFilterSearch(
     columnId: string,
     value: string,
     target: FilterControlTarget = 'live',
+    debounce = false,
   ) {
     const stateKey = getFilterSearchStateKey(columnId, target)
-    filterSearchByColumnId.value = {
-      ...filterSearchByColumnId.value,
+    filterSearchInputByColumnId.value = {
+      ...filterSearchInputByColumnId.value,
       [stateKey]: value,
     }
+
+    const existingTimer = filterSearchDebounceTimers.get(stateKey)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+      filterSearchDebounceTimers.delete(stateKey)
+    }
+
+    if (!debounce) {
+      filterSearchByColumnId.value = {
+        ...filterSearchByColumnId.value,
+        [stateKey]: value,
+      }
+      return
+    }
+
+    const timer = setTimeout(() => {
+      filterSearchDebounceTimers.delete(stateKey)
+      filterSearchByColumnId.value = {
+        ...filterSearchByColumnId.value,
+        [stateKey]: value,
+      }
+    }, ASYNC_FILTER_SEARCH_DEBOUNCE_MS)
+    filterSearchDebounceTimers.set(stateKey, timer)
   }
 
   function getSelectFilterSearch(columnId: string, target: FilterControlTarget = 'live') {
+    return filterSearchInputByColumnId.value[getFilterSearchStateKey(columnId, target)] ?? ''
+  }
+
+  function getResolvedSelectFilterSearch(columnId: string, target: FilterControlTarget = 'live') {
     return filterSearchByColumnId.value[getFilterSearchStateKey(columnId, target)] ?? ''
   }
 
-  function getFilterOptions(config: DataGridFilterConfig) {
-    const filterOptions = [
-      ...(config.optionsResolver?.({
-        columnFilters: options.columnFilters.value,
-        draftColumnFilters: options.draftColumnFilters.value,
-      }) ??
-        config.options ??
-        []),
-    ]
+  function getFilterOptionsStateKey(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    return getFilterSearchStateKey(config.id, target)
+  }
+
+  function normalizeComparableFilterValue(value: unknown) {
+    if (Array.isArray(value)) {
+      return JSON.stringify([...value].map((entry) => String(entry ?? '')).sort())
+    }
+
+    return JSON.stringify(value ?? null)
+  }
+
+  function isFilterPending(config: DataGridFilterConfig) {
+    const modeChanged =
+      Boolean(config.textFallback) &&
+      textFallbackFilterIds.value.has(config.id) !== appliedTextFallbackFilterIds.value.has(config.id)
+
+    return (
+      modeChanged ||
+      normalizeComparableFilterValue(getFilterRawValue(config.id, 'live')) !==
+      normalizeComparableFilterValue(getFilterRawValue(config.id, 'dialog'))
+    )
+  }
+
+  function hasPendingFilterModeChanges() {
+    if (textFallbackFilterIds.value.size !== appliedTextFallbackFilterIds.value.size) {
+      return true
+    }
+
+    for (const id of textFallbackFilterIds.value) {
+      if (!appliedTextFallbackFilterIds.value.has(id)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  function withEmptyFilterOption(config: DataGridFilterConfig, filterOptions: DataGridFilterOption[]) {
+    const nextOptions = [...filterOptions]
 
     if (config.includeEmptyOption) {
-      filterOptions.unshift({
+      nextOptions.unshift({
         label: config.emptyOptionLabel ?? 'Puste',
         value: null,
       })
     }
 
-    return filterOptions
+    return nextOptions
+  }
+
+  function getFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    if (!config.optionsResolver) {
+      return withEmptyFilterOption(config, config.options ?? [])
+    }
+
+    const stateKey = getFilterOptionsStateKey(config, target)
+    const searchValue = getResolvedSelectFilterSearch(config.id, target)
+    const requestKey = JSON.stringify({
+      searchValue,
+      columnFilters: options.columnFilters.value,
+      draftColumnFilters: options.draftColumnFilters.value,
+    })
+
+    if (
+      Object.prototype.hasOwnProperty.call(filterOptionsRequestByStateKey.value, stateKey) &&
+      filterOptionsRequestByStateKey.value[stateKey] === requestKey
+    ) {
+      return withEmptyFilterOption(
+        config,
+        asyncFilterOptionsByStateKey.value[stateKey] ??
+          asyncFilterOptionsByColumnId.value[config.id] ??
+          [],
+      )
+    }
+
+    const resolvedOptions = config.optionsResolver({
+      columnFilters: options.columnFilters.value,
+      draftColumnFilters: options.draftColumnFilters.value,
+      searchValue,
+      target,
+    })
+
+    if (!isPromiseLike<DataGridFilterOption[]>(resolvedOptions)) {
+      return withEmptyFilterOption(config, resolvedOptions)
+    }
+
+    filterOptionsRequestByStateKey.value = {
+      ...filterOptionsRequestByStateKey.value,
+      [stateKey]: requestKey,
+    }
+    filterOptionsLoadingByStateKey.value = {
+      ...filterOptionsLoadingByStateKey.value,
+      [stateKey]: true,
+    }
+
+    void resolvedOptions
+      .then((resolved) => {
+        if (filterOptionsRequestByStateKey.value[stateKey] !== requestKey) {
+          return
+        }
+        filterOptionsLoadingByStateKey.value = {
+          ...filterOptionsLoadingByStateKey.value,
+          [stateKey]: false,
+        }
+        asyncFilterOptionsByStateKey.value = {
+          ...asyncFilterOptionsByStateKey.value,
+          [stateKey]: resolved,
+        }
+        asyncFilterOptionsByColumnId.value = {
+          ...asyncFilterOptionsByColumnId.value,
+          [config.id]: resolved,
+        }
+      })
+      .catch(() => {
+        if (filterOptionsRequestByStateKey.value[stateKey] !== requestKey) {
+          return
+        }
+        filterOptionsLoadingByStateKey.value = {
+          ...filterOptionsLoadingByStateKey.value,
+          [stateKey]: false,
+        }
+        asyncFilterOptionsByStateKey.value = {
+          ...asyncFilterOptionsByStateKey.value,
+          [stateKey]: [],
+        }
+      })
+
+    return withEmptyFilterOption(
+      config,
+      asyncFilterOptionsByStateKey.value[stateKey] ??
+        asyncFilterOptionsByColumnId.value[config.id] ??
+        [],
+    )
+  }
+
+  function isFilterOptionsLoading(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    return Boolean(filterOptionsLoadingByStateKey.value[getFilterOptionsStateKey(config, target)])
   }
 
   function getColumnFilterConfig(column: Column<AnyRow, unknown>): DataGridFilterConfig {
@@ -253,10 +464,10 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function getVisibleFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
-    const filterOptions = getFilterOptions(config)
-    const searchTerm = getSelectFilterSearch(config.id, target).trim().toLocaleLowerCase()
+    const filterOptions = getFilterOptions(config, target)
+    const searchTerm = getResolvedSelectFilterSearch(config.id, target).trim().toLocaleLowerCase()
 
-    if (!searchTerm) {
+    if (!searchTerm || config.optionsResolver) {
       return filterOptions
     }
 
@@ -299,7 +510,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function selectAllFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
-    const filterOptions = getFilterOptions(config).map((option) => option.value)
+    const filterOptions = getFilterOptions(config, target).map((option) => option.value)
     setColumnFilterValue(config.id, filterOptions, target)
   }
 
@@ -317,7 +528,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return value ? value : 'Filtr'
     }
 
-    const filterOptions = getFilterOptions(config)
+    const filterOptions = getFilterOptions(config, target)
     const selectedValues =
       isTextFallbackFilter(config, target)
         ? []
@@ -358,6 +569,8 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   ): VNodeChild {
     const isToolbar = renderOptions?.toolbar ?? false
     const target = renderOptions?.target ?? 'live'
+    const valueTarget: FilterControlTarget = target === 'live' ? 'dialog' : target
+    const pending = isFilterPending(config)
     const isOpen =
       target === 'dialog'
         ? openDialogFilterColumnId.value === config.id
@@ -369,10 +582,10 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       isSelectFilter
         ? config.variant === 'radio'
           ? (() => {
-              const singleValue = getSingleSelectFilterValue(config.id, target)
+              const singleValue = getSingleSelectFilterValue(config.id, valueTarget)
               return singleValue === undefined ? [] : [singleValue]
             })()
-          : getSelectFilterValues(config, target)
+          : getSelectFilterValues(config, valueTarget)
         : []
     const selectedValueKeys = isSelectFilter ? new Set(selectedValues.map((value) => toFilterOptionKey(value))) : undefined
 
@@ -382,15 +595,19 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       isOpen,
       inputValue:
         isSelectFilter
-          ? getFilterTextValue(config, target)
-          : getFilterValue(config.id, target),
-      buttonLabel: getFilterButtonLabel(config, target),
+          ? getFilterTextValue(config, valueTarget)
+          : getFilterValue(config.id, valueTarget),
+      buttonLabel: getFilterButtonLabel(config, valueTarget),
       selectedCount: selectedValues.length,
       selectedValueKeys,
-      allOptions: isSelectFilter && isOpen ? getFilterOptions(config) : [],
+      pending,
+      draftInputDebounceMs: target === 'dialog' ? 250 : 0,
+      allOptions: isSelectFilter && isOpen ? getFilterOptions(config, target) : [],
       visibleOptions: isSelectFilter && isOpen ? getVisibleFilterOptions(config, target) : [],
+      optionsLoading: isSelectFilter && isOpen ? isFilterOptionsLoading(config, target) : false,
       searchValue: getSelectFilterSearch(config.id, target),
       textMode: isTextFallbackFilter(config, target),
+      selectMenuTeleport: target !== 'dialog',
       onToggleMenu: (event: MouseEvent) => {
         event.stopPropagation()
         toggleFilterMenu(config.id, {
@@ -398,7 +615,13 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
           target: target === 'dialog' ? 'dialog' : isToolbar ? 'toolbar' : 'header',
         })
       },
-      onInput: (value: string) => updateColumnFilter(config.id, value, target),
+      onDraftInput: (value: string) => updateColumnFilter(config.id, value, target),
+      onInput: (value: string) => {
+        updateColumnFilter(config.id, value, target)
+        if (target === 'live') {
+          applyDraftColumnFilter(config.id)
+        }
+      },
       onApplySelectFilter: (value: string | DataGridFilterOption['value'][], textMode: boolean) => {
         const nextIds = new Set(textFallbackFilterIds.value)
 
@@ -417,17 +640,50 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
                 .join(config.valueSeparator)
             : value
 
-        setColumnFilterValue(config.id, nextValue, target)
+        setColumnFilterValue(config.id, nextValue, 'dialog')
+        if (target === 'live') {
+          applyDraftColumnFilter(config.id)
+          appliedTextFallbackFilterIds.value = new Set(textFallbackFilterIds.value)
+        }
+        closeFilterMenus()
+      },
+      onCommitSelectFilterDraft: (value: string | DataGridFilterOption['value'][], textMode: boolean) => {
+        const nextIds = new Set(textFallbackFilterIds.value)
+
+        if (textMode) {
+          nextIds.add(config.id)
+        } else {
+          nextIds.delete(config.id)
+        }
+
+        textFallbackFilterIds.value = nextIds
+        const nextValue =
+          !textMode && Array.isArray(value) && config.valueSeparator
+            ? value
+                .map((entry) => toFilterTextToken(entry))
+                .filter((entry) => entry !== '')
+                .join(config.valueSeparator)
+            : value
+
+        setColumnFilterValue(config.id, nextValue, 'dialog')
         closeFilterMenus()
       },
       onCancelSelectFilter: closeFilterMenus,
-      onSearchChange: (value: string) => updateSelectFilterSearch(config.id, value, target),
+      onResetDraftFilter: () => resetDraftColumnFilter(config),
+      onSearchChange: (value: string) =>
+        updateSelectFilterSearch(config.id, value, target, Boolean(config.optionsResolver)),
     })
   }
 
   return {
     closeFilterMenus,
+    acceptFilterDraftModes,
+    clearFilterDraftModes,
     getColumnFilterConfig,
+    hasPendingFilterModeChanges,
+    isFilterPending,
+    resetFilterDraftModes,
+    resetDraftColumnFilter,
     renderFilterControl,
   }
 }

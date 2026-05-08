@@ -36,6 +36,7 @@
         "*.css"
     ],
     "scripts": {
+        "dev": "vite build --watch",
         "build": "vite build && vue-tsc --project tsconfig.build.json && node ./scripts/copy-css.mjs",
         "type-check": "vue-tsc --project tsconfig.build.json --noEmit",
         "prepack": "bun run build"

@@ -54,6 +54,7 @@ export type DataGridMainRenderContext = {
   savedViews: RefLike<DataGridSavedView[]>
   quickFilterConfigs: RefLike<Array<DataGridQuickFilterConfig & { config: DataGridFilterConfig }>>
   activeFilterCount: RefLike<number>
+  hasPendingFilterChanges: () => boolean
   renderFilterControl: (config: DataGridFilterConfig, options?: { toolbar?: boolean; target?: 'live' | 'dialog' }) => VNodeChild
   toggleViewsMenu: () => void
   selectSavedView: (viewId: string) => void | Promise<void>
@@ -128,8 +129,11 @@ export type DataGridMainRenderContext = {
   errorMessage: Ref<string>
   isFilterDialogOpen: Ref<boolean>
   filterDialogSections: RefLike<FilterDialogSection[]>
+  isFilterPending: (config: DataGridFilterConfig) => boolean
+  resetDraftColumnFilter: (config: DataGridFilterConfig) => void
   closeFilterDialog: () => void
   applyFilterDialogChanges: () => void
+  resetFilterDraftChanges: () => void
   isFilterHelpDialogOpen: Ref<boolean>
   isColumnPickerOpen: Ref<boolean>
   columnPickerColumns: RefLike<Array<Column<AnyRow, unknown>>>
@@ -187,7 +191,7 @@ function renderFilterDialog(context: DataGridMainRenderContext) {
     return null
   }
 
-  return <DataGridFilterDialog isOpen={context.isFilterDialogOpen.value} sections={context.filterDialogSections.value} renderFilterControl={(config) => context.renderFilterControl(config, { target: 'dialog' })} onClose={context.closeFilterDialog} onApply={context.applyFilterDialogChanges} />
+  return <DataGridFilterDialog isOpen={context.isFilterDialogOpen.value} sections={context.filterDialogSections.value} renderFilterControl={(config) => context.renderFilterControl(config, { target: 'dialog' })} isFilterPending={context.isFilterPending} onClose={context.closeFilterDialog} onApply={context.applyFilterDialogChanges} onResetDraft={context.resetFilterDraftChanges} onResetFilterDraft={context.resetDraftColumnFilter} />
 }
 
 function renderFilterHelpDialog(context: DataGridMainRenderContext) {
@@ -241,6 +245,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             savedViews={context.savedViews.value}
             quickFilters={context.quickFilterConfigs.value}
             activeFilterCount={context.activeFilterCount.value}
+            hasPendingFilterChanges={context.hasPendingFilterChanges()}
             renderFilterControl={context.renderFilterControl}
             onToggleViewsMenu={context.toggleViewsMenu}
             onSelectSavedView={context.selectSavedView}
@@ -251,6 +256,8 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             onToggleFilterHelpDialog={context.toggleFilterHelpDialog}
             onRefresh={context.refreshData}
             onClearFilters={context.clearAllFilters}
+            onApplyFilters={context.applyFilterDialogChanges}
+            onResetFilterDraft={context.resetFilterDraftChanges}
             onToggleColumnPicker={context.toggleColumnPicker}
             excelExportActions={context.excelExportActions.value}
             isExcelExporting={context.isExcelExporting.value}

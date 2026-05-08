@@ -137,7 +137,6 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
     isColumnPickerOpen.value = false
     isViewsMenuOpen.value = false
     isSaveViewDialogOpen.value = false
-    resetDialogFilterDraftState()
   }
 
   function toggleFilterDialog() {
@@ -151,7 +150,7 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
 
   function closeFilterDialog() {
     isFilterDialogOpen.value = false
-    resetDialogFilterDraftState()
+    options.closeFilterMenus()
   }
 
   function toggleColumnMenu(columnId: string) {

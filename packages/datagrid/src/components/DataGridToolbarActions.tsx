@@ -4,6 +4,8 @@ import IconDownloadRounded from '~icons/material-symbols/download-rounded'
 import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
 import IconHelpOutlineRounded from '~icons/material-symbols/help-outline-rounded'
 import IconRefreshRounded from '~icons/material-symbols/refresh-rounded'
+import IconCheckRounded from '~icons/material-symbols/check-rounded'
+import IconUndoRounded from '~icons/material-symbols/undo-rounded'
 import IconViewColumnOutlineRounded from '~icons/material-symbols/view-column-outline-rounded'
 
 import DataGridDropdownMenu from './DataGridDropdownMenu'
@@ -21,6 +23,10 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    hasPendingFilterChanges: {
+      type: Boolean,
+      default: false,
+    },
     onToggleFilterDialog: {
       type: Function as PropType<() => void>,
       required: true,
@@ -30,6 +36,14 @@ export default defineComponent({
       required: true,
     },
     onClearFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onApplyFilters: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onResetFilterDraft: {
       type: Function as PropType<() => void>,
       required: true,
     },
@@ -173,6 +187,28 @@ export default defineComponent({
             </button>
           ) : null}
         </div>
+        {props.hasPendingFilterChanges ? (
+          <>
+            <button
+              type="button"
+              class="data-grid__toolbar-button data-grid__toolbar-button--pending"
+              onClick={props.onApplyFilters}
+              data-grid-dialog-root="true"
+            >
+              <IconCheckRounded class="data-grid__button-icon" />
+              <span>Zastosuj filtry</span>
+            </button>
+            <button
+              type="button"
+              class="data-grid__toolbar-button"
+              onClick={props.onResetFilterDraft}
+              data-grid-dialog-root="true"
+            >
+              <IconUndoRounded class="data-grid__button-icon" />
+              <span>Cofnij zmiany</span>
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
           class="data-grid__toolbar-button data-grid__toolbar-button--icon-only"

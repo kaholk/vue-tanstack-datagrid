@@ -24,12 +24,24 @@ export default defineComponent({
       type: Function as PropType<(config: DataGridFilterConfig) => VNodeChild>,
       required: true,
     },
+    isFilterPending: {
+      type: Function as PropType<(config: DataGridFilterConfig) => boolean>,
+      required: true,
+    },
     onClose: {
       type: Function as PropType<() => void>,
       required: true,
     },
     onApply: {
       type: Function as PropType<() => void>,
+      required: true,
+    },
+    onResetDraft: {
+      type: Function as PropType<() => void>,
+      required: true,
+    },
+    onResetFilterDraft: {
+      type: Function as PropType<(config: DataGridFilterConfig) => void>,
       required: true,
     },
   },
@@ -47,11 +59,14 @@ export default defineComponent({
           surfaceClass="data-grid__dialog--filters"
           onClose={props.onClose}
           v-slots={{
-            footer: () => (
+            footer: () => [
+              <button type="button" class="data-grid__dialog-action" onClick={props.onResetDraft}>
+                Cofnij zmiany
+              </button>,
               <button type="button" class="data-grid__dialog-action" onClick={props.onApply}>
                 Filtruj
-              </button>
-            ),
+              </button>,
+            ],
           }}
         >
           <div class="data-grid__filter-dialog-list">
@@ -66,9 +81,28 @@ export default defineComponent({
                   </div>
                   <div class="data-grid__filter-dialog-group">
                     {section.items.map((config) => (
-                      <div key={config.id} class="data-grid__filter-dialog-row">
+                      <div
+                        key={config.id}
+                        class={[
+                          'data-grid__filter-dialog-row',
+                          props.isFilterPending(config) ? 'data-grid__filter-dialog-row--pending' : '',
+                        ]}
+                      >
                         <div class="data-grid__filter-dialog-main">
-                          <span class="data-grid__filter-dialog-label">{config.label}</span>
+                          <div class="data-grid__filter-dialog-title-row">
+                            <span class="data-grid__filter-dialog-label">{config.label}</span>
+                            {props.isFilterPending(config) ? (
+                              <button
+                                type="button"
+                                class="data-grid__filter-dialog-reset"
+                                title="Cofnij zmiany"
+                                aria-label="Cofnij zmiany"
+                                onClick={() => props.onResetFilterDraft(config)}
+                              >
+                                Cofnij
+                              </button>
+                            ) : null}
+                          </div>
                           <span class="data-grid__dialog-meta">{config.id}</span>
                         </div>
                         <div class="data-grid__filter-dialog-control">
