@@ -341,6 +341,40 @@
     gap: 0.5rem;
   }
 
+.data-grid__views-list {
+    display: grid;
+    gap: 0.25rem;
+    max-height: min(18rem, 45vh);
+    overflow: auto;
+  }
+
+.data-grid__view-option {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr) 1rem;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    min-height: var(--data-grid-control-height);
+    padding: 0.35rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--app-text);
+    text-align: left;
+  }
+
+.data-grid__view-option span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+.data-grid__view-option:not(:disabled):hover,
+  .data-grid__view-option--active {
+    background: var(--app-accent-soft);
+    border-color: var(--app-accent);
+  }
+
 .data-grid__quick-search,
   .data-grid__views-picker {
     display: grid;

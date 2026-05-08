@@ -9,8 +9,14 @@ export const serializeDataGridSavedViews: DataGridSavedViewsSerialize = (views) 
   JSON.stringify(views)
 
 export const deserializeDataGridSavedViews: DataGridSavedViewsDeserialize = (payload) => {
+  const normalizeViews = (views: DataGridSavedView[]) =>
+    views.map((view) => ({
+      ...view,
+      includesFilters: typeof view.includesFilters === 'boolean' ? view.includesFilters : true,
+    }))
+
   if (Array.isArray(payload)) {
-    return payload as DataGridSavedView[]
+    return normalizeViews(payload as DataGridSavedView[])
   }
 
   if (typeof payload !== 'string' || payload.trim() === '') {
@@ -19,7 +25,7 @@ export const deserializeDataGridSavedViews: DataGridSavedViewsDeserialize = (pay
 
   try {
     const parsed = JSON.parse(payload)
-    return Array.isArray(parsed) ? (parsed as DataGridSavedView[]) : []
+    return Array.isArray(parsed) ? normalizeViews(parsed as DataGridSavedView[]) : []
   } catch {
     return []
   }

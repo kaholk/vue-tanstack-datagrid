@@ -183,7 +183,12 @@ export default defineComponent({
     let measureFrame: number | null = null
     let closeFilterMenus = () => {}
     let syncColumnDialogDraftState = () => {}
-    let createNewView: (name: string) => void | Promise<void> = () => {}
+    let createNewView: (name: string, includeFilters: boolean) => void | Promise<void> = () => {}
+    let overwriteActiveSavedView: (includeFilters: boolean) => void | Promise<void> = () => {}
+
+    function hasActiveFilters() {
+      return columnFilters.value.length > 0 || globalFilter.value.trim() !== ''
+    }
 
     function scheduleColumnMeasure() {
       if (typeof window === 'undefined') {
@@ -214,10 +219,12 @@ export default defineComponent({
       isViewsMenuOpen,
       isSaveViewDialogOpen,
       newViewName,
+      saveViewMode,
+      saveViewIncludesFilters,
       closeOverlayState,
       openSaveViewDialog,
       closeSaveViewDialog,
-      saveNewView,
+      saveView,
       toggleViewsMenu,
       toggleFilterHelpDialog,
       handleDocumentClick,
@@ -231,7 +238,8 @@ export default defineComponent({
       closeFilterMenus: () => closeFilterMenus(),
       syncFilterDialogDraftState,
       syncColumnDialogDraftState: () => syncColumnDialogDraftState(),
-      createNewView: (name) => createNewView(name),
+      createNewView: (name, includeFilters) => createNewView(name, includeFilters),
+      overwriteActiveView: (includeFilters) => overwriteActiveSavedView(includeFilters),
     })
 
     watch(
@@ -433,7 +441,12 @@ export default defineComponent({
         isSaveViewDialogOpen.value = false
         columnVirtualizer.value.measure()
       },
-      onOpenSaveViewDialog: openSaveViewDialog,
+      onOpenSaveViewDialog: () => {
+        openSaveViewDialog({
+          mode: 'create',
+          includeFilters: hasActiveFilters(),
+        })
+      },
       onPersistenceError: (error) => {
         errorMessage.value = error instanceof Error ? error.message : 'Nie udalo sie zapisac widokow gridu.'
       },
@@ -441,6 +454,7 @@ export default defineComponent({
       cloneViewState,
     })
     createNewView = savedViewsState.createNewView
+    overwriteActiveSavedView = savedViewsState.overwriteActiveView
     const { activeViewId, savedViews, loadSavedViews, selectSavedView, overwriteActiveView, deleteActiveView } = savedViewsState
     const isAutoHeight = computed(() => effectiveHeight.value === 'fill' || effectiveHeight.value === -1)
 
@@ -525,7 +539,28 @@ export default defineComponent({
     }
 
     function handleOverwriteActiveView() {
-      void overwriteActiveView()
+      if (!activeViewId.value) {
+        openSaveViewDialog({
+          mode: 'create',
+          includeFilters: hasActiveFilters(),
+        })
+        return
+      }
+
+      const currentView = savedViews.value.find((view) => view.id === activeViewId.value)
+      if (!currentView) {
+        openSaveViewDialog({
+          mode: 'create',
+          includeFilters: hasActiveFilters(),
+        })
+        return
+      }
+
+      openSaveViewDialog({
+        mode: 'overwrite',
+        viewName: currentView.name,
+        includeFilters: hasActiveFilters(),
+      })
     }
 
     function handleDeleteActiveView() {
@@ -781,7 +816,10 @@ export default defineComponent({
       renderFilterControl,
       toggleViewsMenu,
       selectSavedView,
-      openSaveViewDialog,
+      openSaveViewDialog: () => openSaveViewDialog({
+        mode: 'create',
+        includeFilters: hasActiveFilters(),
+      }),
       overwriteActiveView,
       deleteActiveView,
       toggleFilterDialog,
@@ -876,8 +914,10 @@ export default defineComponent({
       moveDraftColumnRelative,
       isSaveViewDialogOpen,
       newViewName,
+      saveViewMode,
+      saveViewIncludesFilters,
       closeSaveViewDialog,
-      saveNewView,
+      saveView,
     })
   },
 })

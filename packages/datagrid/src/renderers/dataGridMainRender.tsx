@@ -148,8 +148,10 @@ export type DataGridMainRenderContext = {
   moveDraftColumnRelative: (columnId: string, targetColumnId: string, position: 'before' | 'after') => void
   isSaveViewDialogOpen: Ref<boolean>
   newViewName: Ref<string>
+  saveViewMode: Ref<'create' | 'overwrite'>
+  saveViewIncludesFilters: Ref<boolean>
   closeSaveViewDialog: () => void
-  saveNewView: () => void
+  saveView: () => void
 }
 
 function renderColumnPickerDialog(context: DataGridMainRenderContext) {
@@ -213,10 +215,15 @@ function renderSaveViewDialog(context: DataGridMainRenderContext) {
     <DataGridSaveViewDialog
       isOpen={context.isSaveViewDialogOpen.value}
       viewName={context.newViewName.value}
+      mode={context.saveViewMode.value}
+      includesFilters={context.saveViewIncludesFilters.value}
       onClose={context.closeSaveViewDialog}
-      onSave={context.saveNewView}
+      onSave={context.saveView}
       onUpdateViewName={(value) => {
         context.newViewName.value = value
+      }}
+      onUpdateIncludesFilters={(value) => {
+        context.saveViewIncludesFilters.value = value
       }}
     />
   )

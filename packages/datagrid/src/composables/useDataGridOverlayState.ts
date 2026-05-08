@@ -4,8 +4,11 @@ type UseDataGridOverlayStateOptions = {
   closeFilterMenus: () => void
   syncFilterDialogDraftState: () => void
   syncColumnDialogDraftState: () => void
-  createNewView: (name: string) => void | Promise<void>
+  createNewView: (name: string, includeFilters: boolean) => void | Promise<void>
+  overwriteActiveView: (includeFilters: boolean) => void | Promise<void>
 }
+
+export type DataGridSaveViewMode = 'create' | 'overwrite'
 
 export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions) {
   const openMenuColumnId = ref<string | null>(null)
@@ -15,6 +18,8 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
   const isViewsMenuOpen = ref(false)
   const isSaveViewDialogOpen = ref(false)
   const newViewName = ref('')
+  const saveViewMode = ref<DataGridSaveViewMode>('create')
+  const saveViewIncludesFilters = ref(false)
 
   function closeOverlayState(closeOptions?: { keepDialogsOpen?: boolean }) {
     openMenuColumnId.value = null
@@ -28,8 +33,14 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
     }
   }
 
-  function openSaveViewDialog() {
-    newViewName.value = ''
+  function openSaveViewDialog(optionsOverride?: {
+    mode?: DataGridSaveViewMode
+    viewName?: string
+    includeFilters?: boolean
+  }) {
+    saveViewMode.value = optionsOverride?.mode ?? 'create'
+    newViewName.value = optionsOverride?.viewName ?? ''
+    saveViewIncludesFilters.value = optionsOverride?.includeFilters ?? false
     isSaveViewDialogOpen.value = true
     isViewsMenuOpen.value = false
     openMenuColumnId.value = null
@@ -42,16 +53,22 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
   function closeSaveViewDialog() {
     isSaveViewDialogOpen.value = false
     newViewName.value = ''
+    saveViewMode.value = 'create'
+    saveViewIncludesFilters.value = false
   }
 
-  function saveNewView() {
+  function saveView() {
     const name = newViewName.value.trim()
 
-    if (!name) {
+    if (saveViewMode.value === 'create' && !name) {
       return
     }
 
-    void options.createNewView(name)
+    if (saveViewMode.value === 'overwrite') {
+      void options.overwriteActiveView(saveViewIncludesFilters.value)
+    } else {
+      void options.createNewView(name, saveViewIncludesFilters.value)
+    }
     closeSaveViewDialog()
   }
 
@@ -172,10 +189,12 @@ export function useDataGridOverlayState(options: UseDataGridOverlayStateOptions)
     isViewsMenuOpen,
     isSaveViewDialogOpen,
     newViewName,
+    saveViewMode,
+    saveViewIncludesFilters,
     closeOverlayState,
     openSaveViewDialog,
     closeSaveViewDialog,
-    saveNewView,
+    saveView,
     toggleViewsMenu,
     toggleFilterHelpDialog,
     handleDocumentClick,

@@ -16,6 +16,7 @@ export type DataGridSavedViewState = {
 export type DataGridSavedView = {
   id: string
   name: string
+  includesFilters: boolean
   state: DataGridSavedViewState
   createdAt: string
   updatedAt: string

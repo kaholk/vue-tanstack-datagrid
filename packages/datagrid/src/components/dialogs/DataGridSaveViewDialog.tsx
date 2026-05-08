@@ -13,6 +13,14 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    mode: {
+      type: String as PropType<'create' | 'overwrite'>,
+      default: 'create',
+    },
+    includesFilters: {
+      type: Boolean,
+      required: true,
+    },
     onClose: {
       type: Function as PropType<() => void>,
       required: true,
@@ -25,6 +33,10 @@ export default defineComponent({
       type: Function as PropType<(value: string) => void>,
       required: true,
     },
+    onUpdateIncludesFilters: {
+      type: Function as PropType<(value: boolean) => void>,
+      required: true,
+    },
   },
   setup(props) {
     return () => {
@@ -34,8 +46,8 @@ export default defineComponent({
 
       return (
         <DataGridDialog
-          title="Zapisz widok"
-          subtitle="Podaj nazwe dla aktualnego ukladu kolumn i filtrow."
+          title={props.mode === 'overwrite' ? 'Zapisz widok' : 'Nowy widok'}
+          subtitle="Wybierz, czy widok ma zapamietac aktualne filtry."
           ariaLabel="Zapisz widok"
           surfaceClass="data-grid__dialog--compact"
           onClose={props.onClose}
@@ -47,6 +59,7 @@ export default defineComponent({
                 value={props.viewName}
                 placeholder="Np. Moj widok"
                 autofocus
+                disabled={props.mode === 'overwrite'}
                 onInput={(event) =>
                   props.onUpdateViewName((event.target as HTMLInputElement).value)
                 }
@@ -57,6 +70,16 @@ export default defineComponent({
                   }
                 }}
               />
+            </label>
+            <label class="data-grid__dialog-checkbox">
+              <input
+                type="checkbox"
+                checked={props.includesFilters}
+                onChange={(event) =>
+                  props.onUpdateIncludesFilters((event.target as HTMLInputElement).checked)
+                }
+              />
+              <span>Zapisz filtry</span>
             </label>
           </div>
 

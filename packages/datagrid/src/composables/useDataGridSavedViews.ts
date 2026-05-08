@@ -42,7 +42,9 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     }
   }
 
-  function getCurrentViewState(): DataGridSavedViewState {
+  function getCurrentViewState(optionsOverride?: { includeFilters?: boolean }): DataGridSavedViewState {
+    const includeFilters = optionsOverride?.includeFilters ?? true
+
     return {
       pagination: {
         pageIndex: 0,
@@ -56,11 +58,13 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
         left: [...(options.columnPinning.value.left ?? [])],
         right: [...(options.columnPinning.value.right ?? [])],
       },
-      columnFilters: options.columnFilters.value.map((filter) => ({
-        id: filter.id,
-        value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
-      })),
-      globalFilter: options.globalFilter.value,
+      columnFilters: includeFilters
+        ? options.columnFilters.value.map((filter) => ({
+            id: filter.id,
+            value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
+          }))
+        : [],
+      globalFilter: includeFilters ? options.globalFilter.value : '',
     }
   }
 
@@ -181,12 +185,13 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     void persistLastSelectedViewId(viewId)
   }
 
-  async function createNewView(name: string) {
+  async function createNewView(name: string, includeFilters = true) {
     const now = new Date().toISOString()
     const nextView: DataGridSavedView = {
       id: options.createViewId(),
       name,
-      state: getCurrentViewState(),
+      includesFilters: includeFilters,
+      state: getCurrentViewState({ includeFilters }),
       createdAt: now,
       updatedAt: now,
     }
@@ -197,7 +202,7 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
     await persistLastSelectedViewId(nextView.id)
   }
 
-  async function overwriteActiveView() {
+  async function overwriteActiveView(includeFilters = true) {
     if (!activeViewId.value) {
       options.onOpenSaveViewDialog()
       return
@@ -214,7 +219,8 @@ export function useDataGridSavedViews(options: UseDataGridSavedViewsOptions) {
       view.id === activeViewId.value
         ? {
             ...view,
-            state: getCurrentViewState(),
+            includesFilters: includeFilters,
+            state: getCurrentViewState({ includeFilters }),
             updatedAt: new Date().toISOString(),
           }
         : view,
