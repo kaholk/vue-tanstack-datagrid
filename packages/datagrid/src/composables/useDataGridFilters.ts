@@ -424,6 +424,20 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     )
   }
 
+  function getCachedFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    if (!config.optionsResolver) {
+      return withEmptyFilterOption(config, config.options ?? [])
+    }
+
+    const stateKey = getFilterOptionsStateKey(config, target)
+    return withEmptyFilterOption(
+      config,
+      asyncFilterOptionsByStateKey.value[stateKey] ??
+        asyncFilterOptionsByColumnId.value[config.id] ??
+        [],
+    )
+  }
+
   function isFilterOptionsLoading(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
     return Boolean(filterOptionsLoadingByStateKey.value[getFilterOptionsStateKey(config, target)])
   }
@@ -528,7 +542,6 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       return value ? value : 'Filtr'
     }
 
-    const filterOptions = getFilterOptions(config, target)
     const selectedValues =
       isTextFallbackFilter(config, target)
         ? []
@@ -542,6 +555,8 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     if (selectedValues.length === 0) {
       return 'Wybierz'
     }
+
+    const filterOptions = getCachedFilterOptions(config, target)
 
     if (selectedValues.length === filterOptions.length) {
       return 'Wszystkie'
