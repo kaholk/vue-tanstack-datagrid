@@ -1,8 +1,9 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, ref, type PropType } from 'vue'
 import IconArrowBackRounded from '~icons/material-symbols/arrow-back-rounded'
 import IconArrowForwardRounded from '~icons/material-symbols/arrow-forward-rounded'
 
 import type { DataGridMetaConfig, DataGridPageSizeConfig } from '../../types'
+import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
 
 type PaginationItem =
   | { type: 'page'; value: number }
@@ -73,6 +74,14 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const isPageSizeOpen = ref(false)
+    const pageSizeTriggerRef = ref<HTMLButtonElement | null>(null)
+
+    function handlePageSizeChange(pageSize: number) {
+      props.onPageSizeChange(pageSize)
+      isPageSizeOpen.value = false
+    }
+
     return () => (
       <div class="data-grid__footer">
         <div class="data-grid__meta data-grid__footer-section data-grid__footer-section--meta">
@@ -143,21 +152,60 @@ export default defineComponent({
           </button>
         </div>
 
-        <label class="data-grid__page-size data-grid__footer-section data-grid__footer-section--page-size">
+        <div class="data-grid__page-size data-grid__footer-section data-grid__footer-section--page-size">
           <span>{props.pageSizeConfig.label ?? 'Rows'}</span>
-          <select
-            value={String(props.pageSize)}
-            onChange={(event) =>
-              props.onPageSizeChange(Number((event.target as HTMLSelectElement).value))
-            }
+          <button
+            ref={pageSizeTriggerRef}
+            type="button"
+            class="data-grid__page-size-trigger"
+            data-grid-page-size-root="true"
+            aria-haspopup="listbox"
+            aria-expanded={isPageSizeOpen.value}
+            onClick={(event) => {
+              event.stopPropagation()
+              isPageSizeOpen.value = !isPageSizeOpen.value
+            }}
           >
-            {(props.pageSizeConfig.options ?? [50, 100, 250, 500]).map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
+            {props.pageSize}
+          </button>
+          {isPageSizeOpen.value ? (
+            <DataGridDropdownMenu
+              triggerRef={pageSizeTriggerRef}
+              teleport
+              menuClass="data-grid__page-size-menu"
+              scopeAttr="data-grid-page-size-root"
+              minWidth={96}
+              desiredHeight={240}
+              minAvailableHeight={120}
+              viewportMargin={8}
+              offset={6}
+              zIndex={220}
+              outsideClickRootAttr="data-grid-page-size-root"
+              onOutsidePointerDown={() => {
+                isPageSizeOpen.value = false
+              }}
+            >
+              <div class="data-grid__page-size-options" role="listbox" data-grid-page-size-root="true">
+                {(props.pageSizeConfig.options ?? [50, 100, 250, 500]).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    data-grid-page-size-root="true"
+                    class={[
+                      'data-grid__page-size-option',
+                      size === props.pageSize ? 'data-grid__page-size-option--active' : '',
+                    ]}
+                    role="option"
+                    aria-selected={size === props.pageSize}
+                    onClick={() => handlePageSizeChange(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </DataGridDropdownMenu>
+          ) : null}
+        </div>
       </div>
     )
   },

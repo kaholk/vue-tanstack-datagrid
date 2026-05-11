@@ -401,7 +401,7 @@
   }
 
 .data-grid__views-picker select,
-  .data-grid__page-size select,
+  .data-grid__page-size-trigger,
   .data-grid__filter-input {
     min-height: var(--data-grid-control-height);
     padding: 0.35rem 0.5rem;
@@ -411,6 +411,43 @@
     color: var(--app-text);
     line-height: 1.2;
     box-sizing: border-box;
+  }
+
+.data-grid__page-size-trigger {
+    min-width: 4.75rem;
+    text-align: left;
+  }
+
+.data-grid__page-size-menu {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.35rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 0.5rem;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-soft);
+  }
+
+.data-grid__page-size-options {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+.data-grid__page-size-option {
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.35rem 0.5rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: var(--app-text);
+    text-align: left;
+  }
+
+.data-grid__page-size-option:hover,
+  .data-grid__page-size-option--active {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
   }
 
 .data-grid__quick-search-filter {

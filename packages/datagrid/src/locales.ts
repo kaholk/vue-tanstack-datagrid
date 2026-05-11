@@ -34,7 +34,7 @@ export const dataGridLocaleTextByLocale: Record<DataGridLocale, Required<DataGri
     fetchedLabel: 'Pobrano',
     datasetLabel: 'Wszystkich',
     pageSizeLabel: 'Wierszy na stronę',
-    selectedRowsLabel: 'Zaznaczone',
+    selectedRowsLabel: 'Zaznaczone Wiersze',
     selectedRowsTotalLabel: 'Zaznaczone razem',
     selectedColumnsLabel: 'Zaznaczone kolumny',
     selectedCellsLabel: 'Zaznaczone komórki',

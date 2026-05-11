@@ -26,6 +26,42 @@ type UseDataGridClipboardOptions = {
   renderColumnPickerLabel: (column: Column<AnyRow, unknown>) => string
 }
 
+async function writeClipboardText(text: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // Fall back for production/non-secure contexts where Clipboard API is blocked.
+    }
+  }
+
+  if (typeof document === 'undefined' || !document.body) {
+    throw new Error('Clipboard is not available.')
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-9999px'
+  textarea.style.left = '-9999px'
+  textarea.style.opacity = '0'
+
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+
+  try {
+    const copied = document.execCommand('copy')
+    if (!copied) {
+      throw new Error('Clipboard copy failed.')
+    }
+  } finally {
+    document.body.removeChild(textarea)
+  }
+}
+
 export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
   const selectionPanelColumns = computed(() => {
     const configuredColumnIds = options.mergedSelectionPanelConfig.value?.copyColumnIds
@@ -150,7 +186,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       lines.push(columns.map((column) => escapeClipboardCell(getClipboardCellValue(row, column))).join('\t'))
     }
 
-    await navigator.clipboard.writeText(lines.join('\n'))
+    await writeClipboardText(lines.join('\n'))
   }
 
   function getSelectedCellColumns(rows: SelectedCellRow[]) {
@@ -181,7 +217,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       lines.push(columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
     }
 
-    await navigator.clipboard.writeText(lines.join('\n'))
+    await writeClipboardText(lines.join('\n'))
   }
 
   async function copyAllSelection(includeHeaders: boolean) {
@@ -217,8 +253,8 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       parts.push(lines.join('\n'))
     }
 
-    if (parts.length > 0 && typeof navigator !== 'undefined') {
-      await navigator.clipboard.writeText(parts.join('\n\n'))
+    if (parts.length > 0) {
+      await writeClipboardText(parts.join('\n\n'))
     }
   }
 

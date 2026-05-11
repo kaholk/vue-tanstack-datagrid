@@ -4,7 +4,8 @@
 [data-grid-filter-root='true'],
 [data-grid-view-root='true'],
 [data-grid-inline-select-root='true'],
-[data-grid-selection-panel-settings-root='true'] {
+[data-grid-selection-panel-settings-root='true'],
+[data-grid-page-size-root='true'] {
   --app-bg: var(--data-grid-bg, #212121);
   --app-surface: var(--data-grid-surface, #2a2a2a);
   --app-surface-muted: var(--data-grid-surface-muted, #303030);
@@ -96,7 +97,8 @@
 [data-grid-view-root='true'] select,
 [data-grid-inline-select-root='true'] button,
 [data-grid-inline-select-root='true'] input,
-[data-grid-inline-select-root='true'] select {
+[data-grid-inline-select-root='true'] select,
+[data-grid-page-size-root='true'] button {
   font: inherit;
   letter-spacing: normal;
 }

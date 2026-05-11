@@ -127,7 +127,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const copiedButton = ref<'copy' | null>(null)
+    const copiedTarget = ref<string | null>(null)
     const includeHeaders = ref(props.copyIncludeHeaders)
     const isSettingsOpen = ref(false)
     const panelRef = ref<HTMLDivElement | null>(null)
@@ -144,37 +144,45 @@ export default defineComponent({
       },
     )
 
-    function showCopiedState() {
-      copiedButton.value = 'copy'
+    function showCopiedState(target: string) {
+      copiedTarget.value = target
 
       if (resetTimer) {
         clearTimeout(resetTimer)
       }
 
       resetTimer = setTimeout(() => {
-        copiedButton.value = null
+        copiedTarget.value = null
       }, 1400)
     }
 
     async function handleCopy() {
-      if (props.onCopy) {
-        await props.onCopy({
-          includeHeaders: includeHeaders.value,
-        })
-      } else if (includeHeaders.value) {
-        await props.onCopyWithHeaders?.()
-      } else {
-        await props.onCopyWithoutHeaders?.()
-      }
+      try {
+        if (props.onCopy) {
+          await props.onCopy({
+            includeHeaders: includeHeaders.value,
+          })
+        } else if (includeHeaders.value) {
+          await props.onCopyWithHeaders?.()
+        } else {
+          await props.onCopyWithoutHeaders?.()
+        }
 
-      showCopiedState()
+        showCopiedState('main')
+      } catch (error) {
+        console.error(error)
+      }
     }
 
     async function handleSectionCopy(section: SelectionPanelSection) {
-      await section.onCopy({
-        includeHeaders: includeHeaders.value,
-      })
-      showCopiedState()
+      try {
+        await section.onCopy({
+          includeHeaders: includeHeaders.value,
+        })
+        showCopiedState(`section:${section.id}`)
+      } catch (error) {
+        console.error(error)
+      }
     }
 
     onBeforeUnmount(() => {
@@ -322,7 +330,7 @@ export default defineComponent({
               class={[
                 'data-grid__selection-panel-button',
                 'data-grid__selection-panel-button--icon',
-                copiedButton.value === 'copy' ? 'data-grid__selection-panel-button--success' : '',
+                copiedTarget.value === 'main' ? 'data-grid__selection-panel-button--success' : '',
               ]}
               title={props.copyLabel}
               aria-label={props.copyLabel}
@@ -434,7 +442,11 @@ export default defineComponent({
                 <div class="data-grid__selection-panel-section-actions">
                   <button
                     type="button"
-                    class="data-grid__selection-panel-button data-grid__selection-panel-button--icon"
+                    class={[
+                      'data-grid__selection-panel-button',
+                      'data-grid__selection-panel-button--icon',
+                      copiedTarget.value === `section:${section.id}` ? 'data-grid__selection-panel-button--success' : '',
+                    ]}
                     title={section.copyLabel}
                     aria-label={section.copyLabel}
                     onClick={() => {
