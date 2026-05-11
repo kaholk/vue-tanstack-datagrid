@@ -87,6 +87,9 @@ export type DataGridLocaleText = {
   copyAllLabel?: string
   copyWithHeadersLabel?: string
   copyWithoutHeadersLabel?: string
+  copyFormatLabel?: string
+  copyFormatHtmlLabel?: string
+  copyFormatTextLabel?: string
   loadingLabel?: string
   fetchErrorMessage?: string
   columnFiltersGroupLabel?: string

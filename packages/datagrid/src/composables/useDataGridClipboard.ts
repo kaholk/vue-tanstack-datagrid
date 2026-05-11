@@ -1,9 +1,24 @@
 import { computed, type Ref, type ShallowRef } from 'vue'
 import type { Cell, Column, Row, RowSelectionState } from '@tanstack/vue-table'
 
-import type { DataGridColumn, DataGridSelectionPanelConfig } from '../types'
+import type { DataGridColumn, DataGridCopyFormat, DataGridSelectionPanelConfig } from '../types'
 import { parseDataGridCellSelectionKey, type AnyRow, type CellSelectionAnchor, type SelectedCellRow } from '../types/internal'
-import { escapeClipboardCell } from '../utils/clipboard'
+import { escapeClipboardCell, escapeClipboardHtml } from '../utils/clipboard'
+
+type CopyOptions = {
+  includeHeaders: boolean
+  format: DataGridCopyFormat
+}
+
+type ClipboardTableColumn = {
+  label: string | null
+  width: number
+}
+
+type ClipboardTable = {
+  columns: ClipboardTableColumn[]
+  rows: string[][]
+}
 
 type UseDataGridClipboardOptions = {
   visibleColumns: Ref<Column<AnyRow, unknown>[]>
@@ -60,6 +75,30 @@ async function writeClipboardText(text: string) {
   } finally {
     document.body.removeChild(textarea)
   }
+}
+
+async function writeClipboardTable(text: string, html: string | null) {
+  if (
+    html &&
+    typeof navigator !== 'undefined' &&
+    navigator.clipboard?.write &&
+    typeof ClipboardItem !== 'undefined' &&
+    typeof Blob !== 'undefined'
+  ) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        }),
+      ])
+      return
+    } catch {
+      // Fall back to plain text when rich clipboard writes are blocked.
+    }
+  }
+
+  await writeClipboardText(text)
 }
 
 export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
@@ -132,6 +171,80 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     return JSON.stringify(rawValue)
   }
 
+  function getClipboardColumnWidth(column: Column<AnyRow, unknown>) {
+    const size = column.getSize()
+    return Number.isFinite(size) && size > 0 ? Math.round(size) : 160
+  }
+
+  function buildClipboardColumns(columns: Column<AnyRow, unknown>[], includeHeaders: boolean): ClipboardTableColumn[] {
+    return columns.map((column) => ({
+      label: includeHeaders ? getColumnClipboardLabel(column) : null,
+      width: getClipboardColumnWidth(column),
+    }))
+  }
+
+  function buildRowsTable(rows: Row<AnyRow>[], columns: Column<AnyRow, unknown>[], includeHeaders: boolean): ClipboardTable {
+    return {
+      columns: buildClipboardColumns(columns, includeHeaders),
+      rows: rows.map((row) => columns.map((column) => getClipboardCellValue(row, column))),
+    }
+  }
+
+  function buildCellsTable(rows: SelectedCellRow[], columns: Column<AnyRow, unknown>[], includeHeaders: boolean): ClipboardTable {
+    return {
+      columns: buildClipboardColumns(columns, includeHeaders),
+      rows: rows.map((rowEntry) =>
+        columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? getClipboardCellValue(rowEntry.row, column) : '')),
+      ),
+    }
+  }
+
+  function tableToText(table: ClipboardTable) {
+    const lines: string[] = []
+
+    const headers = table.columns.map((column) => column.label).filter((label): label is string => label !== null)
+    if (headers.length > 0) {
+      lines.push(headers.map((header) => escapeClipboardCell(header)).join('\t'))
+    }
+
+    for (const row of table.rows) {
+      lines.push(row.map((value) => escapeClipboardCell(value)).join('\t'))
+    }
+
+    return lines.join('\n')
+  }
+
+  function tableToHtml(table: ClipboardTable) {
+    const cellStyle = 'white-space:nowrap;overflow-wrap:normal;word-break:normal'
+    const colgroupHtml = `<colgroup>${table.columns
+      .map((column) => `<col style="width:${column.width}px;min-width:${column.width}px">`)
+      .join('')}</colgroup>`
+    const headerHtml =
+      table.columns.some((column) => column.label !== null)
+        ? `<thead><tr>${table.columns.map((column) => `<th style="${cellStyle};width:${column.width}px;min-width:${column.width}px">${escapeClipboardHtml(column.label ?? '')}</th>`).join('')}</tr></thead>`
+        : ''
+    const bodyHtml = `<tbody>${table.rows
+      .map((row) => `<tr>${row.map((value, index) => {
+        const width = table.columns[index]?.width ?? 160
+        return `<td style="${cellStyle};width:${width}px;min-width:${width}px">${escapeClipboardHtml(value)}</td>`
+      }).join('')}</tr>`)
+      .join('')}</tbody>`
+
+    return `<table style="border-collapse:collapse;table-layout:fixed;white-space:nowrap">${colgroupHtml}${headerHtml}${bodyHtml}</table>`
+  }
+
+  async function copyTables(tables: ClipboardTable[], format: DataGridCopyFormat) {
+    const nonEmptyTables = tables.filter((table) => table.columns.length > 0 || table.rows.length > 0)
+    if (nonEmptyTables.length === 0) {
+      return
+    }
+
+    const text = nonEmptyTables.map((table) => tableToText(table)).join('\n\n')
+    const html = format === 'html' ? nonEmptyTables.map((table) => tableToHtml(table)).join('') : null
+
+    await writeClipboardTable(text, html)
+  }
+
   function clearSelectedCells() {
     options.selectedCellKeys.value = new Set()
     options.previewCellRangeKeys.value = new Set()
@@ -168,7 +281,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     options.currentPointerCell.value = null
   }
 
-  async function copySelectedRows(includeHeaders: boolean) {
+  async function copySelectedRows(copyOptions: CopyOptions) {
     const columns = selectionPanelColumns.value
     const rows = options.selectedRows.value
 
@@ -176,17 +289,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       return
     }
 
-    const lines: string[] = []
-
-    if (includeHeaders) {
-      lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-    }
-
-    for (const row of rows) {
-      lines.push(columns.map((column) => escapeClipboardCell(getClipboardCellValue(row, column))).join('\t'))
-    }
-
-    await writeClipboardText(lines.join('\n'))
+    await copyTables([buildRowsTable(rows, columns, copyOptions.includeHeaders)], copyOptions.format)
   }
 
   function getSelectedCellColumns(rows: SelectedCellRow[]) {
@@ -199,7 +302,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
     return options.cellSelectionColumns.value.filter((column) => selectedColumnIds.has(column.id))
   }
 
-  async function copySelectedCells(includeHeaders: boolean) {
+  async function copySelectedCells(copyOptions: CopyOptions) {
     const rows = options.selectedCellRows.value
     const columns = getSelectedCellColumns(rows)
 
@@ -207,55 +310,27 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
       return
     }
 
-    const lines: string[] = []
-
-    if (includeHeaders) {
-      lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
-    }
-
-    for (const rowEntry of rows) {
-      lines.push(columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
-    }
-
-    await writeClipboardText(lines.join('\n'))
+    await copyTables([buildCellsTable(rows, columns, copyOptions.includeHeaders)], copyOptions.format)
   }
 
-  async function copyAllSelection(includeHeaders: boolean) {
-    const parts: string[] = []
+  async function copyAllSelection(copyOptions: CopyOptions) {
+    const tables: ClipboardTable[] = []
 
     if (options.selectedRows.value.length > 0) {
       const columns = selectionPanelColumns.value
-      const lines: string[] = []
-
-      if (includeHeaders) {
-        lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
+      if (columns.length > 0) {
+        tables.push(buildRowsTable(options.selectedRows.value, columns, copyOptions.includeHeaders))
       }
-
-      for (const row of options.selectedRows.value) {
-        lines.push(columns.map((column) => escapeClipboardCell(getClipboardCellValue(row, column))).join('\t'))
-      }
-
-      parts.push(lines.join('\n'))
     }
 
     if (options.selectedCellCount.value > 0) {
       const columns = getSelectedCellColumns(options.selectedCellRows.value)
-      const lines: string[] = []
-
-      if (includeHeaders) {
-        lines.push(columns.map((column) => escapeClipboardCell(getColumnClipboardLabel(column))).join('\t'))
+      if (columns.length > 0) {
+        tables.push(buildCellsTable(options.selectedCellRows.value, columns, copyOptions.includeHeaders))
       }
-
-      for (const rowEntry of options.selectedCellRows.value) {
-        lines.push(columns.map((column) => (rowEntry.selectedColumnIds.has(column.id) ? escapeClipboardCell(getClipboardCellValue(rowEntry.row, column)) : '')).join('\t'))
-      }
-
-      parts.push(lines.join('\n'))
     }
 
-    if (parts.length > 0) {
-      await writeClipboardText(parts.join('\n\n'))
-    }
+    await copyTables(tables, copyOptions.format)
   }
 
   const selectionPanelSums = computed(() => {

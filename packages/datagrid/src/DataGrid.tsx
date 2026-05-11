@@ -20,7 +20,7 @@ import { dataGridProps } from './DataGrid.props'
 import { getDataGridColumnMenuStyle, renderDataGridCell, renderDataGridColumnPickerLabel } from './renderers/dataGridRenderHelpers'
 import { renderDataGridMain } from './renderers/dataGridMainRender'
 import type { AnyRow } from './types/internal'
-import type { DataGridColumn, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridColumnVisibilityState, DataGridInitialState, DataGridRowIdResolver, DataGridRowSelectionConfig } from './types'
+import type { DataGridColumn, DataGridCopyFormat, DataGridExcelExportConfig, DataGridExcelExportMode, DataGridColumnVisibilityState, DataGridInitialState, DataGridRowIdResolver, DataGridRowSelectionConfig } from './types'
 import { appendMissingColumnId, appendMissingPinnedColumnId, getFixedColumnSize, normalizeColumnSize } from './utils/columns'
 import { cloneColumnFilters, cloneColumnPinningState, cloneViewState } from './utils/clone'
 import { toNumber } from './utils/number'
@@ -586,8 +586,8 @@ export default defineComponent({
       }
     }
 
-    function handleCopyAllSelection(options: { includeHeaders: boolean }) {
-      void copyAllSelection(options.includeHeaders)
+    function handleCopyAllSelection(options: { includeHeaders: boolean; format: DataGridCopyFormat }) {
+      void copyAllSelection(options)
     }
 
     function resetPageForFilterChange() {

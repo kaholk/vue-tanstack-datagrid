@@ -11,6 +11,7 @@ import type { RenderedSequenceItem } from '../composables/useDataGridVirtualizat
 import type {
   DataGridColumn,
   DataGridColumnVisibilityState,
+  DataGridCopyFormat,
   DataGridExcelExportMode,
   DataGridFilterConfig,
   DataGridFloatingPosition,
@@ -71,7 +72,7 @@ export type DataGridMainRenderContext = {
   handleNextPage: () => void
   handleSetPageIndex: (nextPageIndex: number) => void
   handlePageSizeChange: (pageSize: number) => void
-  handleCopyAllSelection: (options: { includeHeaders: boolean }) => void
+  handleCopyAllSelection: (options: { includeHeaders: boolean; format: DataGridCopyFormat }) => void
   slots: Slots
   effectiveHeight: RefLike<number | string>
   scrollElementRef: Ref<HTMLDivElement | null>
@@ -113,7 +114,7 @@ export type DataGridMainRenderContext = {
   selectionPanelSelectedCount: RefLike<number>
   selectionPanelActions: RefLike<SelectionPanelAction[]>
   selectionPanelSums: RefLike<Array<{ columnId: string; label: string; value: string }>>
-  copyAllSelection: (includeHeaders: boolean) => void | Promise<void>
+  copyAllSelection: (options: { includeHeaders: boolean; format: DataGridCopyFormat }) => void | Promise<void>
   clearAllSelection: () => void
   updateSelectionPanelPosition: (position: DataGridSelectionPanelPosition) => void
   updateSelectionPanelFloatingPosition: (position: DataGridFloatingPosition) => void
@@ -344,6 +345,10 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             sums={context.selectionPanelSums.value}
             copyLabel={context.localeText.value.copyAllLabel}
             copyIncludeHeaders={context.mergedSelectionPanelConfig.value.copyIncludeHeaders ?? false}
+            copyFormat={context.mergedSelectionPanelConfig.value.copyFormat ?? 'html'}
+            copyFormatLabel={context.localeText.value.copyFormatLabel}
+            copyFormatHtmlLabel={context.localeText.value.copyFormatHtmlLabel}
+            copyFormatTextLabel={context.localeText.value.copyFormatTextLabel}
             copyWithHeadersLabel={context.mergedSelectionPanelConfig.value.copyWithHeadersLabel ?? context.localeText.value.copyWithHeadersLabel}
             copyWithoutHeadersLabel={context.mergedSelectionPanelConfig.value.copyWithoutHeadersLabel ?? context.localeText.value.copyWithoutHeadersLabel}
             allowPositionChange={context.mergedSelectionPanelConfig.value.allowPositionChange ?? true}

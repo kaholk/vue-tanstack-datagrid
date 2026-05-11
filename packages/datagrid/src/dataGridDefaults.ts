@@ -23,6 +23,7 @@ export const defaultDataGridSelectionPanelConfig: DataGridSelectionPanelConfig =
   sumColumns: [],
   copyColumnIds: undefined,
   copyIncludeHeaders: true,
+  copyFormat: 'html',
   selectedRowsLabel: 'Zaznaczone wiersze',
   copyWithHeadersLabel: 'Kopiuj z naglowkami',
   copyWithoutHeadersLabel: 'Kopiuj bez naglowkow',

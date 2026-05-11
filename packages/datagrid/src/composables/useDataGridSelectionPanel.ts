@@ -4,6 +4,7 @@ import type { Row, RowSelectionState } from '@tanstack/vue-table'
 import { defaultDataGridSelectionPanelConfig } from '../dataGridDefaults'
 import type {
   DataGridFloatingPosition,
+  DataGridCopyFormat,
   DataGridLocaleText,
   DataGridSelectionPanelActionContext,
   DataGridSelectionPanelConfig,
@@ -28,8 +29,8 @@ type UseDataGridSelectionPanelSectionsOptions = {
   clearSelectedRows: () => void
   clearSelectedColumns: () => void
   clearSelectedCells: () => void
-  copySelectedRows: (includeHeaders: boolean) => void | Promise<void>
-  copySelectedCells: (includeHeaders: boolean) => void | Promise<void>
+  copySelectedRows: (options: { includeHeaders: boolean; format: DataGridCopyFormat }) => void | Promise<void>
+  copySelectedCells: (options: { includeHeaders: boolean; format: DataGridCopyFormat }) => void | Promise<void>
 }
 
 function isSelectionPanelPosition(value: string | null): value is DataGridSelectionPanelPosition {
@@ -75,6 +76,7 @@ export function useDataGridSelectionPanel(options: UseDataGridSelectionPanelOpti
       actions: config.actions ?? defaultDataGridSelectionPanelConfig.actions,
       copyColumnIds: config.copyColumnIds ?? defaultDataGridSelectionPanelConfig.copyColumnIds,
       copyIncludeHeaders: config.copyIncludeHeaders ?? defaultDataGridSelectionPanelConfig.copyIncludeHeaders,
+      copyFormat: config.copyFormat ?? defaultDataGridSelectionPanelConfig.copyFormat,
       selectedRowsLabel: config.selectedRowsLabel ?? options.localeText.value.selectedRowsLabel,
       copyWithHeadersLabel: config.copyWithHeadersLabel ?? options.localeText.value.copyWithHeadersLabel,
       copyWithoutHeadersLabel: config.copyWithoutHeadersLabel ?? options.localeText.value.copyWithoutHeadersLabel,
@@ -186,8 +188,8 @@ export function useDataGridSelectionPanelSections(options: UseDataGridSelectionP
         count: options.selectedRows.value.length,
         copyLabel: options.localeText.value.copyRowsLabel,
         clearLabel: 'Wyczysc wiersze',
-        onCopy: (copyOptions: { includeHeaders: boolean }) =>
-          options.copySelectedRows(copyOptions.includeHeaders),
+        onCopy: (copyOptions: { includeHeaders: boolean; format: DataGridCopyFormat }) =>
+          options.copySelectedRows(copyOptions),
         onClear: options.clearSelectedRows,
       })
     }
@@ -199,8 +201,8 @@ export function useDataGridSelectionPanelSections(options: UseDataGridSelectionP
         count: options.selectedColumnIds.value.length,
         copyLabel: options.localeText.value.copyColumnsLabel,
         clearLabel: 'Wyczysc kolumny',
-        onCopy: (copyOptions: { includeHeaders: boolean }) =>
-          options.copySelectedCells(copyOptions.includeHeaders),
+        onCopy: (copyOptions: { includeHeaders: boolean; format: DataGridCopyFormat }) =>
+          options.copySelectedCells(copyOptions),
         onClear: options.clearSelectedColumns,
       })
     }
@@ -212,8 +214,8 @@ export function useDataGridSelectionPanelSections(options: UseDataGridSelectionP
         count: options.selectedCellCount.value,
         copyLabel: options.localeText.value.copyCellsLabel,
         clearLabel: 'Wyczysc komorki',
-        onCopy: (copyOptions: { includeHeaders: boolean }) =>
-          options.copySelectedCells(copyOptions.includeHeaders),
+        onCopy: (copyOptions: { includeHeaders: boolean; format: DataGridCopyFormat }) =>
+          options.copySelectedCells(copyOptions),
         onClear: options.clearSelectedCells,
       })
     }

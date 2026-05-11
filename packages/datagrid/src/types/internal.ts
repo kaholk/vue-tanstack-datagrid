@@ -1,6 +1,6 @@
 import type { Cell } from '@tanstack/vue-table'
 
-import type { DataGridColumnAlign, DataGridFilterConfig } from '../types'
+import type { DataGridColumnAlign, DataGridCopyFormat, DataGridFilterConfig } from '../types'
 
 export type AnyRow = Record<string, unknown>
 
@@ -52,7 +52,7 @@ export type SelectionPanelSection = {
   count: number
   copyLabel: string
   clearLabel: string
-  onCopy: (options: { includeHeaders: boolean }) => void | Promise<void>
+  onCopy: (options: { includeHeaders: boolean; format: DataGridCopyFormat }) => void | Promise<void>
   onClear: () => void
 }
 

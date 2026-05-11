@@ -119,6 +119,13 @@
     background: var(--app-border);
   }
 
+.data-grid__selection-panel-settings-label {
+    padding: 0.15rem 0.35rem 0;
+    color: var(--app-text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
 .data-grid__selection-panel-settings-option {
     min-height: 1.85rem;
     padding: 0.25rem 0.45rem;

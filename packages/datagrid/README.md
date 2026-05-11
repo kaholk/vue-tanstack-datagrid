@@ -233,6 +233,8 @@ type DataGridFetchResult<TData> = {
 ## Column Values For Copy And Sums
 
 By default, the selection panel copies and sums `row.getValue(column.id)`.
+The default copy format is `html`, which writes a `<table>` to the clipboard with a TSV plain-text fallback.
+Use `selectionPanelConfig.copyFormat: 'text'` to keep plain TSV copying by default.
 
 For computed or formatted columns, define custom value resolvers:
 

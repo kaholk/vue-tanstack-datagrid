@@ -4,6 +4,7 @@ import type { DataGridColumn } from './columns'
 import type { DataGridRowId } from './core'
 
 export type DataGridSelectionPanelPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'floating'
+export type DataGridCopyFormat = 'html' | 'text'
 
 export type DataGridFloatingPosition = {
   x: number
@@ -37,6 +38,7 @@ export type DataGridSelectionPanelConfig<TData extends RowData = RowData> = {
   actions?: DataGridSelectionPanelAction<TData>[]
   copyColumnIds?: string[]
   copyIncludeHeaders?: boolean
+  copyFormat?: DataGridCopyFormat
   selectedRowsLabel?: string
   copyWithHeadersLabel?: string
   copyWithoutHeadersLabel?: string

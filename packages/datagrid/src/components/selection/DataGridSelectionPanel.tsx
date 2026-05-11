@@ -4,7 +4,7 @@ import IconCloseRounded from '~icons/material-symbols/close-rounded'
 import IconSettingsRounded from '~icons/material-symbols/settings-rounded'
 
 import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
-import type { DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../../types'
+import type { DataGridCopyFormat, DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../../types'
 
 type SumItem = {
   columnId: string
@@ -14,6 +14,7 @@ type SumItem = {
 
 type CopyOptions = {
   includeHeaders: boolean
+  format: DataGridCopyFormat
 }
 
 type SelectionPanelSection = {
@@ -93,6 +94,22 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    copyFormat: {
+      type: String as PropType<DataGridCopyFormat>,
+      default: 'html',
+    },
+    copyFormatLabel: {
+      type: String,
+      default: 'Format kopiowania',
+    },
+    copyFormatHtmlLabel: {
+      type: String,
+      default: 'Tabela HTML',
+    },
+    copyFormatTextLabel: {
+      type: String,
+      default: 'Tekst TSV',
+    },
     allowPositionChange: {
       type: Boolean,
       default: true,
@@ -129,6 +146,7 @@ export default defineComponent({
   setup(props) {
     const copiedTarget = ref<string | null>(null)
     const includeHeaders = ref(props.copyIncludeHeaders)
+    const copyFormat = ref<DataGridCopyFormat>(props.copyFormat)
     const isSettingsOpen = ref(false)
     const panelRef = ref<HTMLDivElement | null>(null)
     const settingsTriggerRef = ref<HTMLElement | null>(null)
@@ -141,6 +159,13 @@ export default defineComponent({
       () => props.copyIncludeHeaders,
       (value) => {
         includeHeaders.value = value
+      },
+    )
+
+    watch(
+      () => props.copyFormat,
+      (value) => {
+        copyFormat.value = value
       },
     )
 
@@ -161,6 +186,7 @@ export default defineComponent({
         if (props.onCopy) {
           await props.onCopy({
             includeHeaders: includeHeaders.value,
+            format: copyFormat.value,
           })
         } else if (includeHeaders.value) {
           await props.onCopyWithHeaders?.()
@@ -178,6 +204,7 @@ export default defineComponent({
       try {
         await section.onCopy({
           includeHeaders: includeHeaders.value,
+          format: copyFormat.value,
         })
         showCopiedState(`section:${section.id}`)
       } catch (error) {
@@ -401,6 +428,45 @@ export default defineComponent({
                       }}
                     />
                     <span>Kopiuj naglowki</span>
+                  </label>
+                  <div class="data-grid__selection-panel-settings-divider" />
+                  <div
+                    class="data-grid__selection-panel-settings-label"
+                    data-grid-selection-panel-settings-root="true"
+                  >
+                    {props.copyFormatLabel}
+                  </div>
+                  <label
+                    class="data-grid__selection-panel-settings-choice"
+                    data-grid-selection-panel-settings-root="true"
+                  >
+                    <input
+                      data-grid-selection-panel-settings-root="true"
+                      type="radio"
+                      name="data-grid-copy-format"
+                      value="html"
+                      checked={copyFormat.value === 'html'}
+                      onChange={() => {
+                        copyFormat.value = 'html'
+                      }}
+                    />
+                    <span>{props.copyFormatHtmlLabel}</span>
+                  </label>
+                  <label
+                    class="data-grid__selection-panel-settings-choice"
+                    data-grid-selection-panel-settings-root="true"
+                  >
+                    <input
+                      data-grid-selection-panel-settings-root="true"
+                      type="radio"
+                      name="data-grid-copy-format"
+                      value="text"
+                      checked={copyFormat.value === 'text'}
+                      onChange={() => {
+                        copyFormat.value = 'text'
+                      }}
+                    />
+                    <span>{props.copyFormatTextLabel}</span>
                   </label>
                   {props.allowPositionChange ? (
                     <div class="data-grid__selection-panel-settings-divider" />
