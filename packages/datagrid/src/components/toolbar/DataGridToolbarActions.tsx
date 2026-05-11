@@ -1,4 +1,4 @@
-import { defineComponent, ref, type PropType, type VNodeChild } from 'vue'
+import { computed, defineComponent, ref, type PropType, type VNodeChild } from 'vue'
 import IconDeleteRounded from '~icons/material-symbols/delete-rounded'
 import IconDownloadRounded from '~icons/material-symbols/download-rounded'
 import IconFilterAltOutline from '~icons/material-symbols/filter-alt-outline'
@@ -92,8 +92,8 @@ export default defineComponent({
       props.onExportExcel?.(mode)
     }
 
-    const viewActions = () => props.excelExportActions.filter((action) => action.mode.startsWith('view-'))
-    const allActions = () => props.excelExportActions.filter((action) => action.mode.startsWith('all-columns-'))
+    const viewActions = computed(() => props.excelExportActions.filter((action) => action.mode.startsWith('view-')))
+    const allActions = computed(() => props.excelExportActions.filter((action) => action.mode.startsWith('all-columns-')))
     const renderExcelAction = (action: ExcelExportAction) => {
       const Icon = action.mode.startsWith('all-columns-') ? IconViewColumnOutlineRounded : IconDownloadRounded
 
@@ -137,16 +137,16 @@ export default defineComponent({
                 outsideClickRootAttr="data-grid-excel-root"
                 onOutsidePointerDown={closeExcelMenu}
               >
-                {viewActions().length > 0 ? (
+                {viewActions.value.length > 0 ? (
                   <div class="data-grid__excel-menu-section">
                     <div class="data-grid__excel-menu-section-title">Widok</div>
-                    {viewActions().map(renderExcelAction)}
+                    {viewActions.value.map(renderExcelAction)}
                   </div>
                 ) : null}
-                {allActions().length > 0 ? (
+                {allActions.value.length > 0 ? (
                   <div class="data-grid__excel-menu-section">
                     <div class="data-grid__excel-menu-section-title">Wszystko</div>
-                    {allActions().map(renderExcelAction)}
+                    {allActions.value.map(renderExcelAction)}
                   </div>
                 ) : null}
               </DataGridDropdownMenu>

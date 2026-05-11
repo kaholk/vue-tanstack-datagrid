@@ -67,21 +67,44 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   const cellSelectionColumnIdSet = computed(() => new Set(options.cellSelectionColumns.value.map((column) => column.id)))
   const cellSelectionColumnIndexById = computed(() => new Map(options.cellSelectionColumns.value.map((column, index) => [column.id, index])))
   const selectedCellCount = computed(() => selectedCellKeys.value.size)
-  const selectedCellIndex = computed(() => {
+  const selectedColumnIds = computed(() => {
     const rowIds = options.visibleRowById.value
     const columnIds = cellSelectionColumnIdSet.value
-    const selectedColumnIdsByRowId = new Map<string, Set<string>>()
     const selectedCountByColumnId = new Map<string, number>()
-    const selectedCellRowsByRowId = new Map<string, SelectedCellRow>()
     const selectedColumnIds: string[] = []
 
     if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
-      return {
-        selectedColumnIdsByRowId,
-        selectedCountByColumnId,
-        selectedCellRows: [],
-        selectedColumnIds,
+      return selectedColumnIds
+    }
+
+    for (const key of selectedCellKeys.value) {
+      const parsedKey = parseDataGridCellSelectionKey(key)
+      if (!parsedKey || !rowIds.has(parsedKey.rowId) || !columnIds.has(parsedKey.columnId)) {
+        continue
       }
+
+      selectedCountByColumnId.set(parsedKey.columnId, (selectedCountByColumnId.get(parsedKey.columnId) ?? 0) + 1)
+    }
+
+    const rowCount = options.visibleRows.value.length
+    if (rowCount > 0) {
+      for (const column of options.cellSelectionColumns.value) {
+        if ((selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
+          selectedColumnIds.push(column.id)
+        }
+      }
+    }
+
+    return selectedColumnIds
+  })
+  const selectedCellRows = computed<SelectedCellRow[]>(() => {
+    const rowIds = options.visibleRowById.value
+    const columnIds = cellSelectionColumnIdSet.value
+    const selectedColumnIdsByRowId = new Map<string, Set<string>>()
+    const selectedCellRows: SelectedCellRow[] = []
+
+    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+      return selectedCellRows
     }
 
     for (const key of selectedCellKeys.value) {
@@ -96,43 +119,25 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
         selectedColumnIdsByRowId.set(parsedKey.rowId, rowColumnIds)
       }
 
-      if (rowColumnIds.has(parsedKey.columnId)) {
-        continue
-      }
-
       rowColumnIds.add(parsedKey.columnId)
-      selectedCountByColumnId.set(parsedKey.columnId, (selectedCountByColumnId.get(parsedKey.columnId) ?? 0) + 1)
-    }
-
-    const rowCount = options.visibleRows.value.length
-    if (rowCount > 0) {
-      for (const column of options.cellSelectionColumns.value) {
-        if ((selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
-          selectedColumnIds.push(column.id)
-        }
-      }
     }
 
     for (const row of options.visibleRows.value) {
       const rowColumnIds = selectedColumnIdsByRowId.get(row.id)
       if (rowColumnIds && rowColumnIds.size > 0) {
-        selectedCellRowsByRowId.set(row.id, { row, selectedColumnIds: rowColumnIds })
+        selectedCellRows.push({ row, selectedColumnIds: rowColumnIds })
       }
     }
 
-    return {
-      selectedColumnIdsByRowId,
-      selectedCountByColumnId,
-      selectedCellRows: Array.from(selectedCellRowsByRowId.values()),
-      selectedColumnIds,
-    }
+    return selectedCellRows
   })
-  const selectedColumnIds = computed(() => {
-    return selectedCellIndex.value.selectedColumnIds
-  })
-  const selectedCellRows = computed<SelectedCellRow[]>(() => {
-    return selectedCellIndex.value.selectedCellRows
-  })
+  const hasCellSelectionPreview = computed(() =>
+    Boolean(
+      currentPointerCell.value &&
+        cellSelectionPreviewMode.value &&
+        (previewColumnId.value || previewCellRange.value || previewCellRangeKeys.value.size > 0),
+    ),
+  )
 
   function isCellSelectionColumn(column: Column<AnyRow, unknown>) {
     if (!options.isEnabled.value) {
@@ -622,6 +627,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     selectedCellCount,
     selectedColumnIds,
     selectedCellRows,
+    hasCellSelectionPreview,
     getCellSelectionKey,
     isCellSelected,
     isCellSelectionHovered,

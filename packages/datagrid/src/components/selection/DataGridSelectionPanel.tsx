@@ -153,6 +153,8 @@ export default defineComponent({
     let dragOffsetX = 0
     let dragOffsetY = 0
     let resetTimer: ReturnType<typeof setTimeout> | undefined
+    let dragFrame: number | null = null
+    let pendingFloatingPosition: DataGridFloatingPosition | null = null
 
     watch(
       () => props.copyIncludeHeaders,
@@ -219,6 +221,9 @@ export default defineComponent({
       if (typeof window !== 'undefined') {
         window.removeEventListener('pointermove', handlePointerMove)
         window.removeEventListener('pointerup', handlePointerUp)
+        if (dragFrame !== null) {
+          window.cancelAnimationFrame(dragFrame)
+        }
       }
     })
 
@@ -243,6 +248,31 @@ export default defineComponent({
       }
     }
 
+    function flushPendingFloatingPosition() {
+      dragFrame = null
+      if (!pendingFloatingPosition) {
+        return
+      }
+
+      props.onUpdateFloatingPosition?.(pendingFloatingPosition)
+      pendingFloatingPosition = null
+    }
+
+    function scheduleFloatingPositionUpdate(position: DataGridFloatingPosition) {
+      pendingFloatingPosition = position
+
+      if (typeof window === 'undefined') {
+        flushPendingFloatingPosition()
+        return
+      }
+
+      if (dragFrame !== null) {
+        return
+      }
+
+      dragFrame = window.requestAnimationFrame(flushPendingFloatingPosition)
+    }
+
     function handlePointerMove(event: PointerEvent) {
       if (props.position !== 'floating' || activePointerId !== event.pointerId) {
         return
@@ -255,12 +285,12 @@ export default defineComponent({
       }
 
       const parentRect = parent.getBoundingClientRect()
-      const nextPosition = clampFloatingPosition(
-        event.clientX - parentRect.left - dragOffsetX,
-        event.clientY - parentRect.top - dragOffsetY,
+      scheduleFloatingPositionUpdate(
+        clampFloatingPosition(
+          event.clientX - parentRect.left - dragOffsetX,
+          event.clientY - parentRect.top - dragOffsetY,
+        ),
       )
-
-      props.onUpdateFloatingPosition?.(nextPosition)
     }
 
     function handlePointerUp(event: PointerEvent) {
@@ -269,6 +299,9 @@ export default defineComponent({
       }
 
       activePointerId = null
+      if (dragFrame === null) {
+        flushPendingFloatingPosition()
+      }
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }

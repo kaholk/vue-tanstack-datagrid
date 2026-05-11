@@ -9,6 +9,8 @@ import {
 import DataGridSelectFilterMenu from '../select/DataGridSelectFilterMenu'
 import type { DataGridFilterConfig, DataGridFilterOption } from '../../types'
 
+const emptySelectedValueKeys = new Set<string>()
+
 export default defineComponent({
   name: 'DataGridFilterControl',
   props: {
@@ -208,7 +210,7 @@ export default defineComponent({
                 allOptions={props.allOptions}
                 visibleOptions={props.visibleOptions}
                 optionsLoading={props.optionsLoading}
-                selectedValueKeys={props.selectedValueKeys ?? new Set<string>()}
+                selectedValueKeys={props.selectedValueKeys ?? emptySelectedValueKeys}
                 triggerRef={triggerRef}
                 teleport={props.selectMenuTeleport}
                 textMode={props.textMode}

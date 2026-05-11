@@ -103,6 +103,7 @@ export type DataGridMainRenderContext = {
   isCellSelectionEnabled: RefLike<boolean>
   isCellSelected: (cell: Cell<AnyRow, unknown>) => boolean
   isCellSelectionHovered: (cell: Cell<AnyRow, unknown>) => boolean
+  hasCellSelectionPreview: RefLike<boolean>
   getCellSelectionPreviewMode: (cell: Cell<AnyRow, unknown>) => SelectionPreviewMode
   handleCellSelectionPointerEnter: (cell: Cell<AnyRow, unknown>, event: PointerEvent) => void
   handleCellSelectionPointerLeave: (cell: Cell<AnyRow, unknown>, event: PointerEvent) => void
@@ -321,7 +322,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
                     : null
 
                   return (
-                    <DataGridBodyRow key={row.id} row={row} rowStart={virtualRow.start} rowSize={virtualRow.size} rowSequence={context.rowSequence.value} visibleColumnIndexById={context.visibleColumnIndexById.value} cellStylesByColumnId={context.cellStylesByColumnId.value} getPinnedSide={context.getPinnedSide} renderCell={context.renderCell} isSelectionPreviewed={rowPreviewMode === 'select'} isSelectionRevertPreviewed={rowPreviewMode === 'deselect'} enableCellSelection={context.isCellSelectionEnabled.value} isCellSelected={context.isCellSelectionEnabled.value ? context.isCellSelected : undefined} isCellSelectionHovered={context.isCellSelectionEnabled.value ? context.isCellSelectionHovered : undefined} getCellSelectionPreviewMode={context.isCellSelectionEnabled.value ? context.getCellSelectionPreviewMode : undefined} onCellSelectionPointerEnter={context.isCellSelectionEnabled.value ? context.handleCellSelectionPointerEnter : undefined} onCellSelectionPointerLeave={context.isCellSelectionEnabled.value ? context.handleCellSelectionPointerLeave : undefined} onCellSelectionClick={context.isCellSelectionEnabled.value ? context.handleCellSelectionClick : undefined} />
+                    <DataGridBodyRow key={row.id} row={row} rowStart={virtualRow.start} rowSize={virtualRow.size} rowSequence={context.rowSequence.value} visibleColumnIndexById={context.visibleColumnIndexById.value} cellStylesByColumnId={context.cellStylesByColumnId.value} getPinnedSide={context.getPinnedSide} renderCell={context.renderCell} isSelectionPreviewed={rowPreviewMode === 'select'} isSelectionRevertPreviewed={rowPreviewMode === 'deselect'} enableCellSelection={context.isCellSelectionEnabled.value} enableCellSelectionPreview={context.hasCellSelectionPreview.value} isCellSelected={context.isCellSelectionEnabled.value ? context.isCellSelected : undefined} isCellSelectionHovered={context.isCellSelectionEnabled.value ? context.isCellSelectionHovered : undefined} getCellSelectionPreviewMode={context.isCellSelectionEnabled.value && context.hasCellSelectionPreview.value ? context.getCellSelectionPreviewMode : undefined} onCellSelectionPointerEnter={context.isCellSelectionEnabled.value ? context.handleCellSelectionPointerEnter : undefined} onCellSelectionPointerLeave={context.isCellSelectionEnabled.value ? context.handleCellSelectionPointerLeave : undefined} onCellSelectionClick={context.isCellSelectionEnabled.value ? context.handleCellSelectionClick : undefined} />
                   )
                 })}
               </div>

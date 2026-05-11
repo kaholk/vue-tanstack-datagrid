@@ -54,6 +54,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    enableCellSelectionPreview: {
+      type: Boolean,
+      default: false,
+    },
     isCellSelected: {
       type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
       default: undefined,
@@ -80,10 +84,31 @@ export default defineComponent({
     },
   },
   setup(props) {
+    let cachedVisibleCellsRowId = ''
+    let cachedVisibleCellsRow: Row<AnyRow> | null = null
+    let cachedVisibleColumnIndexById: Map<string, number> | null = null
+    let cachedVisibleCells: Cell<AnyRow, unknown>[] = []
+
+    function getVisibleCells() {
+      if (
+        cachedVisibleCellsRow === props.row &&
+        cachedVisibleCellsRowId === props.row.id &&
+        cachedVisibleColumnIndexById === props.visibleColumnIndexById
+      ) {
+        return cachedVisibleCells
+      }
+
+      cachedVisibleCellsRowId = props.row.id
+      cachedVisibleCellsRow = props.row
+      cachedVisibleColumnIndexById = props.visibleColumnIndexById
+      cachedVisibleCells = props.row.getVisibleCells()
+      return cachedVisibleCells
+    }
+
     return () => {
       const row = props.row
       const isSelected = row.getIsSelected()
-      const visibleCells = row.getVisibleCells()
+      const visibleCells = getVisibleCells()
 
       return (
         <div
@@ -127,6 +152,7 @@ export default defineComponent({
                 cellStyle={props.cellStylesByColumnId.get(entry.column.id)}
                 renderCell={props.renderCell}
                 enableCellSelection={props.enableCellSelection}
+                enableCellSelectionPreview={props.enableCellSelectionPreview}
                 isCellSelected={props.isCellSelected}
                 isCellSelectionHovered={props.isCellSelectionHovered}
                 getCellSelectionPreviewMode={props.getCellSelectionPreviewMode}

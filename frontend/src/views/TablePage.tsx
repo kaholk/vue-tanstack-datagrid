@@ -565,6 +565,9 @@ function buildDefaultSegments(row: Pick<CustomerRow, 'status' | 'plan' | 'countr
 export default defineComponent({
   name: 'TablePage',
   setup() {
+    const isProfilingScenario =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('profile') === 'datagrid'
     const savedEdits = ref<Record<number, CustomerRowPatch>>({})
     const draftEdits = ref<Record<number, CustomerRowPatch>>({})
     const updatingRowId = ref<number | null>(null)
@@ -708,6 +711,11 @@ export default defineComponent({
             kliknij <code>Aktualizuj</code> w tym samym wierszu.
             {lastUpdatedMessage.value ? ` ${lastUpdatedMessage.value}` : ''}
           </p>
+          {isProfilingScenario ? (
+            <p>
+              Profiling scenario: page size 1000, wide columns, row/column virtualization active.
+            </p>
+          ) : null}
           <DataGrid
             columns={columns}
             toolbarFilters={toolbarFilters}
@@ -723,7 +731,7 @@ export default defineComponent({
             initialState={{
               pagination: {
                 pageIndex: 0,
-                pageSize: 100,
+                pageSize: isProfilingScenario ? 1000 : 100,
               },
               sorting: [
                 {

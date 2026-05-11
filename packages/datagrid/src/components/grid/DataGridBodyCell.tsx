@@ -37,6 +37,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    enableCellSelectionPreview: {
+      type: Boolean,
+      default: false,
+    },
     isCellSelected: {
       type: Function as PropType<(cell: Cell<AnyRow, unknown>) => boolean>,
       default: undefined,
@@ -143,7 +147,9 @@ export default defineComponent({
 
       const isCellSelected = props.isCellSelected?.(props.cell) ?? false
       const isCellSelectionHovered = props.isCellSelectionHovered?.(props.cell) ?? false
-      const cellSelectionPreviewMode = props.getCellSelectionPreviewMode?.(props.cell) ?? null
+      const cellSelectionPreviewMode = props.enableCellSelectionPreview
+        ? props.getCellSelectionPreviewMode?.(props.cell) ?? null
+        : null
       const isCellSelectionAddPreviewed =
         !isCellSelected &&
         (cellSelectionPreviewMode === 'select' || cellSelectionPreviewMode === 'toggle')

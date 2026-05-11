@@ -1,4 +1,4 @@
-import { h, onBeforeUnmount, ref, type Ref, type VNodeChild } from 'vue'
+import { h, onBeforeUnmount, ref, watch, type Ref, type VNodeChild } from 'vue'
 import { type Column, type ColumnFiltersState, type PaginationState } from '@tanstack/vue-table'
 
 import DataGridFilterControl from '../components/common/DataGridFilterControl'
@@ -50,6 +50,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   const filterOptionsRequestByStateKey = ref<Record<string, string>>({})
   const filterSearchDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const columnFilterConfigCache = new Map<string, { key: string; filterOptions: DataGridColumn<AnyRow>['filterOptions']; config: DataGridFilterConfig }>()
+  const columnFilterConfigById = new Map<string, DataGridFilterConfig>()
 
   onBeforeUnmount(() => {
     filterSearchDebounceTimers.forEach((timer) => clearTimeout(timer))
@@ -61,6 +62,31 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     openToolbarFilterColumnId.value = null
     openDialogFilterColumnId.value = null
   }
+
+  function loadOpenFilterOptions() {
+    const openFilters: Array<{ columnId: string | null; target: FilterControlTarget }> = [
+      { columnId: openHeaderFilterColumnId.value, target: 'live' },
+      { columnId: openToolbarFilterColumnId.value, target: 'live' },
+      { columnId: openDialogFilterColumnId.value, target: 'dialog' },
+    ]
+
+    for (const { columnId, target } of openFilters) {
+      if (!columnId) {
+        continue
+      }
+
+      const config = columnFilterConfigById.get(columnId)
+      if (config) {
+        loadFilterOptions(config, target)
+      }
+    }
+  }
+
+  watch(
+    [options.columnFilters, options.draftColumnFilters, filterSearchByColumnId],
+    loadOpenFilterOptions,
+    { flush: 'post' },
+  )
 
   function getNextColumnFilters(
     filters: ColumnFiltersState,
@@ -245,11 +271,12 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function updateSelectFilterSearch(
-    columnId: string,
+    config: DataGridFilterConfig,
     value: string,
     target: FilterControlTarget = 'live',
     debounce = false,
   ) {
+    const columnId = config.id
     const stateKey = getFilterSearchStateKey(columnId, target)
     filterSearchInputByColumnId.value = {
       ...filterSearchInputByColumnId.value,
@@ -267,6 +294,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
         ...filterSearchByColumnId.value,
         [stateKey]: value,
       }
+      loadFilterOptions(config, target)
       return
     }
 
@@ -276,6 +304,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
         ...filterSearchByColumnId.value,
         [stateKey]: value,
       }
+      loadFilterOptions(config, target)
     }, ASYNC_FILTER_SEARCH_DEBOUNCE_MS)
     filterSearchDebounceTimers.set(stateKey, timer)
   }
@@ -339,29 +368,28 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     return nextOptions
   }
 
-  function getFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+  function resolveFilterOptionsRequestKey(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    return JSON.stringify({
+      searchValue: getResolvedSelectFilterSearch(config.id, target),
+      columnFilters: options.columnFilters.value,
+      draftColumnFilters: options.draftColumnFilters.value,
+    })
+  }
+
+  function loadFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
     if (!config.optionsResolver) {
-      return withEmptyFilterOption(config, config.options ?? [])
+      return
     }
 
     const stateKey = getFilterOptionsStateKey(config, target)
     const searchValue = getResolvedSelectFilterSearch(config.id, target)
-    const requestKey = JSON.stringify({
-      searchValue,
-      columnFilters: options.columnFilters.value,
-      draftColumnFilters: options.draftColumnFilters.value,
-    })
+    const requestKey = resolveFilterOptionsRequestKey(config, target)
 
     if (
       Object.prototype.hasOwnProperty.call(filterOptionsRequestByStateKey.value, stateKey) &&
       filterOptionsRequestByStateKey.value[stateKey] === requestKey
     ) {
-      return withEmptyFilterOption(
-        config,
-        asyncFilterOptionsByStateKey.value[stateKey] ??
-          asyncFilterOptionsByColumnId.value[config.id] ??
-          [],
-      )
+      return
     }
 
     const resolvedOptions = config.optionsResolver({
@@ -372,7 +400,23 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     })
 
     if (!isPromiseLike<DataGridFilterOption[]>(resolvedOptions)) {
-      return withEmptyFilterOption(config, resolvedOptions)
+      filterOptionsRequestByStateKey.value = {
+        ...filterOptionsRequestByStateKey.value,
+        [stateKey]: requestKey,
+      }
+      filterOptionsLoadingByStateKey.value = {
+        ...filterOptionsLoadingByStateKey.value,
+        [stateKey]: false,
+      }
+      asyncFilterOptionsByStateKey.value = {
+        ...asyncFilterOptionsByStateKey.value,
+        [stateKey]: resolvedOptions,
+      }
+      asyncFilterOptionsByColumnId.value = {
+        ...asyncFilterOptionsByColumnId.value,
+        [config.id]: resolvedOptions,
+      }
+      return
     }
 
     filterOptionsRequestByStateKey.value = {
@@ -416,6 +460,14 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
         }
       })
 
+  }
+
+  function getFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
+    if (!config.optionsResolver) {
+      return withEmptyFilterOption(config, config.options ?? [])
+    }
+
+    const stateKey = getFilterOptionsStateKey(config, target)
     return withEmptyFilterOption(
       config,
       asyncFilterOptionsByStateKey.value[stateKey] ??
@@ -474,6 +526,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       placeholder: columnDef.filterPlaceholder ?? 'Filtr',
     }
     columnFilterConfigCache.set(column.id, { key, filterOptions: columnDef.filterOptions, config })
+    columnFilterConfigById.set(column.id, config)
     return config
   }
 
@@ -524,7 +577,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
   }
 
   function selectAllFilterOptions(config: DataGridFilterConfig, target: FilterControlTarget = 'live') {
-    const filterOptions = getFilterOptions(config, target).map((option) => option.value)
+    const filterOptions = getCachedFilterOptions(config, target).map((option) => option.value)
     setColumnFilterValue(config.id, filterOptions, target)
   }
 
@@ -582,6 +635,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
     config: DataGridFilterConfig,
     renderOptions?: { toolbar?: boolean; target?: FilterControlTarget },
   ): VNodeChild {
+    columnFilterConfigById.set(config.id, config)
     const isToolbar = renderOptions?.toolbar ?? false
     const target = renderOptions?.target ?? 'live'
     const valueTarget: FilterControlTarget = target === 'live' ? 'dialog' : target
@@ -625,10 +679,21 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       selectMenuTeleport: target !== 'dialog',
       onToggleMenu: (event: MouseEvent) => {
         event.stopPropagation()
+        const menuTarget = target === 'dialog' ? 'dialog' : isToolbar ? 'toolbar' : 'header'
+        const isOpening =
+          menuTarget === 'dialog'
+            ? openDialogFilterColumnId.value !== config.id
+            : menuTarget === 'toolbar'
+              ? openToolbarFilterColumnId.value !== config.id
+              : openHeaderFilterColumnId.value !== config.id
+
         toggleFilterMenu(config.id, {
           keepDialogsOpen: isToolbar || target === 'dialog',
-          target: target === 'dialog' ? 'dialog' : isToolbar ? 'toolbar' : 'header',
+          target: menuTarget,
         })
+        if (isOpening) {
+          loadFilterOptions(config, target)
+        }
       },
       onDraftInput: (value: string) => updateColumnFilter(config.id, value, target),
       onInput: (value: string) => {
@@ -686,7 +751,7 @@ export function useDataGridFilters(options: UseDataGridFiltersOptions) {
       onCancelSelectFilter: closeFilterMenus,
       onResetDraftFilter: () => resetDraftColumnFilter(config),
       onSearchChange: (value: string) =>
-        updateSelectFilterSearch(config.id, value, target, Boolean(config.optionsResolver)),
+        updateSelectFilterSearch(config, value, target, Boolean(config.optionsResolver)),
     })
   }
 
