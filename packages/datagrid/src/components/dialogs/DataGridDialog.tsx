@@ -1,4 +1,4 @@
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, Teleport, type PropType } from 'vue'
 
 export default defineComponent({
   name: 'DataGridDialog',
@@ -33,7 +33,7 @@ export default defineComponent({
     },
   },
   setup(props, { slots }) {
-    return () => (
+    const dialog = () => (
       <div
         class="data-grid__dialog-backdrop"
         data-grid-dialog-root="true"
@@ -66,5 +66,7 @@ export default defineComponent({
         </div>
       </div>
     )
+
+    return () => <Teleport to="body">{dialog()}</Teleport>
   },
 })

@@ -148,7 +148,6 @@ export default defineComponent({
         !isCellSelected &&
         (cellSelectionPreviewMode === 'select' || cellSelectionPreviewMode === 'toggle')
       const isCellSelectionRevertPreviewed =
-        isCellSelected &&
         (cellSelectionPreviewMode === 'deselect' || cellSelectionPreviewMode === 'toggle')
 
       return (

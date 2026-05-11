@@ -273,26 +273,8 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     }
   }
 
-  function isCellRangePreviewFullySelected(range: CellSelectionPreviewRange) {
-    const rows = options.visibleRows.value
-    const columns = options.cellSelectionColumns.value
-    const selectedKeys = selectedCellKeys.value
-
-    for (let rowIndex = range.rowStart; rowIndex <= range.rowEnd; rowIndex += 1) {
-      const row = rows[rowIndex]
-      if (!row) {
-        return false
-      }
-
-      for (let columnIndex = range.columnStart; columnIndex <= range.columnEnd; columnIndex += 1) {
-        const column = columns[columnIndex]
-        if (!column || !selectedKeys.has(getCellSelectionKey(row.id, column.id))) {
-          return false
-        }
-      }
-    }
-
-    return true
+  function isCellRangeTargetSelected(target: CellSelectionAnchor, selectedKeys = selectedCellKeys.value) {
+    return selectedKeys.has(getCellSelectionKey(target.rowId, target.columnId))
   }
 
   function isColumnSelectionFullySelected(columnId: string) {
@@ -321,7 +303,7 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     previewCellRangeKeys.value = new Set()
     previewColumnId.value = null
     previewCellRange.value = range
-    cellSelectionPreviewMode.value = isCellRangePreviewFullySelected(range)
+    cellSelectionPreviewMode.value = isCellRangeTargetSelected(target)
       ? 'deselect'
       : 'select'
   }
@@ -336,8 +318,9 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     }
 
     const nextKeys = new Set(selectedCellKeys.value)
-    const rangeKeys = getCellRangeKeys(getCellSelectionAnchor(targetCell))
-    const shouldDeselectRange = areAllKeysSelected(rangeKeys, nextKeys)
+    const target = getCellSelectionAnchor(targetCell)
+    const rangeKeys = getCellRangeKeys(target)
+    const shouldDeselectRange = isCellRangeTargetSelected(target, nextKeys)
 
     for (const key of rangeKeys) {
       if (shouldDeselectRange) {

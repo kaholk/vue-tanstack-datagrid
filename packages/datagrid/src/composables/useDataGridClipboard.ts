@@ -215,22 +215,27 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
   }
 
   function tableToHtml(table: ClipboardTable) {
-    const cellStyle = 'white-space:nowrap;overflow-wrap:normal;word-break:normal'
+    const getWidthStyle = (width: number) => `width:${width}px;min-width:${width}px;mso-width-source:userset`
+    const borderStyle = 'border:1px solid #cbd5e1'
+    const baseCellStyle = `${borderStyle};padding:4px 8px;white-space:nowrap;overflow-wrap:normal;word-break:normal`
+    const getCellStyle = (width: number) => `${baseCellStyle};${getWidthStyle(width)}`
+    const getHeaderStyle = (width: number) =>
+      `${getCellStyle(width)};background:#f1f5f9;color:#0f172a;font-weight:700;text-align:left`
     const colgroupHtml = `<colgroup>${table.columns
-      .map((column) => `<col style="width:${column.width}px;min-width:${column.width}px">`)
+      .map((column) => `<col width="${column.width}" style="${getWidthStyle(column.width)}">`)
       .join('')}</colgroup>`
     const headerHtml =
       table.columns.some((column) => column.label !== null)
-        ? `<thead><tr>${table.columns.map((column) => `<th style="${cellStyle};width:${column.width}px;min-width:${column.width}px">${escapeClipboardHtml(column.label ?? '')}</th>`).join('')}</tr></thead>`
+        ? `<thead><tr>${table.columns.map((column) => `<th width="${column.width}" style="${getHeaderStyle(column.width)}">${escapeClipboardHtml(column.label ?? '')}</th>`).join('')}</tr></thead>`
         : ''
     const bodyHtml = `<tbody>${table.rows
       .map((row) => `<tr>${row.map((value, index) => {
         const width = table.columns[index]?.width ?? 160
-        return `<td style="${cellStyle};width:${width}px;min-width:${width}px">${escapeClipboardHtml(value)}</td>`
+        return `<td width="${width}" style="${getCellStyle(width)}">${escapeClipboardHtml(value)}</td>`
       }).join('')}</tr>`)
       .join('')}</tbody>`
 
-    return `<table style="border-collapse:collapse;table-layout:fixed;white-space:nowrap">${colgroupHtml}${headerHtml}${bodyHtml}</table>`
+    return `<table style="border-collapse:collapse;table-layout:fixed;white-space:nowrap;${borderStyle}">${colgroupHtml}${headerHtml}${bodyHtml}</table>`
   }
 
   async function copyTables(tables: ClipboardTable[], format: DataGridCopyFormat) {

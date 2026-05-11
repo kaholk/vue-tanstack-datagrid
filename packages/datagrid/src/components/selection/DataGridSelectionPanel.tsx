@@ -3,7 +3,7 @@ import IconContentCopyRounded from '~icons/material-symbols/content-copy-rounded
 import IconCloseRounded from '~icons/material-symbols/close-rounded'
 import IconSettingsRounded from '~icons/material-symbols/settings-rounded'
 
-import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
+import DataGridDialog from '../dialogs/DataGridDialog'
 import type { DataGridCopyFormat, DataGridFloatingPosition, DataGridSelectionPanelPosition } from '../../types'
 
 type SumItem = {
@@ -147,9 +147,8 @@ export default defineComponent({
     const copiedTarget = ref<string | null>(null)
     const includeHeaders = ref(props.copyIncludeHeaders)
     const copyFormat = ref<DataGridCopyFormat>(props.copyFormat)
-    const isSettingsOpen = ref(false)
+    const isSettingsDialogOpen = ref(false)
     const panelRef = ref<HTMLDivElement | null>(null)
-    const settingsTriggerRef = ref<HTMLElement | null>(null)
     let activePointerId: number | null = null
     let dragOffsetX = 0
     let dragOffsetY = 0
@@ -319,7 +318,7 @@ export default defineComponent({
             props.position === 'floating' ? 'data-grid__selection-panel-toolbar--draggable' : '',
           ]}
           onPointerdown={(event) => {
-            if ((event.target as HTMLElement)?.closest('button, input, label')) {
+            if ((event.target as HTMLElement)?.closest('button, input, label, [data-grid-dialog-root]')) {
               return
             }
 
@@ -383,7 +382,6 @@ export default defineComponent({
             </button>
             <div class="data-grid__selection-panel-settings">
               <button
-                ref={settingsTriggerRef}
                 type="button"
                 data-grid-selection-panel-settings-root="true"
                 class={[
@@ -393,32 +391,36 @@ export default defineComponent({
                 title="Ustawienia kopiowania"
                 aria-label="Ustawienia kopiowania"
                 onClick={() => {
-                  isSettingsOpen.value = !isSettingsOpen.value
+                  isSettingsDialogOpen.value = true
                 }}
               >
                 <IconSettingsRounded class="data-grid__icon" />
               </button>
-              {isSettingsOpen.value ? (
-                <DataGridDropdownMenu
-                  triggerRef={settingsTriggerRef}
-                  teleport
-                  menuClass="data-grid__selection-panel-settings-menu"
-                  scopeAttr="data-grid-selection-panel-settings-root"
-                  minWidth={160}
-                  desiredHeight={250}
-                  minAvailableHeight={120}
-                  viewportMargin={8}
-                  offset={6}
-                  zIndex={230}
-                  outsideClickRootAttr="data-grid-selection-panel-settings-root"
-                  onOutsidePointerDown={() => {
-                    isSettingsOpen.value = false
+              {isSettingsDialogOpen.value ? (
+                <DataGridDialog
+                  title="Ustawienia kopiowania"
+                  ariaLabel="Ustawienia kopiowania"
+                  surfaceClass="data-grid__dialog--copy-settings"
+                  closeLabel="Zamknij"
+                  onClose={() => {
+                    isSettingsDialogOpen.value = false
+                  }}
+                  v-slots={{
+                    footer: () => (
+                      <button
+                        type="button"
+                        class="data-grid__dialog-action"
+                        onClick={() => {
+                          isSettingsDialogOpen.value = false
+                        }}
+                      >
+                        Zamknij
+                      </button>
+                    ),
                   }}
                 >
-                  <label
-                    class="data-grid__selection-panel-settings-choice"
-                    data-grid-selection-panel-settings-root="true"
-                  >
+                  <div class="data-grid__dialog-form">
+                    <label class="data-grid__dialog-checkbox">
                     <input
                       data-grid-selection-panel-settings-root="true"
                       type="checkbox"
@@ -428,71 +430,62 @@ export default defineComponent({
                       }}
                     />
                     <span>Kopiuj naglowki</span>
-                  </label>
-                  <div class="data-grid__selection-panel-settings-divider" />
-                  <div
-                    class="data-grid__selection-panel-settings-label"
-                    data-grid-selection-panel-settings-root="true"
-                  >
-                    {props.copyFormatLabel}
+                    </label>
+
+                    <div class="data-grid__dialog-field">
+                      <span>{props.copyFormatLabel}</span>
+                      <div class="data-grid__dialog-actions">
+                        <button
+                          type="button"
+                          class={[
+                            'data-grid__dialog-action',
+                            copyFormat.value === 'html' ? 'data-grid__dialog-action--active' : '',
+                          ]}
+                          onClick={() => {
+                            copyFormat.value = 'html'
+                          }}
+                        >
+                          {props.copyFormatHtmlLabel}
+                        </button>
+                        <button
+                          type="button"
+                          class={[
+                            'data-grid__dialog-action',
+                            copyFormat.value === 'text' ? 'data-grid__dialog-action--active' : '',
+                          ]}
+                          onClick={() => {
+                            copyFormat.value = 'text'
+                          }}
+                        >
+                          {props.copyFormatTextLabel}
+                        </button>
+                      </div>
+                    </div>
+
+                    {props.allowPositionChange ? (
+                      <div class="data-grid__dialog-field">
+                        <span>Pozycja panelu</span>
+                        <div class="data-grid__dialog-actions">
+                          {positions.map((position) => (
+                            <button
+                              key={position}
+                              type="button"
+                              class={[
+                                'data-grid__dialog-action',
+                                position === props.position ? 'data-grid__dialog-action--active' : '',
+                              ]}
+                              onClick={() => {
+                                props.onUpdatePosition?.(position)
+                              }}
+                            >
+                              {position}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <label
-                    class="data-grid__selection-panel-settings-choice"
-                    data-grid-selection-panel-settings-root="true"
-                  >
-                    <input
-                      data-grid-selection-panel-settings-root="true"
-                      type="radio"
-                      name="data-grid-copy-format"
-                      value="html"
-                      checked={copyFormat.value === 'html'}
-                      onChange={() => {
-                        copyFormat.value = 'html'
-                      }}
-                    />
-                    <span>{props.copyFormatHtmlLabel}</span>
-                  </label>
-                  <label
-                    class="data-grid__selection-panel-settings-choice"
-                    data-grid-selection-panel-settings-root="true"
-                  >
-                    <input
-                      data-grid-selection-panel-settings-root="true"
-                      type="radio"
-                      name="data-grid-copy-format"
-                      value="text"
-                      checked={copyFormat.value === 'text'}
-                      onChange={() => {
-                        copyFormat.value = 'text'
-                      }}
-                    />
-                    <span>{props.copyFormatTextLabel}</span>
-                  </label>
-                  {props.allowPositionChange ? (
-                    <div class="data-grid__selection-panel-settings-divider" />
-                  ) : null}
-                  {props.allowPositionChange ? (
-                    positions.map((position) => (
-                      <button
-                        key={position}
-                        type="button"
-                        data-grid-selection-panel-settings-root="true"
-                        class={[
-                          'data-grid__selection-panel-settings-option',
-                          position === props.position
-                            ? 'data-grid__selection-panel-settings-option--active'
-                            : '',
-                        ]}
-                        onClick={() => {
-                          props.onUpdatePosition?.(position)
-                          isSettingsOpen.value = false
-                        }}
-                      >
-                        {position}
-                      </button>
-                    ))
-                  ) : null}
-                </DataGridDropdownMenu>
+                </DataGridDialog>
               ) : null}
             </div>
           </div>
