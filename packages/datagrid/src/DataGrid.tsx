@@ -663,12 +663,12 @@ export default defineComponent({
       closeFilterMenus()
     }
 
-    function hasPendingFilterChanges() {
+    const hasPendingFilterChanges = computed(() => {
       return (
         JSON.stringify(columnFilters.value) !== JSON.stringify(draftColumnFilters.value) ||
         hasPendingFilterModeChanges()
       )
-    }
+    })
 
     expose({
       refreshData,

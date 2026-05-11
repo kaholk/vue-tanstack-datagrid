@@ -1,5 +1,5 @@
 import { type Column } from '@tanstack/vue-table'
-import { defineComponent, type PropType } from 'vue'
+import { computed, defineComponent, type PropType } from 'vue'
 
 import DataGridDialog from './DataGridDialog'
 import DataGridValidatedNumberInput from '../common/DataGridValidatedNumberInput'
@@ -73,6 +73,27 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const moveOptionsByColumnId = computed(() => {
+      const options = props.columns.map((column) => ({
+        id: column.id,
+        label: props.renderColumnLabel(column),
+      }))
+      const optionsByColumnId = new Map<string, Array<{ id: string; label: string }>>()
+
+      for (const column of props.columns) {
+        optionsByColumnId.set(
+          column.id,
+          options.filter((option) => option.id !== column.id),
+        )
+      }
+
+      return optionsByColumnId
+    })
+
+    function getMoveOptions(columnId: string) {
+      return moveOptionsByColumnId.value.get(columnId) ?? []
+    }
+
     return () => {
       if (!props.isOpen) {
         return null
@@ -204,11 +225,10 @@ export default defineComponent({
                           )
                         }
                       >
-                        {props.columns
-                          .filter((candidateColumn) => candidateColumn.id !== column.id)
+                        {getMoveOptions(column.id)
                           .map((candidateColumn) => (
                             <option key={candidateColumn.id} value={candidateColumn.id}>
-                              {props.renderColumnLabel(candidateColumn)}
+                              {candidateColumn.label}
                             </option>
                           ))}
                       </select>

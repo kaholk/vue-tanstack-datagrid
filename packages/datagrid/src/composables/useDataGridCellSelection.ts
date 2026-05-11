@@ -67,31 +67,17 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
   const cellSelectionColumnIdSet = computed(() => new Set(options.cellSelectionColumns.value.map((column) => column.id)))
   const cellSelectionColumnIndexById = computed(() => new Map(options.cellSelectionColumns.value.map((column, index) => [column.id, index])))
   const selectedCellCount = computed(() => selectedCellKeys.value.size)
+  const selectedCellColumnCounts = shallowRef<Map<string, number>>(new Map())
   const selectedColumnIds = computed(() => {
-    const rowIds = options.visibleRowById.value
-    const columnIds = cellSelectionColumnIdSet.value
-    const selectedCountByColumnId = new Map<string, number>()
     const selectedColumnIds: string[] = []
-
-    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+    const rowCount = options.visibleRows.value.length
+    if (!options.isEnabled.value || rowCount === 0) {
       return selectedColumnIds
     }
 
-    for (const key of selectedCellKeys.value) {
-      const parsedKey = parseDataGridCellSelectionKey(key)
-      if (!parsedKey || !rowIds.has(parsedKey.rowId) || !columnIds.has(parsedKey.columnId)) {
-        continue
-      }
-
-      selectedCountByColumnId.set(parsedKey.columnId, (selectedCountByColumnId.get(parsedKey.columnId) ?? 0) + 1)
-    }
-
-    const rowCount = options.visibleRows.value.length
-    if (rowCount > 0) {
-      for (const column of options.cellSelectionColumns.value) {
-        if ((selectedCountByColumnId.get(column.id) ?? 0) === rowCount) {
-          selectedColumnIds.push(column.id)
-        }
+    for (const column of options.cellSelectionColumns.value) {
+      if ((selectedCellColumnCounts.value.get(column.id) ?? 0) === rowCount) {
+        selectedColumnIds.push(column.id)
       }
     }
 
@@ -202,6 +188,28 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
 
   function replaceSelectedCellKeys(nextKeys: Set<string>) {
     selectedCellKeys.value = new Set(nextKeys)
+  }
+
+  function rebuildSelectedCellColumnCounts() {
+    if (!options.isEnabled.value || selectedCellKeys.value.size === 0) {
+      selectedCellColumnCounts.value = new Map()
+      return
+    }
+
+    const rowIds = options.visibleRowById.value
+    const columnIds = cellSelectionColumnIdSet.value
+    const nextCounts = new Map<string, number>()
+
+    for (const key of selectedCellKeys.value) {
+      const parsedKey = parseDataGridCellSelectionKey(key)
+      if (!parsedKey || !rowIds.has(parsedKey.rowId) || !columnIds.has(parsedKey.columnId)) {
+        continue
+      }
+
+      nextCounts.set(parsedKey.columnId, (nextCounts.get(parsedKey.columnId) ?? 0) + 1)
+    }
+
+    selectedCellColumnCounts.value = nextCounts
   }
 
   function clearCellSelectionPreview() {
@@ -567,13 +575,21 @@ export function useDataGridCellSelection(options: UseDataGridCellSelectionOption
     (enabled) => {
       if (enabled) {
         attachCellSelectionListeners()
+        rebuildSelectedCellColumnCounts()
         return
       }
 
       detachCellSelectionListeners()
       clearCellSelectionModifierState()
+      rebuildSelectedCellColumnCounts()
     },
     { immediate: true },
+  )
+
+  watch(
+    [selectedCellKeys, options.visibleRowById, cellSelectionColumnIdSet],
+    rebuildSelectedCellColumnCounts,
+    { flush: 'sync' },
   )
 
   watch(

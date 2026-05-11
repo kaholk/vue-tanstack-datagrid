@@ -1,4 +1,4 @@
-import { defineComponent, ref, type PropType } from 'vue'
+import { computed, defineComponent, ref, type PropType } from 'vue'
 
 import DataGridDropdownMenu from '../menus/DataGridDropdownMenu'
 import DataGridSelectMenuContent, {
@@ -114,6 +114,13 @@ export default defineComponent({
     const draftTextMode = ref(props.textMode)
     const draftTextValue = ref(props.textValue)
     const draftSelectedValueKeys = ref(new Set(props.selectedValueKeys))
+    const optionByKey = computed(() => {
+      const options = new Map<string, DataGridFilterOption>()
+      for (const option of props.allOptions) {
+        options.set(toDataGridSelectOptionKey(option.value), option)
+      }
+      return options
+    })
 
     function resetDraft() {
       draftTextMode.value = props.textMode
@@ -122,9 +129,14 @@ export default defineComponent({
     }
 
     function getDraftSelectedValues() {
-      return props.allOptions
-        .filter((option) => draftSelectedValueKeys.value.has(toDataGridSelectOptionKey(option.value)))
-        .map((option) => option.value)
+      const values: DataGridFilterOption['value'][] = []
+      for (const optionKey of draftSelectedValueKeys.value) {
+        const option = optionByKey.value.get(optionKey)
+        if (option) {
+          values.push(option.value)
+        }
+      }
+      return values
     }
 
     function switchTextMode(enabled: boolean) {

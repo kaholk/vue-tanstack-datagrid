@@ -80,36 +80,40 @@ export default defineComponent({
                     </span>
                   </div>
                   <div class="data-grid__filter-dialog-group">
-                    {section.items.map((config) => (
-                      <div
-                        key={config.id}
-                        class={[
-                          'data-grid__filter-dialog-row',
-                          props.isFilterPending(config) ? 'data-grid__filter-dialog-row--pending' : '',
-                        ]}
-                      >
-                        <div class="data-grid__filter-dialog-main">
-                          <div class="data-grid__filter-dialog-title-row">
-                            <span class="data-grid__filter-dialog-label">{config.label}</span>
-                            {props.isFilterPending(config) ? (
-                              <button
-                                type="button"
-                                class="data-grid__filter-dialog-reset"
-                                title="Cofnij zmiany"
-                                aria-label="Cofnij zmiany"
-                                onClick={() => props.onResetFilterDraft(config)}
-                              >
-                                Cofnij
-                              </button>
-                            ) : null}
+                    {section.items.map((config) => {
+                      const pending = props.isFilterPending(config)
+
+                      return (
+                        <div
+                          key={config.id}
+                          class={[
+                            'data-grid__filter-dialog-row',
+                            pending ? 'data-grid__filter-dialog-row--pending' : '',
+                          ]}
+                        >
+                          <div class="data-grid__filter-dialog-main">
+                            <div class="data-grid__filter-dialog-title-row">
+                              <span class="data-grid__filter-dialog-label">{config.label}</span>
+                              {pending ? (
+                                <button
+                                  type="button"
+                                  class="data-grid__filter-dialog-reset"
+                                  title="Cofnij zmiany"
+                                  aria-label="Cofnij zmiany"
+                                  onClick={() => props.onResetFilterDraft(config)}
+                                >
+                                  Cofnij
+                                </button>
+                              ) : null}
+                            </div>
+                            <span class="data-grid__dialog-meta">{config.id}</span>
                           </div>
-                          <span class="data-grid__dialog-meta">{config.id}</span>
+                          <div class="data-grid__filter-dialog-control">
+                            {props.renderFilterControl(config)}
+                          </div>
                         </div>
-                        <div class="data-grid__filter-dialog-control">
-                          {props.renderFilterControl(config)}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               ))

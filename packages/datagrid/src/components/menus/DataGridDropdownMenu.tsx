@@ -103,6 +103,7 @@ export default defineComponent({
     },
   },
   setup(props, { slots }) {
+    let positionFrame: number | null = null
     const positionedStyle = ref<CSSProperties>(
       props.triggerRef
         ? {
@@ -112,13 +113,31 @@ export default defineComponent({
             width: props.minWidth > 0 ? `${props.minWidth}px` : undefined,
             ...(props.zIndex === undefined ? {} : { zIndex: props.zIndex }),
           }
-        : {},
+          : {},
     )
+
+    function areStylesEqual(left: CSSProperties, right: CSSProperties) {
+      const leftKeys = Object.keys(left)
+      const rightKeys = Object.keys(right)
+      if (leftKeys.length !== rightKeys.length) {
+        return false
+      }
+
+      return leftKeys.every((key) => left[key as keyof CSSProperties] === right[key as keyof CSSProperties])
+    }
+
+    function setPositionedStyle(nextStyle: CSSProperties) {
+      if (areStylesEqual(positionedStyle.value, nextStyle)) {
+        return
+      }
+
+      positionedStyle.value = nextStyle
+    }
 
     function updatePosition() {
       const trigger = props.triggerRef?.value
       if (!trigger) {
-        positionedStyle.value = {}
+        setPositionedStyle({})
         return
       }
 
@@ -142,7 +161,7 @@ export default defineComponent({
           ? undefined
           : Math.max(props.maxOptionsHeightMin, availableHeight - props.chromeHeight)
 
-      positionedStyle.value = {
+      setPositionedStyle({
         position: 'fixed',
         top: openAbove ? 'auto' : `${rect.bottom + props.offset}px`,
         bottom: openAbove ? `${viewportHeight - rect.top + props.offset}px` : 'auto',
@@ -159,7 +178,23 @@ export default defineComponent({
         ...(props.optionsMinHeightVar && props.minOptionsHeight > 0
           ? { [props.optionsMinHeightVar]: `${props.minOptionsHeight}px` }
           : {}),
-      } as CSSProperties
+      } as CSSProperties)
+    }
+
+    function schedulePositionUpdate() {
+      if (typeof window === 'undefined') {
+        updatePosition()
+        return
+      }
+
+      if (positionFrame !== null) {
+        return
+      }
+
+      positionFrame = window.requestAnimationFrame(() => {
+        positionFrame = null
+        updatePosition()
+      })
     }
 
     function handleDocumentPointerDown(event: PointerEvent) {
@@ -181,9 +216,9 @@ export default defineComponent({
 
     onMounted(() => {
       if (props.triggerRef) {
-        void nextTick(updatePosition)
-        window.addEventListener('resize', updatePosition)
-        window.addEventListener('scroll', updatePosition, true)
+        void nextTick(schedulePositionUpdate)
+        window.addEventListener('resize', schedulePositionUpdate)
+        window.addEventListener('scroll', schedulePositionUpdate, true)
       }
 
       if (props.outsideClickRootAttr && props.onOutsidePointerDown) {
@@ -193,8 +228,12 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       if (props.triggerRef) {
-        window.removeEventListener('resize', updatePosition)
-        window.removeEventListener('scroll', updatePosition, true)
+        window.removeEventListener('resize', schedulePositionUpdate)
+        window.removeEventListener('scroll', schedulePositionUpdate, true)
+      }
+
+      if (positionFrame !== null && typeof window !== 'undefined') {
+        window.cancelAnimationFrame(positionFrame)
       }
 
       if (props.outsideClickRootAttr && props.onOutsidePointerDown) {
@@ -216,7 +255,7 @@ export default defineComponent({
         props.offset,
         props.zIndex,
       ],
-      () => void nextTick(updatePosition),
+      () => void nextTick(schedulePositionUpdate),
       { flush: 'post' },
     )
 

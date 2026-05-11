@@ -340,7 +340,7 @@ export function useDataGridClipboard(options: UseDataGridClipboardOptions) {
 
   const selectionPanelSums = computed(() => {
     const sumConfigs = options.mergedSelectionPanelConfig.value?.sumColumns ?? []
-    if (!options.mergedSelectionPanelConfig.value || sumConfigs.length === 0 || Object.keys(options.rowSelection.value).length === 0) {
+    if (!options.mergedSelectionPanelConfig.value || sumConfigs.length === 0 || options.selectedRows.value.length === 0) {
       return []
     }
 

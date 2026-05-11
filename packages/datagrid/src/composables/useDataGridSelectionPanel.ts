@@ -88,17 +88,27 @@ export function useDataGridSelectionPanel(options: UseDataGridSelectionPanelOpti
         defaultDataGridSelectionPanelConfig.floatingPosition,
     }
   })
+  const selectedRowIds = computed(() => {
+    if (!mergedSelectionPanelConfig.value) {
+      return []
+    }
+
+    const rowIds: string[] = []
+    for (const [rowId, selected] of Object.entries(options.rowSelection.value)) {
+      if (selected) {
+        rowIds.push(rowId)
+      }
+    }
+    return rowIds
+  })
   const selectedRows = computed<Row<AnyRow>[]>(() => {
-    if (!mergedSelectionPanelConfig.value || Object.keys(options.rowSelection.value).length === 0) {
+    if (selectedRowIds.value.length === 0) {
       return []
     }
 
     const rows: Row<AnyRow>[] = []
     const rowsById = options.visibleRowById.value
-    for (const [rowId, selected] of Object.entries(options.rowSelection.value)) {
-      if (!selected) {
-        continue
-      }
+    for (const rowId of selectedRowIds.value) {
       const row = rowsById.get(rowId)
       if (row) {
         rows.push(row)
@@ -166,6 +176,7 @@ export function useDataGridSelectionPanel(options: UseDataGridSelectionPanelOpti
     selectionPanelFloatingPosition,
     selectionPanelPositionStorageKey,
     mergedSelectionPanelConfig,
+    selectedRowIds,
     selectedRows,
     updateSelectionPanelPosition,
     updateSelectionPanelFloatingPosition,

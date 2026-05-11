@@ -50,7 +50,7 @@ export type DataGridMainRenderContext = {
   savedViews: RefLike<DataGridSavedView[]>
   quickFilterConfigs: RefLike<Array<DataGridQuickFilterConfig & { config: DataGridFilterConfig }>>
   activeFilterCount: RefLike<number>
-  hasPendingFilterChanges: () => boolean
+  hasPendingFilterChanges: RefLike<boolean>
   renderFilterControl: (config: DataGridFilterConfig, options?: { toolbar?: boolean; target?: 'live' | 'dialog' }) => VNodeChild
   toggleViewsMenu: () => void
   selectSavedView: (viewId: string) => void | Promise<void>
@@ -249,7 +249,7 @@ export function renderDataGridMain(context: DataGridMainRenderContext) {
             savedViews={context.savedViews.value}
             quickFilters={context.quickFilterConfigs.value}
             activeFilterCount={context.activeFilterCount.value}
-            hasPendingFilterChanges={context.hasPendingFilterChanges()}
+            hasPendingFilterChanges={context.hasPendingFilterChanges.value}
             renderFilterControl={context.renderFilterControl}
             onToggleViewsMenu={context.toggleViewsMenu}
             onSelectSavedView={context.selectSavedView}

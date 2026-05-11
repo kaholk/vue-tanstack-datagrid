@@ -101,18 +101,23 @@ export default defineComponent({
     const selectedValueKeys = computed(
       () => new Set(normalizedSelectedValues.value.map((value) => toDataGridSelectOptionKey(value))),
     )
-
-    function getSelectedCount() {
-      return props.multiple
+    const optionByKey = computed(() => {
+      const options = new Map<string, DataGridFilterOption>()
+      for (const option of props.options) {
+        options.set(toDataGridSelectOptionKey(option.value), option)
+      }
+      return options
+    })
+    const selectedCount = computed(() =>
+      props.multiple
         ? Array.isArray(draftValue.value)
           ? draftValue.value.length
           : 0
         : draftValue.value === null || draftValue.value === undefined || draftValue.value === ''
           ? 0
-          : 1
-    }
-
-    function getTriggerLabel() {
+          : 1,
+    )
+    const triggerLabel = computed(() => {
       if (props.multiple) {
         const selectedValues = Array.isArray(draftValue.value) ? draftValue.value : []
         if (selectedValues.length === 0) {
@@ -120,11 +125,7 @@ export default defineComponent({
         }
 
         if (selectedValues.length === 1) {
-          const selectedOption = props.options.find(
-            (option) =>
-              toDataGridSelectOptionKey(option.value) ===
-              toDataGridSelectOptionKey(selectedValues[0] ?? null),
-          )
+          const selectedOption = optionByKey.value.get(toDataGridSelectOptionKey(selectedValues[0] ?? null))
           return selectedOption?.label ?? String(selectedValues[0])
         }
 
@@ -134,12 +135,9 @@ export default defineComponent({
       const singleValue = Array.isArray(draftValue.value)
         ? null
         : (draftValue.value ?? null)
-      const selectedOption = props.options.find(
-        (option) =>
-          toDataGridSelectOptionKey(option.value) === toDataGridSelectOptionKey(singleValue),
-      )
+      const selectedOption = optionByKey.value.get(toDataGridSelectOptionKey(singleValue))
       return selectedOption?.label ?? String(singleValue ?? props.emptyLabel)
-    }
+    })
 
     const visibleOptions = computed(() => {
       const searchTerm = searchValue.value.trim().toLocaleLowerCase()
@@ -209,9 +207,9 @@ export default defineComponent({
             cancelAndClose()
           }}
         >
-          <span class="data-grid__filter-select-label">{getTriggerLabel()}</span>
+          <span class="data-grid__filter-select-label">{triggerLabel.value}</span>
           <span class="data-grid__filter-select-count">
-            {getSelectedCount() > 0 ? String(getSelectedCount()) : ''}
+            {selectedCount.value > 0 ? String(selectedCount.value) : ''}
           </span>
         </button>
         <DataGridDropdownMenu

@@ -21,6 +21,16 @@ export function renderDataGridColumnPickerLabel(column: Column<AnyRow, unknown>)
 
 export function renderDataGridCell(cell: Cell<AnyRow, unknown>) {
   const columnDef = cell.column.columnDef as DataGridColumn<AnyRow>
+  const cellRenderer = cell.column.columnDef.cell
+
+  if (typeof cellRenderer !== 'function' && (typeof cellRenderer !== 'object' || cellRenderer === null)) {
+    return renderFlexibleContent(cellRenderer, {
+      align: columnDef.align ?? 'start',
+      getValue: cell.getValue,
+      renderValue: cell.renderValue,
+    })
+  }
+
   const context = cell.getContext()
   const renderProps: CellRenderProps = {
     table: context.table,
@@ -32,7 +42,7 @@ export function renderDataGridCell(cell: Cell<AnyRow, unknown>) {
     align: columnDef.align ?? 'start',
   }
 
-  return renderFlexibleContent(cell.column.columnDef.cell, renderProps as Record<string, unknown>)
+  return renderFlexibleContent(cellRenderer, renderProps as Record<string, unknown>)
 }
 
 export function getDataGridColumnMenuStyle(options: {
