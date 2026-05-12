@@ -2,6 +2,7 @@ import type { PropType } from 'vue'
 
 import type {
   DataGridCellSelectionConfig,
+  DataGridClearFiltersState,
   DataGridColumn,
   DataGridExcelExportConfig,
   DataGridFetchParams,
@@ -54,6 +55,10 @@ export const dataGridProps = {
   },
   initialState: {
     type: Object as PropType<DataGridInitialState | undefined>,
+    default: undefined,
+  },
+  clearFiltersState: {
+    type: Object as PropType<DataGridClearFiltersState | undefined>,
     default: undefined,
   },
   rowHeight: {

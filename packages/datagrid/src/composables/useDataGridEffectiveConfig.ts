@@ -4,6 +4,7 @@ import { defaultDataGridLoadingConfig, defaultDataGridMetaItems, defaultDataGrid
 import { resolveDataGridLocaleText } from '../locales'
 import type {
   DataGridCellSelectionConfig,
+  DataGridClearFiltersState,
   DataGridExcelExportConfig,
   DataGridHeight,
   DataGridInitialState,
@@ -23,6 +24,7 @@ type DataGridEffectiveConfigProps = {
   locale?: DataGridLocale
   preset?: DataGridPreset<any>
   initialState?: DataGridInitialState
+  clearFiltersState?: DataGridClearFiltersState
   metaItems?: DataGridMetaConfig[]
   pageSizeConfig?: DataGridPageSizeConfig
   loadingConfig?: DataGridLoadingConfig
@@ -53,6 +55,17 @@ export function useDataGridEffectiveConfig(props: DataGridEffectiveConfigProps) 
     ...(preset.value.initialState ?? {}),
     ...(props.initialState ?? {}),
   }))
+  const effectiveClearFiltersState = computed<DataGridClearFiltersState | undefined>(() => {
+    const presetState = preset.value.clearFiltersState
+    const propState = props.clearFiltersState
+
+    if (!presetState && !propState) return undefined
+
+    return {
+      ...(presetState ?? {}),
+      ...(propState ?? {}),
+    }
+  })
   const effectiveMetaItems = computed<DataGridMetaConfig[]>(() => {
     const items = props.metaItems ?? preset.value.metaItems ?? defaultDataGridMetaItems
     return items.map((item) => ({ ...item }))
@@ -99,6 +112,7 @@ export function useDataGridEffectiveConfig(props: DataGridEffectiveConfigProps) 
     effectiveLocale,
     localeText,
     effectiveInitialState,
+    effectiveClearFiltersState,
     effectiveMetaItems,
     effectivePageSizeConfig,
     effectiveLoadingConfigInput,

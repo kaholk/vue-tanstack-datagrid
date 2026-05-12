@@ -33,6 +33,7 @@ export default defineComponent({
     const {
       localeText,
       effectiveInitialState,
+      effectiveClearFiltersState,
       effectiveMetaItems,
       effectivePageSizeConfig,
       effectiveSelectionPanelConfig,
@@ -682,12 +683,18 @@ export default defineComponent({
     })
 
     function clearAllFilters() {
+      const clearState = effectiveClearFiltersState.value ?? {}
+
       resetPageForFilterChange()
-      sorting.value = [...(mergedInitialState.value.sorting ?? [])]
-      columnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
-      globalFilter.value = mergedInitialState.value.globalFilter ?? ''
-      draftColumnFilters.value = cloneColumnFilters(mergedInitialState.value.columnFilters ?? [])
-      draftGlobalFilter.value = mergedInitialState.value.globalFilter ?? ''
+      sorting.value = [...(clearState.sorting ?? mergedInitialState.value.sorting ?? [])]
+      columnFilters.value = cloneColumnFilters(
+        clearState.columnFilters ?? mergedInitialState.value.columnFilters ?? [],
+      )
+      globalFilter.value = clearState.globalFilter ?? mergedInitialState.value.globalFilter ?? ''
+      draftColumnFilters.value = cloneColumnFilters(
+        clearState.columnFilters ?? mergedInitialState.value.columnFilters ?? [],
+      )
+      draftGlobalFilter.value = clearState.globalFilter ?? mergedInitialState.value.globalFilter ?? ''
       clearFilterDraftModes()
       closeFilterMenus()
     }

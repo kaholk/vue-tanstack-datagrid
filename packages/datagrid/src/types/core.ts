@@ -159,3 +159,8 @@ export type DataGridInitialState = {
   columnFilters?: ColumnFiltersState
   globalFilter?: string
 }
+
+export type DataGridClearFiltersState = Pick<
+  DataGridInitialState,
+  'sorting' | 'columnFilters' | 'globalFilter'
+>

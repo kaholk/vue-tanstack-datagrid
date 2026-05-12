@@ -8,6 +8,7 @@ export function createDataGridPreset<TData extends RowData>(
   return {
     ...preset,
     initialState: preset.initialState ? { ...preset.initialState } : undefined,
+    clearFiltersState: preset.clearFiltersState ? { ...preset.clearFiltersState } : undefined,
     pageSizeConfig: preset.pageSizeConfig ? { ...preset.pageSizeConfig } : undefined,
     metaItems: preset.metaItems ? preset.metaItems.map((item) => ({ ...item })) : undefined,
     loadingConfig: preset.loadingConfig ? { ...preset.loadingConfig } : undefined,

@@ -1,6 +1,7 @@
 import type { RowData } from '@tanstack/vue-table'
 
 import type {
+  DataGridClearFiltersState,
   DataGridExcelExportConfig,
   DataGridInitialState,
   DataGridLocale,
@@ -20,6 +21,7 @@ export type DataGridPreset<TData extends RowData = RowData> = {
   locale?: DataGridLocale
   localeText?: DataGridLocaleText
   initialState?: DataGridInitialState
+  clearFiltersState?: DataGridClearFiltersState
   pageSizeConfig?: DataGridPageSizeConfig
   metaItems?: DataGridMetaConfig[]
   loadingConfig?: DataGridLoadingConfig
